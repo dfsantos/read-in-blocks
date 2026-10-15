@@ -64,6 +64,10 @@ tests/
 
 ## Git
 
+- **Conventional Commits é obrigatório** (tipos, escopos fechados, rodapé `Refs: US-XXX`): ver [git-workflow.md](git-workflow.md) e [ADR-0012](../adr/0012-conventional-commits.md).
 - Uma branch e um PR por história: `story/US-013-leaf-reading-status`.
-- Commits no formato Conventional Commits, em inglês: `feat(library): add book creation form`.
-- O PR referencia a história (`US-013`) e lista os critérios de aceite atendidos.
+- O PR referencia a história (`US-013`), lista os critérios de aceite atendidos e traz o checklist de segurança.
+
+## Segurança
+
+Zero Trust é obrigatório em todo código: [zero-trust.md](../security/zero-trust.md) e [ADR-0011](../adr/0011-zero-trust-security.md).

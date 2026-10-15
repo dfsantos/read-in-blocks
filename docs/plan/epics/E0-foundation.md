@@ -30,6 +30,9 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 - [ ] GitHub Actions executa lint, typecheck, testes e build em PRs.
 - [ ] `.env.example` e README de desenvolvimento local.
 - [ ] Estrutura de pastas conforme [conventions.md](../../architecture/conventions.md).
+- [ ] **Conventional Commits:** `commitlint` com `scope-enum` de [git-workflow.md](../../architecture/git-workflow.md), hook `commit-msg` local e job no CI validando commits e título do PR.
+- [ ] **Segurança da cadeia de suprimentos:** lockfile com `--frozen-lockfile`, Dependabot, `pnpm audit` e secret scanning no CI; GitHub Actions fixadas por SHA; `permissions` mínimas no workflow.
+- [ ] Template de PR com o checklist de segurança Zero Trust e a lista de critérios de aceite.
 
 **Notas técnicas:** ADR-0001, 0002, 0010. Versões estáveis vigentes na data da implementação.
 
@@ -63,6 +66,7 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 - [ ] Postgres local reproduzível (ex.: Docker Compose) para desenvolvimento e testes de integração; CI com Postgres de serviço.
 - [ ] Página de saúde simples confirma conexão com o banco no ambiente publicado (sem expor dados).
 - [ ] Variáveis de ambiente documentadas; nenhum segredo no repositório.
+- [ ] **Zero Trust:** papéis de banco separados (`app` sem DDL; `migrator` só no deploy), credenciais distintas por ambiente; Preview Deployments com *Deployment Protection* da Vercel; Preview sem segredos de produção.
 
 **Notas técnicas:** ADR-0001, 0003, 0004, 0010.
 **Fora desta história:** modelos de domínio.

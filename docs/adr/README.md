@@ -18,6 +18,8 @@ Todos os ADRs abaixo estão **Propostos** e passam a **Aceitos** quando você ap
 | [0008](0008-data-isolation-per-user.md) | Isolamento de dados por usuário na camada de repositórios | Proposto |
 | [0009](0009-book-tree-model-and-weighted-progress.md) | Modelo em árvore e progresso ponderado | Proposto |
 | [0010](0010-quality-testing-and-ci.md) | Qualidade, testes e CI | Proposto |
+| [0011](0011-zero-trust-security.md) | Estratégia de segurança Zero Trust | Proposto |
+| [0012](0012-conventional-commits.md) | Conventional Commits | Proposto |
 
 ## Template
 

@@ -13,6 +13,7 @@ Itens que **dependem de você** ou que o PRD deixou sem resposta. Cada um indica
 | D-07 | **Estado de um nó pai (RF-003):** o PRD define só “todos concluídos ⇒ concluído”. Assumido que pais são derivados dos filhos, sem marcação manual. | US-014 | Pai derivado dos filhos; marcar um pai como concluído conclui todos os descendentes (com confirmação) | Aberta |
 | D-08 | **Campos extras de livro** (autor, capa, total de páginas): o PRD só exige “cadastrar um livro”. | US-007 | Título obrigatório; autor opcional; sem capa no MVP | Aberta |
 | D-09 | **Exclusão de dados e conta:** não consta no PRD, mas há conteúdo protegido por direitos autorais. | US-009 | Excluir livro apaga em cascata estrutura e anotações (com confirmação). Exclusão de conta fica fora do MVP | Aberta |
+| D-10 | **Quem pode entrar (Zero Trust, acesso negado por padrão):** hoje há um único usuário (PRD §8). | US-004 | **Allowlist de e-mails Google** em variável de ambiente; abrir cadastro a qualquer conta Google exige nova decisão e revisão de segurança | Aberta |
 
 ## Como fechar
 

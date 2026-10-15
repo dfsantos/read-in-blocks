@@ -23,7 +23,7 @@ Nada além da história corrente é implementado. Se algo fora do escopo for des
 
 - Critérios de aceite escritos e sem pendência de decisão que a bloqueie (ver `Bloqueios` da história).
 - Dependências anteriores *Aprovadas*.
-- Impacto em i18n, dados e privacidade identificado.
+- Impacto em i18n, dados, privacidade e segurança (superfície de ataque nova) identificado.
 
 ### Definition of Done (pode ser aprovada)
 
@@ -32,6 +32,8 @@ Nada além da história corrente é implementado. Se algo fora do escopo for des
 - Lint, typecheck e build passando no CI.
 - Todo texto de interface em `messages/pt-BR.json`; código, commits e comentários em inglês.
 - Se houver dados do usuário: casos de isolamento entre usuários adicionados à suíte (ADR-0008).
+- **Checklist de segurança Zero Trust** da [política](../security/zero-trust.md) preenchido no PR.
+- **Todos os commits em Conventional Commits** ([git-workflow.md](../architecture/git-workflow.md)); `commitlint` passando.
 - Se houver mudança de schema: migração versionada incluída.
 - Documentação afetada atualizada (este plano, ADRs, `.env.example`).
 - Quadro [progress.md](progress.md) atualizado.

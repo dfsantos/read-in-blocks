@@ -18,7 +18,8 @@ O projeto será entregue em histórias pequenas, cada uma aprovada por você ant
 - **Qualidade estática:** ESLint (config do Next + regras de i18n) e Prettier; `tsc --noEmit`; hooks de pré-commit leves (lint-staged) opcionais.
 - **CI (GitHub Actions)** em todo PR: install, lint, typecheck, testes unitários/integração, build. E2E roda no CI contra um Postgres de serviço.
 - **CD:** integração Git da Vercel (Preview por PR, produção em `main`). Migrações de banco aplicadas por passo explícito no deploy (definido na US-003).
-- **Convenções de Git:** branch por história (`story/US-XXX-short-name`), PR por história, commits em inglês no formato Conventional Commits.
+- **Convenções de Git:** branch por história (`story/US-XXX-short-name`), PR por história, **Conventional Commits** com `commitlint` (hook `commit-msg` local + job no CI para commits e título do PR) — ver [ADR-0012](0012-conventional-commits.md).
+- **Segurança no CI:** `pnpm audit`, secret scanning, Dependabot, GitHub Actions fixadas por SHA e `GITHUB_TOKEN` com permissões mínimas — ver [ADR-0011](0011-zero-trust-security.md).
 
 ## Alternativas consideradas
 

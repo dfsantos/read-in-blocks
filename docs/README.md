@@ -8,10 +8,13 @@ docs/
 │   └── prd-read-in-blocks.md      # PRD (fonte de verdade do produto)
 ├── architecture/
 │   ├── tech-stack.md              # Stack e arquitetura
-│   └── conventions.md             # Convenções de código, i18n e dados
+│   ├── conventions.md             # Convenções de código, i18n e dados
+│   └── git-workflow.md            # Conventional Commits, branches e PRs
+├── security/
+│   └── zero-trust.md              # Política Zero Trust e checklist por história
 ├── adr/                           # Architecture Decision Records
 │   ├── README.md
-│   └── 0001 … 0010
+│   └── 0001 … 0012
 └── plan/
     ├── README.md                  # Processo, Definition of Ready/Done, fluxo de aprovação
     ├── progress.md                # Quadro de acompanhamento (atualizado a cada história)
@@ -28,6 +31,8 @@ docs/
         ├── E6-desirable-features.md
         └── E7-release.md
 ```
+
+> Na raiz do repositório, [`CLAUDE.md`](../CLAUDE.md) contém as regras permanentes lidas pelo agente (Conventional Commits, Zero Trust, idioma, processo).
 
 ## Por onde começar a validação
 

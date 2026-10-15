@@ -10,9 +10,10 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Pendente | |
 | M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Pendente | |
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | D-04 | Pendente | |
-| M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | D-04 | Pendente | |
+| M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | D-04, D-10 | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
+| M2 | [US-028](epics/E1-authentication-and-privacy.md) | Cabeçalhos de segurança e proteção de requisições | RF-010 | M | US-005 | — | Pendente | |
 | M3 | [US-007](epics/E2-library-and-book-structure.md) | Cadastrar um livro | RF-001 | M | US-006 | D-02, D-08 | Pendente | |
 | M3 | [US-008](epics/E2-library-and-book-structure.md) | Biblioteca pessoal | RF-009 | P | US-007 | — | Pendente | |
 | M3 | [US-009](epics/E2-library-and-book-structure.md) | Editar e excluir livro | RF-001 | M | US-007 | D-09 | Pendente | |
@@ -37,8 +38,8 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 
 ## Resumo
 
-- 28 histórias (1 de aprovação, 26 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** você validar este plano ([US-000](epics/E0-foundation.md)) e responder as [decisões em aberto](open-decisions.md).
+- 29 histórias (1 de aprovação, 27 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
+- **Próxima ação:** você validar este plano ([US-000](epics/E0-foundation.md)) e responder as [decisões em aberto](open-decisions.md). Regras permanentes do agente (Conventional Commits, Zero Trust) estão em [`CLAUDE.md`](../../CLAUDE.md).
 
 ## Registro de aprovações
 

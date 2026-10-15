@@ -32,6 +32,7 @@ Cobre RF-005, RF-006, RF-007 e RF-009 (retomada). Persona: **Leitor**.
 - [ ] Editor carregado sob demanda (lazy); telas de leitura não pagam o custo.
 - [ ] Anotações da US-018 (texto simples) continuam legíveis (migração de dados, se necessária).
 - [ ] Conteúdo malicioso colado (ex.: HTML/script) é neutralizado.
+- [ ] **Zero Trust:** o servidor valida o JSON do editor contra o schema permitido e um limite de tamanho antes de gravar (o cliente não é confiável); links só com protocolos `http(s)`/`mailto`; teste com payloads XSS conhecidos.
 
 **Notas técnicas:** ADR-0007.
 

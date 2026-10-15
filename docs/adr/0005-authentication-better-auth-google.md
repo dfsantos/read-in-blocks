@@ -12,6 +12,7 @@ O app precisa de login social, **apenas Google por ora**, e de sessão segura pa
 - **Better Auth** com o provedor **Google (OAuth 2.0 / OIDC)**, adapter Drizzle e sessões em banco com cookie httpOnly.
 - Apenas o provedor Google é habilitado; a configuração é feita em um único módulo (`src/server/auth`) de modo que adicionar provedores seja só configuração.
 - E-mail/senha **desabilitado** explicitamente.
+- **Zero Trust:** acesso negado por padrão — só contas Google em **allowlist** (D-10) criam/usam conta; `email_verified` exigido; OAuth com `state` e PKCE; sessões curtas, com rotação e revogação no servidor ([ADR-0011](0011-zero-trust-security.md)).
 - O `userId` da sessão é a única fonte de identidade usada pelos repositórios (ADR-0008).
 - Segredos (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`) vivem em variáveis de ambiente da Vercel; nunca no repositório. Um `.env.example` documenta os nomes.
 - Redirect URIs do Google cadastrados para: localhost, produção e Preview Deployments (limitação conhecida: previews com URL dinâmica exigem domínio de preview estável ou proxy de OAuth — resolvido na US-004).

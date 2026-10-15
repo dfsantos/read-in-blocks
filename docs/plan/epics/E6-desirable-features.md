@@ -11,7 +11,7 @@ Cobre RF-012, RF-013 e RF-014 (classificação **Desejável**). Podem ser descar
 **Critérios de aceite**
 - [ ] Inserir bloco de diagrama no editor (sintaxe Mermaid) com pré-visualização.
 - [ ] Renderização no modo leitura; erro de sintaxe exibe mensagem amigável sem quebrar a anotação.
-- [ ] Renderização isolada e segura (sem executar HTML/JS arbitrário).
+- [ ] Renderização isolada e segura (sem executar HTML/JS arbitrário): Mermaid em `securityLevel: 'strict'`, compatível com a CSP da US-028; teste com diagrama malicioso.
 - [ ] Biblioteca carregada sob demanda.
 - [ ] Textos de interface em pt-BR via i18n.
 

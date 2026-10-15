@@ -16,7 +16,7 @@ Defesa em camadas:
 3. **Server Actions e rotas** obtêm o usuário por um helper único (`requireUser()`); sem sessão, a requisição é rejeitada. O `userId` nunca vem de parâmetros do cliente.
 4. **Acesso inexistente = recurso inexistente:** recursos de outro usuário respondem 404 (não 403), para não revelar existência.
 5. **Testes:** suíte de integração que cria dois usuários e tenta ler/alterar/apagar todos os recursos do outro (US-006 monta o arcabouço; cada história nova adiciona seus casos; US-026 faz a auditoria final).
-6. **Opcional/futuro:** Row Level Security do Postgres como segunda barreira. Não entra no MVP porque o driver serverless e o pool complicam o `SET LOCAL`; reavaliar se houver mais de um usuário real.
+6. **Row Level Security (RLS) do Postgres como segunda barreira**, em linha com o [ADR-0011](0011-zero-trust-security.md) (assumir violação da camada de aplicação). O driver serverless e o pool dificultam o `SET LOCAL`; por isso a US-006 inclui um **spike** para validar a viabilidade (ex.: transação com `set_config` por requisição e papel `app` sem `BYPASSRLS`). Se viável, RLS entra no MVP; se não, fica registrada a razão e a decisão é reavaliada antes da US-026.
 
 ## Alternativas consideradas
 

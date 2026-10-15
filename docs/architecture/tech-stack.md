@@ -32,6 +32,8 @@ Cada escolha abaixo tem um ADR com contexto, alternativas e consequências. Nenh
 | Testes | Vitest + Testing Library (unit/integração), Playwright (E2E) | [0010](../adr/0010-quality-testing-and-ci.md) |
 | Qualidade | ESLint + Prettier + `tsc --noEmit` | [0010](../adr/0010-quality-testing-and-ci.md) |
 | CI/CD | GitHub Actions (qualidade) + integração Git da Vercel (deploy) | [0010](../adr/0010-quality-testing-and-ci.md) |
+| Segurança | Zero Trust: verificar sempre, menor privilégio, assumir violação | [0011](../adr/0011-zero-trust-security.md) |
+| Histórico Git | Conventional Commits com commitlint | [0012](../adr/0012-conventional-commits.md) |
 
 ## Visão de arquitetura
 
@@ -61,6 +63,7 @@ PostgreSQL (Neon)
 3. **Texto de interface só em catálogos de mensagens.** Nenhum literal em português dentro de componentes ([conventions.md](conventions.md)).
 4. **Server Components por padrão**; Client Components só onde há interação (árvore dobrável, editor).
 5. **Mudanças de schema só por migração versionada**, aplicadas no deploy.
+6. **Zero Trust:** nenhuma camada confia na anterior. Autenticação e autorização no ponto do dado, entrada sempre validada, menor privilégio no banco/CI/segredos, CSP e cabeçalhos como segunda barreira ([política](../security/zero-trust.md)).
 
 ## Fora da stack (por enquanto)
 
