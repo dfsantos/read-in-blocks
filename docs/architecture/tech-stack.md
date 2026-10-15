@@ -2,7 +2,7 @@
 
 **Status:** Proposta para aprovação · **Data:** 2026-10-15
 
-Cada escolha abaixo tem um ADR com contexto, alternativas e consequências. Nenhuma versão está fixada aqui: a história US-001 fixa as versões estáveis vigentes no momento da implementação.
+Cada escolha abaixo tem um ADR com contexto, alternativas e consequências. Nenhuma versão está fixada aqui: a história US-001 fixa as versões estáveis vigentes no momento da implementação, **confirmadas no Context7** ([política](stack-docs-policy.md)).
 
 ## Exigências (dadas pelo responsável do projeto)
 
@@ -34,6 +34,7 @@ Cada escolha abaixo tem um ADR com contexto, alternativas e consequências. Nenh
 | CI/CD | GitHub Actions (qualidade) + integração Git da Vercel (deploy) | [0010](../adr/0010-quality-testing-and-ci.md) |
 | Segurança | Zero Trust: verificar sempre, menor privilégio, assumir violação | [0011](../adr/0011-zero-trust-security.md) |
 | Histórico Git | Conventional Commits com commitlint | [0012](../adr/0012-conventional-commits.md) |
+| Versões e APIs da stack | Sempre a partir de documentação atual do Context7 ([política](stack-docs-policy.md)) | [0013](../adr/0013-context7-docs-first.md) |
 
 ## Visão de arquitetura
 

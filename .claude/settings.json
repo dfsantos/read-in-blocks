@@ -31,6 +31,10 @@
       "Bash(git commit -n:*)",
       "Bash(cat .env:*)",
       "Bash(cat ./.env:*)"
+    ],
+    "allow": [
+      "mcp__Context7__resolve-library-id",
+      "mcp__Context7__query-docs"
     ]
   },
   "hooks": {
@@ -41,6 +45,15 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-commit-msg.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-context7.py\""
           }
         ]
       }

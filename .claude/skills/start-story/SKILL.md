@@ -18,12 +18,13 @@ Argumento: o ID da história (ex.: `US-013`). Se ausente, pergunte qual.
    - o usuário autorizou esta história.
 3. **Atualizar** o status da história para *Em desenvolvimento* em `progress.md`.
 4. **Branch:** `story/US-XXX-short-name` (inglês). Se a plataforma designou uma branch para a sessão, use a designada.
-5. **Plano de implementação** (curto, mostrado ao usuário antes de codar):
+5. **Stack e Context7:** liste as bibliotecas que a história vai usar ou adicionar e consulte o Context7 para cada uma **antes** de planejar (`resolve-library-id` ⇒ `query-docs`); use skill `stack-change` ao mexer em dependências/configs. Inclua no plano as versões e APIs confirmadas.
+6. **Plano de implementação** (curto, mostrado ao usuário antes de codar):
    - critérios de aceite, um a um, e como cada um será verificado;
    - arquivos/camadas afetados (domínio, repositório, action, UI, migração, catálogo i18n);
    - testes a escrever (unitário, integração com isolamento, E2E se listado);
    - riscos de segurança (superfície nova, entradas, dados do usuário).
-6. Implemente **somente** esta história. O que for descoberto fora do escopo vira nova história ou entrada em `open-decisions.md`.
+7. Implemente **somente** esta história. O que for descoberto fora do escopo vira nova história ou entrada em `open-decisions.md`.
 
 ## Lembretes
 

@@ -61,7 +61,9 @@ def main() -> None:
     if re.search(r"\s(--no-verify|-n)(\s|$)", command):
         fail("`--no-verify` is not allowed; hooks and commitlint must run.")
 
-    headers = extract_messages(command)
+    # Only inspect what follows `git commit`: earlier heredocs/-m flags belong to other commands.
+    commit_match = re.search(r"(^|[;&|\s(])git\s+(?:-C\s+\S+\s+)?commit\b", command)
+    headers = extract_messages(command[commit_match.end():])
     if not headers:
         # --amend --no-edit, -F file, or editor: cannot be inspected here; commitlint (US-001) covers it.
         sys.exit(0)

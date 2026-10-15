@@ -32,6 +32,7 @@ Nada além da história corrente é implementado. Se algo fora do escopo for des
 - Lint, typecheck e build passando no CI.
 - Todo texto de interface em `messages/pt-BR.json`; código, commits e comentários em inglês.
 - Se houver dados do usuário: casos de isolamento entre usuários adicionados à suíte (ADR-0008).
+- **Mudanças de stack documentadas:** toda dependência/config criada ou atualizada foi precedida de consulta ao Context7, com a tabela “Documentação consultada” (biblioteca, ID Context7, versão) no PR ([política](../architecture/stack-docs-policy.md)).
 - **Checklist de segurança Zero Trust** da [política](../security/zero-trust.md) preenchido no PR.
 - **Todos os commits em Conventional Commits** ([git-workflow.md](../architecture/git-workflow.md)); `commitlint` passando.
 - Se houver mudança de schema: migração versionada incluída.

@@ -15,7 +15,8 @@ O ID da história (ex.: `US-013`). Leia a história em `docs/plan/epics/*.md`, o
 2. **Escopo:** há código fora da história (adiantamento de histórias futuras)? Há algo do "Fora desta história" implementado?
 3. **Regras do PRD:** privacidade (§6.1), progresso ponderado (§6.2) e regras visíveis do RF envolvido respeitadas?
 4. **DoD:** textos só via `messages/pt-BR.json`; código/commits em inglês; migração incluída; isolamento de dois usuários testado; `.env.example`; commits em Conventional Commits com `Refs: US-XXX`.
-5. Rode os scripts de teste/lint/typecheck do projeto e cite a saída real das falhas. Não afirme que passa sem ter rodado.
+5. **Stack/Context7:** dependências e configs alteradas pela história têm versão coerente com o `package.json`/lockfile e consta a tabela “Documentação consultada”? Há uso de API obsoleta ou depreciada visível no diff? Sinalize qualquer dependência fixada sem evidência de consulta (política `docs/architecture/stack-docs-policy.md`).
+6. Rode os scripts de teste/lint/typecheck do projeto e cite a saída real das falhas. Não afirme que passa sem ter rodado.
 
 ## Resposta
 Tabela critério → status → evidência, seguida de lista de lacunas priorizadas. Seja objetivo; não elogie, não proponha melhorias fora dos critérios.

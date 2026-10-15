@@ -37,13 +37,23 @@ Nunca confiar em rede, cliente, sessão, ambiente ou entrada. Verificar explicit
 7. **Dependências:** adicionar o mínimo, com versão fixada via lockfile; justificar na descrição do PR.
 8. Qualquer dúvida de segurança: escolher a opção mais restritiva e registrar a dúvida para o usuário.
 
-## 3. Idioma
+## 3. Stack sempre a partir do Context7 (obrigatório)
+
+**Toda criação ou atualização da stack parte de documentação atual obtida no Context7**, nunca da memória do agente. Política: [`docs/architecture/stack-docs-policy.md`](docs/architecture/stack-docs-policy.md) e [ADR-0013](docs/adr/0013-context7-docs-first.md).
+
+- **Antes** de adicionar/atualizar/remover dependência, editar `package.json` ou alterar configuração da stack (Next, Drizzle, shadcn, Tailwind, ESLint, Vitest, Playwright, commitlint, `tsconfig`, `vercel.json`, workflows): para **cada** biblioteca, `mcp__Context7__resolve-library-id` e depois `mcp__Context7__query-docs` (com versão, se fixada).
+- Também consultar antes de usar uma API de biblioteca pela primeira vez na sessão e antes de upgrades de versão maior (guia de migração).
+- O que o Context7 retorna prevalece sobre a memória. Nunca fixar versão “de cabeça”. Nunca editar o lockfile à mão.
+- Um hook bloqueia o que não tiver consulta prévia na sessão. Se bloquear: consulte e repita; não contorne. Biblioteca fora do Context7 ou Context7 indisponível ⇒ parar e avisar o usuário; `.claude/context7-exceptions.json` só com aprovação dele.
+- Registrar no PR a tabela “Documentação consultada” (biblioteca, ID Context7, versão adotada). Skill: `stack-change`.
+
+## 4. Idioma
 
 - **Código, comentários, commits, branches, chaves de i18n:** inglês.
 - **Interface da aplicação:** português (pt-BR), sempre via `messages/pt-BR.json` (next-intl). Nenhum texto de interface direto em componentes.
 - **Documentação em `docs/`:** português.
 
-## 4. Processo de trabalho
+## 5. Processo de trabalho
 
 - Implementar **uma história por vez**, somente a que o usuário autorizou ([`docs/plan/progress.md`](docs/plan/progress.md)). Não adiantar histórias futuras.
 - Branch `story/US-XXX-short-name` (exceto quando a plataforma designar outra branch; nesse caso usar a designada).
@@ -52,21 +62,22 @@ Nunca confiar em rede, cliente, sessão, ambiente ou entrada. Verificar explicit
 - Não criar PR a menos que o usuário peça.
 - Decisões técnicas novas ⇒ novo ADR em `docs/adr/`. Não contradizer ADRs aceitos sem propor um ADR substituto.
 
-## 5. Rules, skills e subagents (`.claude/`)
+## 6. Rules, skills e subagents (`.claude/`)
 
-- **Rules** (`.claude/rules/`): carregam por caminho — `data-access`, `server-actions`, `i18n`, `domain`, `migrations`, `ui-shadcn`, `docs-ptbr`. Seguir sem exceção.
-- **Skills:** `/start-story US-XXX`, `/finish-story US-XXX`, `new-adr`, `vertical-slice`, `isolation-tests`, `security-checklist`, `resolve-decision`. Preferir a skill ao improviso quando a tarefa coincidir.
+- **Rules** (`.claude/rules/`): carregam por caminho — `data-access`, `server-actions`, `i18n`, `domain`, `migrations`, `ui-shadcn`, `docs-ptbr`; e `stack-docs` (sempre carregada). Seguir sem exceção.
+- **Skills:** `/start-story US-XXX`, `/finish-story US-XXX`, `new-adr`, `vertical-slice`, `isolation-tests`, `security-checklist`, `resolve-decision`, `stack-change`. Preferir a skill ao improviso quando a tarefa coincidir.
 - **Subagents (somente leitura):** `security-reviewer`, `acceptance-reviewer`, `migration-reviewer`. Invocados na finalização de cada história (ver `finish-story`).
 
-- **Hook e permissões** (`.claude/settings.json`): o hook `validate-commit-msg.py` bloqueia commits fora da convenção e a flag de pular hooks; `deny` impede ler/editar `.env*` (exceto `.env.example`) e force push. Se um commit for bloqueado, corrija a mensagem; não contorne.
+- **Hooks e permissões** (`.claude/settings.json`): `require-context7.py` bloqueia mudança de stack sem consulta ao Context7; `validate-commit-msg.py` bloqueia commits fora da convenção e a flag de pular hooks; `deny` impede ler/editar `.env*` (exceto `.env.example`) e force push. Se um commit for bloqueado, corrija a mensagem; não contorne.
 
-## 6. Mapa de documentos
+## 7. Mapa de documentos
 
 | Assunto | Documento |
 |---|---|
 | Produto | [`docs/prd/prd-read-in-blocks.md`](docs/prd/prd-read-in-blocks.md) |
 | Stack e arquitetura | [`docs/architecture/tech-stack.md`](docs/architecture/tech-stack.md) |
 | Convenções de código | [`docs/architecture/conventions.md`](docs/architecture/conventions.md) |
+| Stack e Context7 | [`docs/architecture/stack-docs-policy.md`](docs/architecture/stack-docs-policy.md) |
 | Git e commits | [`docs/architecture/git-workflow.md`](docs/architecture/git-workflow.md) |
 | Segurança | [`docs/security/zero-trust.md`](docs/security/zero-trust.md) |
 | Decisões | [`docs/adr/`](docs/adr/README.md) |

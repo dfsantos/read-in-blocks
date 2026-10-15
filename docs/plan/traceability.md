@@ -37,6 +37,7 @@ Cada requisito do [PRD](../prd/prd-read-in-blocks.md) mapeado para as histórias
 |---|---|
 | Zero Trust ([ADR-0011](../adr/0011-zero-trust-security.md)) | Política em `docs/security/zero-trust.md`; checklist no Definition of Done de toda história; US-004 (allowlist), US-006 (RLS), US-028 (cabeçalhos), US-019/022 (conteúdo), US-026 (auditoria) |
 | Conventional Commits ([ADR-0012](../adr/0012-conventional-commits.md)) | `CLAUDE.md` (agente), `commitlint` + CI (US-001) |
+| Stack atualizada via Context7 ([ADR-0013](../adr/0013-context7-docs-first.md)) | `CLAUDE.md`, regra `stack-docs`, skill `stack-change`, hook `require-context7.py`; seção “Documentação consultada” no PR (US-001) |
 | Código em inglês / UI em pt-BR | [conventions.md](../architecture/conventions.md); US-002 (verificação automática) |
 
 ## Escopo

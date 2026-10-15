@@ -18,7 +18,8 @@ Argumento: ID da história em andamento (padrão: a que está *Em desenvolviment
    - migração versionada incluída se houve mudança de schema;
    - `.env.example` e docs afetadas atualizados;
    - commits em Conventional Commits com `Refs: US-XXX`.
-4. **Checklist Zero Trust:** execute a skill `security-checklist` sobre o diff e anexe o resultado. Para mudanças em dados, entradas ou autenticação, invoque também o subagent `security-reviewer`; para mudanças de schema, `migration-reviewer`; e sempre `acceptance-reviewer`.
-5. **Atualizar** `docs/plan/progress.md`: status *Em validação*. **Nunca** marque *Aprovada* — só o usuário aprova.
-6. **Resumo para o usuário:** o que foi entregue, como validar (passos e URL de preview se houver), desvios/decisões tomadas, riscos residuais e itens fora de escopo descobertos.
-7. Push na branch. Não abrir PR sem pedido do usuário.
+4. **Documentação consultada (Context7):** conferir que toda mudança de dependência/config da história tem consulta registrada; montar a tabela “Documentação consultada” (biblioteca, ID Context7, versão adotada) para o resumo/PR. Sem ela, a história não está pronta.
+5. **Checklist Zero Trust:** execute a skill `security-checklist` sobre o diff e anexe o resultado. Para mudanças em dados, entradas ou autenticação, invoque também o subagent `security-reviewer`; para mudanças de schema, `migration-reviewer`; e sempre `acceptance-reviewer`.
+6. **Atualizar** `docs/plan/progress.md`: status *Em validação*. **Nunca** marque *Aprovada* — só o usuário aprova.
+7. **Resumo para o usuário:** o que foi entregue, como validar (passos e URL de preview se houver), desvios/decisões tomadas, riscos residuais e itens fora de escopo descobertos.
+8. Push na branch. Não abrir PR sem pedido do usuário.

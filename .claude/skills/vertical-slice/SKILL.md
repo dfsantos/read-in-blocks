@@ -16,4 +16,6 @@ Crie, **na ordem**, apenas o que a história em andamento exige:
 6. **UI** (`src/components/<feature>/`, `src/app/[locale]/…`): shadcn, Server Components por padrão. Regra `ui-shadcn`.
 7. **Testes:** unitário (domínio), integração com **isolamento de dois usuários** (skill `isolation-tests`), componente se houver lógica, E2E se a história listar.
 
+**Context7 primeiro:** antes de cada camada, consulte o Context7 para as APIs que vai usar (Drizzle, Next.js, Zod, next-intl, shadcn, Tiptap, Better Auth) e siga a versão adotada no projeto. Não escreva de memória.
+
 Antes de escrever, confira os arquivos existentes do mesmo tipo e **siga o padrão deles**. Não crie abstrações além do necessário para a história.
