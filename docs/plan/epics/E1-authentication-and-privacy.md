@@ -21,6 +21,15 @@ Cobre RF-010 e a regra crítica de privacidade (PRD §6.1). Persona: **Leitor**.
 
 **Notas técnicas:** ADR-0005. Tabelas de usuário/conta/sessão via Drizzle + migração.
 
+**Versões fixadas** — validadas no Context7 em 2026-10-15 (evidências em [stack-versions.md](../../architecture/stack-versions.md))
+
+| Pacote | Versão | Status | Fonte Context7 |
+|---|---|---|---|
+| `better-auth` | **1.6.23** | ✅ Fixada | `/better-auth/better-auth` |
+| `@better-auth/drizzle-adapter` | **alinhar a 1.6.23 (confirmar)** | 🟡 Linha (patch a fechar) | `/better-auth/better-auth` |
+
+- [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. Itens "Decisão" só instalam após a decisão registrada em [open-decisions.md](../open-decisions.md).
+
 ---
 
 ### US-005 — Sessão, sair e rotas protegidas

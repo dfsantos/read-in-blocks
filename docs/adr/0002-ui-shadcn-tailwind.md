@@ -11,6 +11,7 @@ A UI deve ser construída com shadcn (exigência). O shadcn/ui não é uma bibli
 
 - **shadcn/ui** como base de todos os componentes de interface; componentes ficam em `src/components/ui` (gerados pela CLI) e não recebem lógica de negócio.
 - **Tailwind CSS** com tokens de tema em variáveis CSS (cores, raio, tipografia), permitindo tema escuro depois.
+- **Base de primitivos (Radix ou Base UI):** a CLI atual do shadcn usa Base UI por padrão; a escolha está em aberto (D-11) e define as dependências instaladas.
 - **lucide-react** para ícones.
 - **Sonner** (toasts) e demais componentes do shadcn conforme necessidade; evitar outras bibliotecas de componentes.
 - Componentes de composição do produto (ex.: `BookTree`, `ProgressBar`) ficam em `src/components/<feature>`.

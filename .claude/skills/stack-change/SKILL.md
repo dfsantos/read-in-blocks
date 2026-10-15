@@ -10,6 +10,7 @@ Política: `docs/architecture/stack-docs-policy.md` (ADR-0013). Um hook bloqueia
 
 ## Passos
 
+0. **Versão aprovada:** abra `docs/architecture/stack-versions.md` e a tabela “Versões fixadas” da história. Use exatamente aquela versão (sem `^`/`~`). Se for “Linha (patch a fechar)”, descubra o patch no Context7 e registre na tabela; se for “Decisão”, pare e pergunte; se a biblioteca não estiver na tabela, proponha incluí-la.
 1. **Listar as bibliotecas envolvidas** (a pedida e as que ela exige: peer deps, plugins, CLIs, tipos).
 2. **Resolver:** para cada uma, `mcp__Context7__resolve-library-id` (nome + objetivo). Escolha o ID mais aderente (fonte oficial, versão compatível, boa cobertura).
 3. **Consultar:** `mcp__Context7__query-docs` com o ID (e a versão quando existir) e perguntas específicas:

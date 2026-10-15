@@ -63,6 +63,15 @@ Biblioteca que o Context7 não tem: o agente **informa o usuário** e propõe a 
 
 Só o responsável aprova. Cada exceção é revisada ao fim do marco. Sem aprovação, o agente não altera esse arquivo.
 
+## Versões aprovadas
+
+As versões que o projeto adota estão em [stack-versions.md](stack-versions.md), validadas no Context7 e espelhadas em cada história de stack ("Versões fixadas"). Regras:
+
+- Instalar **exatamente** a versão da tabela, com `package.json` sem `^`/`~`.
+- Item “Linha (patch a fechar)”: consultar o Context7 para o patch e registrar na tabela antes de instalar; se não houver, parar e perguntar.
+- Item “Decisão”: não instalar antes da decisão registrada em `open-decisions.md`.
+- Divergência entre o que o Context7 retorna e a tabela: parar, informar e propor atualização da tabela (nunca instalar “a mais nova” por conta própria).
+
 ## Manutenção
 
 - Pacote novo na stack ⇒ conferir se precisa de alias no hook (`ALIASES` em `require-context7.py`) e atualizar o mapa de arquivos de configuração (`CONFIG_FILES`).

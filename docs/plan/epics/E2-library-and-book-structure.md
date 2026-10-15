@@ -15,6 +15,16 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 - [ ] Migração do schema `book` incluída.
 - [ ] Testes de isolamento: outro usuário não vê nem acessa o livro por URL (404).
 
+**Versões fixadas** — validadas no Context7 em 2026-10-15 (evidências em [stack-versions.md](../../architecture/stack-versions.md))
+
+| Pacote | Versão | Status | Fonte Context7 |
+|---|---|---|---|
+| `zod` | **4.6.5** | ✅ Fixada | `/colinhacks/zod` |
+| `react-hook-form` | **7.66.0** | ✅ Fixada | `/react-hook-form/react-hook-form` |
+| `@hookform/resolvers` | **a fechar na US-007** | 🟡 Linha (patch a fechar) | `/react-hook-form/resolvers` |
+
+- [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. Itens "Decisão" só instalam após a decisão registrada em [open-decisions.md](../open-decisions.md).
+
 ---
 
 ### US-008 — Biblioteca pessoal

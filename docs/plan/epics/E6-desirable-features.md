@@ -17,6 +17,14 @@ Cobre RF-012, RF-013 e RF-014 (classificação **Desejável**). Podem ser descar
 
 **Notas técnicas:** ADR-0007. A escolha final (Mermaid vs. alternativa) é confirmada ao iniciar a história.
 
+**Versões fixadas** — validadas no Context7 em 2026-10-15 (evidências em [stack-versions.md](../../architecture/stack-versions.md))
+
+| Pacote | Versão | Status | Fonte Context7 |
+|---|---|---|---|
+| `mermaid` | **11.x (a fechar na US-022)** | 🟡 Linha (patch a fechar) | `/mermaid-js/mermaid` |
+
+- [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. Itens "Decisão" só instalam após a decisão registrada em [open-decisions.md](../open-decisions.md).
+
 ---
 
 ### US-023 — Ritmo e previsão de conclusão

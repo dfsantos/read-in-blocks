@@ -36,6 +36,15 @@ Cobre RF-005, RF-006, RF-007 e RF-009 (retomada). Persona: **Leitor**.
 
 **Notas técnicas:** ADR-0007.
 
+**Versões fixadas** — validadas no Context7 em 2026-10-15 (evidências em [stack-versions.md](../../architecture/stack-versions.md))
+
+| Pacote | Versão | Status | Fonte Context7 |
+|---|---|---|---|
+| `@tiptap/react, @tiptap/pm, @tiptap/starter-kit, @tiptap/extension-code-block-lowlight` | **3.x (a fechar na US-019)** | 🟡 Linha (patch a fechar) | `/ueberdosis/tiptap-docs` |
+| `lowlight` | **a fechar na US-019** | 🟡 Linha (patch a fechar) | `/wooorm/lowlight` |
+
+- [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. Itens "Decisão" só instalam após a decisão registrada em [open-decisions.md](../open-decisions.md).
+
 ---
 
 ### US-020 — Tipos de anotação

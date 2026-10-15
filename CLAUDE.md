@@ -45,6 +45,7 @@ Nunca confiar em rede, cliente, sessão, ambiente ou entrada. Verificar explicit
 - Também consultar antes de usar uma API de biblioteca pela primeira vez na sessão e antes de upgrades de versão maior (guia de migração).
 - O que o Context7 retorna prevalece sobre a memória. Nunca fixar versão “de cabeça”. Nunca editar o lockfile à mão.
 - Um hook bloqueia o que não tiver consulta prévia na sessão. Se bloquear: consulte e repita; não contorne. Biblioteca fora do Context7 ou Context7 indisponível ⇒ parar e avisar o usuário; `.claude/context7-exceptions.json` só com aprovação dele.
+- **Versões aprovadas:** [`docs/architecture/stack-versions.md`](docs/architecture/stack-versions.md) (espelhadas em “Versões fixadas” nas histórias). Instalar exatamente essas, sem `^`/`~`; patch “a fechar” ⇒ consultar o Context7 e registrar; item “Decisão” ⇒ não instalar antes da decisão do usuário.
 - Registrar no PR a tabela “Documentação consultada” (biblioteca, ID Context7, versão adotada). Skill: `stack-change`.
 
 ## 4. Idioma
