@@ -6,7 +6,7 @@ Cobre RF-010 e a regra crítica de privacidade (PRD §6.1). Persona: **Leitor**.
 
 ### US-004 — Entrar com Google
 **Como** leitor, **quero** entrar com minha conta Google, **para** acessar meus livros sem criar senha.
-**Cobre:** exigência 3 · RF-010 (base) · **Tamanho:** G · **Depende de:** US-003 · **Bloqueios:** D-04, D-10
+**Cobre:** exigência 3 · RF-010 (base) · **Tamanho:** G · **Depende de:** US-003
 
 **Critérios de aceite**
 - [ ] Tela de login (shadcn) com botão “Entrar com Google”, todos os textos em pt-BR via i18n.
@@ -14,10 +14,12 @@ Cobre RF-010 e a regra crítica de privacidade (PRD §6.1). Persona: **Leitor**.
 - [ ] Primeiro login cria o usuário; logins seguintes reutilizam o mesmo registro.
 - [ ] Sessão em cookie httpOnly; segredos apenas em variáveis de ambiente.
 - [ ] Nenhum outro método de login disponível (sem e-mail/senha); adicionar provedor futuro é só configuração (documentado).
-- [ ] **Zero Trust:** acesso negado por padrão — apenas e-mails na allowlist (D-10) conseguem entrar; `email_verified` exigido; `state` e PKCE no OAuth; conta fora da lista recebe mensagem genérica e nada é criado no banco.
+- [ ] **Zero Trust:** acesso negado por padrão — apenas e-mails na allowlist (D-10, aprovada) conseguem entrar; `email_verified` exigido; `state` e PKCE no OAuth; conta fora da lista recebe mensagem genérica e nada é criado no banco.
 - [ ] Sessão curta com rotação e revogação no servidor; eventos de login/falha registrados (sem dados sensíveis).
 - [ ] Erros de OAuth (acesso negado, falha) mostram mensagem amigável.
 - [ ] Teste E2E do login usando sessão de teste semeada (não o Google real).
+
+**Pré-requisitos do responsável (D-04):** projeto no Google Cloud Console com cliente OAuth (redirect URIs de local, preview e produção) e lista de e-mails autorizados (D-10) em variável de ambiente.
 
 **Notas técnicas:** ADR-0005. Tabelas de usuário/conta/sessão via Drizzle + migração.
 

@@ -6,10 +6,10 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 
 ### US-007 — Cadastrar um livro
 **Como** leitor, **quero** cadastrar um livro, **para** começar a acompanhar sua leitura.
-**Cobre:** RF-001 (livro) · **Tamanho:** M · **Depende de:** US-006 · **Bloqueios:** D-02, D-08
+**Cobre:** RF-001 (livro) · **Tamanho:** M · **Depende de:** US-006
 
 **Critérios de aceite**
-- [ ] Formulário (shadcn + RHF + Zod) com título obrigatório, autor opcional e unidade da meta do livro (conforme D-02).
+- [ ] Formulário (shadcn + RHF + Zod) com **título obrigatório** e autor opcional (D-08). Sem campo de capa. A unidade das metas é sempre **páginas** (D-02), então não há seletor de unidade.
 - [ ] Validação com mensagens em pt-BR via i18n.
 - [ ] Livro salvo vinculado ao usuário logado; após salvar, abre a página do livro.
 - [ ] Migração do schema `book` incluída.
@@ -43,21 +43,21 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 
 ### US-009 — Editar e excluir livro
 **Como** leitor, **quero** editar os dados do livro e excluí-lo, **para** corrigir erros e remover o que não quero mais guardar.
-**Cobre:** RF-001, RF-010 · **Tamanho:** M · **Depende de:** US-007 · **Bloqueios:** D-09
+**Cobre:** RF-001, RF-010 · **Tamanho:** M · **Depende de:** US-007
 
 **Critérios de aceite**
-- [ ] Edição de título, autor (e unidade da meta, com aviso se já houver metas — conforme D-02).
-- [ ] Exclusão exige confirmação explícita e apaga em cascata estrutura e anotações do livro.
+- [ ] Edição de título e autor.
+- [ ] Exclusão exige confirmação explícita e **apaga em cascata** estrutura e anotações do livro (D-09). Exclusão de conta fica fora do MVP.
 - [ ] Ações indisponíveis para livros de terceiros (teste de isolamento).
 
 ---
 
 ### US-010 — Montar a estrutura do livro
 **Como** leitor, **quero** cadastrar partes, capítulos e tópicos de um livro, **para** refletir a organização real da obra.
-**Cobre:** RF-001 · **Tamanho:** G · **Depende de:** US-007 · **Bloqueios:** D-06
+**Cobre:** RF-001 · **Tamanho:** G · **Depende de:** US-007
 
 **Critérios de aceite**
-- [ ] Adicionar parte; adicionar capítulo (dentro de uma parte ou direto no livro, conforme D-06); adicionar tópico (opcional, só dentro de capítulo).
+- [ ] Adicionar parte; adicionar capítulo (dentro de uma parte ou **direto no livro**: partes são opcionais, D-06); adicionar tópico (opcional, só dentro de capítulo).
 - [ ] Renomear e excluir nós; excluir nó com filhos pede confirmação e remove a subárvore.
 - [ ] A hierarquia é exibida em lista aninhada simples (a versão interativa é a US-015).
 - [ ] Cadastro ágil para livros longos: adicionar vários capítulos em sequência sem sair do formulário (ex.: colar uma lista de títulos, um por linha). *Mitiga o risco registrado no PRD §9.*
@@ -72,10 +72,10 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 
 ### US-011 — Descrição e meta de cada nó
 **Como** leitor, **quero** registrar título, resumo da proposta e meta estimada em cada nó, **para** planejar a leitura e dar peso a cada trecho.
-**Cobre:** RF-002 · **Tamanho:** M · **Depende de:** US-010 · **Bloqueios:** D-02
+**Cobre:** RF-002 · **Tamanho:** M · **Depende de:** US-010
 
 **Critérios de aceite**
-- [ ] Edição de título, resumo (texto simples) e meta estimada (valor numérico na unidade do livro).
+- [ ] Edição de título, resumo (texto simples) e meta estimada em **páginas** (número inteiro positivo; unidade única, D-02).
 - [ ] Meta opcional; nós sem meta usam peso igual ao dos irmãos sem meta (regra do ADR-0009), com indicação visual de “peso padrão”.
 - [ ] Validação: meta positiva, limites razoáveis, mensagens em pt-BR.
 - [ ] Testes unitários do cálculo de peso efetivo.

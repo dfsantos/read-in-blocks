@@ -18,7 +18,7 @@ Vocabulário do domínio em inglês, para uso consistente no código:
 | Livro | `book` |
 | Parte / Capítulo / Tópico | `part` / `chapter` / `topic` (todos são `node`) |
 | Estado de leitura | `status`: `not_started`, `in_progress`, `completed` |
-| Meta estimada | `goal` (`goalUnit`: `pages`, `minutes`, `weight`; `goalValue`) |
+| Meta estimada | `goalPages` (meta em páginas; unidade única, D-02) |
 | Anotação / Caderno | `note` / `notebook` |
 | Conceito-chave / Citação / Ação ou dúvida | `key_concept` / `quote` / `action_or_question` |
 | Biblioteca | `library` |

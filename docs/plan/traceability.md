@@ -46,6 +46,7 @@ Cada requisito do [PRD](../prd/prd-read-in-blocks.md) mapeado para as histórias
 |---|---|
 | Itens “Incluso (MVP)” do PRD §5 | Todos cobertos: cadastro manual (US-010), sumário e blocos (US-015, US-017), estado de leitura (US-013/014), anotações ricas (US-018/019), painel (US-016), acesso individual (E1) |
 | Itens “Fora de Escopo” | Não planejados: importação automática, grafo avançado, exportação, gamificação/streaks, recursos sociais |
+| RF-002 “páginas, minutos ou peso” | Estreitado no MVP: meta **somente em páginas** (D-02) |
 | Risco §9 (cadastro manual trabalhoso) | Mitigação no MVP: cadastro em lote por lista de títulos (US-010). Importação automática continua pós-MVP, conforme o PRD |
 
 ## Itens inferidos por este plano (não estão no PRD)
@@ -56,5 +57,5 @@ Marcados para você aceitar ou cortar:
 - Marcar “ação/dúvida” como resolvida (US-020).
 - Edição manual das datas de leitura (US-013).
 - Cadastro em lote de capítulos (US-010).
-- Campo “autor” do livro (US-007, D-08).
+- Campo “autor” do livro (US-007, D-08, aprovado).
 - Exclusão de livro em cascata (US-009, D-09).

@@ -9,21 +9,21 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M0 | [US-000](epics/E0-foundation.md) | Aprovar PRD, stack e plano | — | P | — | — | Em validação | |
 | M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Pendente | |
 | M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Pendente | |
-| M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | D-04 | Pendente | |
-| M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | D-04, D-10 | Pendente | |
+| M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Pendente | |
+| M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
 | M2 | [US-028](epics/E1-authentication-and-privacy.md) | Cabeçalhos de segurança e proteção de requisições | RF-010 | M | US-005 | — | Pendente | |
-| M3 | [US-007](epics/E2-library-and-book-structure.md) | Cadastrar um livro | RF-001 | M | US-006 | D-02, D-08 | Pendente | |
+| M3 | [US-007](epics/E2-library-and-book-structure.md) | Cadastrar um livro | RF-001 | M | US-006 | — | Pendente | |
 | M3 | [US-008](epics/E2-library-and-book-structure.md) | Biblioteca pessoal | RF-009 | P | US-007 | — | Pendente | |
-| M3 | [US-009](epics/E2-library-and-book-structure.md) | Editar e excluir livro | RF-001 | M | US-007 | D-09 | Pendente | |
-| M3 | [US-010](epics/E2-library-and-book-structure.md) | Montar a estrutura do livro | RF-001 | G | US-007 | D-06 | Pendente | |
-| M3 | [US-011](epics/E2-library-and-book-structure.md) | Descrição e meta de cada nó | RF-002 | M | US-010 | D-02 | Pendente | |
+| M3 | [US-009](epics/E2-library-and-book-structure.md) | Editar e excluir livro | RF-001 | M | US-007 | — | Pendente | |
+| M3 | [US-010](epics/E2-library-and-book-structure.md) | Montar a estrutura do livro | RF-001 | G | US-007 | — | Pendente | |
+| M3 | [US-011](epics/E2-library-and-book-structure.md) | Descrição e meta de cada nó | RF-002 | M | US-010 | — | Pendente | |
 | M3 | [US-012](epics/E2-library-and-book-structure.md) | Reordenar e mover nós | RF-001 | M | US-010 | — | Pendente | |
 | M4 | [US-013](epics/E3-reading-state.md) | Marcar o estado de leitura dos nós | RF-003 | M | US-010 | — | Pendente | |
-| M4 | [US-014](epics/E3-reading-state.md) | Estado derivado dos nós com filhos | RF-003 | M | US-013 | D-07 | Pendente | |
+| M4 | [US-014](epics/E3-reading-state.md) | Estado derivado dos nós com filhos | RF-003 | M | US-013 | — | Pendente | |
 | M4 | [US-015](epics/E4-progress-visualization.md) | Sumário interativo | RF-004 | M | US-014 | — | Pendente | |
-| M4 | [US-016](epics/E4-progress-visualization.md) | Painel de progresso ponderado | RF-008 | G | US-011, US-014 | D-02, D-03 | Pendente | |
+| M4 | [US-016](epics/E4-progress-visualization.md) | Painel de progresso ponderado | RF-008 | G | US-011, US-014 | — | Pendente | |
 | M5 | [US-018](epics/E5-notes.md) | Caderno por capítulo | RF-005 | M | US-015 | — | Pendente | |
 | M5 | [US-019](epics/E5-notes.md) | Formatação rica e blocos de código | RF-007 | G | US-018 | — | Pendente | |
 | M5 | [US-020](epics/E5-notes.md) | Tipos de anotação | RF-006 | M | US-019 | — | Pendente | |

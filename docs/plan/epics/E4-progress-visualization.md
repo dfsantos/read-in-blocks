@@ -20,14 +20,14 @@ Cobre RF-004, RF-008 e RF-011. Persona: **Leitor**.
 
 ### US-016 — Painel de progresso ponderado
 **Como** leitor, **quero** ver o progresso geral do livro considerando o peso de cada parte, **para** saber o quanto realmente avancei.
-**Cobre:** RF-008, regra §6.2 · **Tamanho:** G · **Depende de:** US-011, US-014 · **Bloqueios:** D-02, D-03
+**Cobre:** RF-008, regra §6.2 · **Tamanho:** G · **Depende de:** US-011, US-014
 
 **Critérios de aceite**
 - [ ] Domínio puro `computeProgress` implementado com testes em tabela, incluindo o exemplo do PRD: concluir uma parte de peso 40% avança o progresso geral em 40%.
 - [ ] Painel na página do livro: progresso geral (%) e progresso por parte/capítulo.
 - [ ] Contagem simples complementar (ex.: “7 de 20 capítulos concluídos”), claramente distinta do percentual ponderado.
 - [ ] Nós sem meta recebem peso padrão conforme ADR-0009, com aviso discreto quando isso afeta o resultado.
-- [ ] Contribuição de nós “em andamento” conforme a decisão D-03.
+- [ ] **Só concluídas contam** (D-03): folha concluída vale 100% do seu peso; “em andamento” e “não iniciado” valem 0%. Teste unitário explícito.
 - [ ] Porcentagem formatada via i18n; barra de progresso acessível (`role=progressbar`, valores).
 - [ ] Livro sem estrutura mostra estado vazio com orientação.
 

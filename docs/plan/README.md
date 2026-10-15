@@ -76,4 +76,4 @@ As histórias de infraestrutura (épico E0) usam o papel de **Desenvolvedor**, p
 
 ## O que o PRD não define
 
-O PRD marca como `[PENDENTE]` os objetivos e as métricas de sucesso, e o responsável pelo documento. Isso **não bloqueia o MVP técnico**, mas significa que não há critério objetivo para declarar o MVP bem-sucedido. Ver D-01 e D-05 em [open-decisions.md](open-decisions.md).
+O PRD marca como `[PENDENTE]` os objetivos e as métricas de sucesso. Isso **não bloqueia o MVP técnico**, mas significa que não há critério objetivo para declarar o MVP bem-sucedido. Ver D-01 em [open-decisions.md](open-decisions.md).

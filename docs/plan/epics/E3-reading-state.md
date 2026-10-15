@@ -21,11 +21,11 @@ Cobre RF-003. Persona: **Leitor**.
 
 ### US-014 — Estado derivado dos nós com filhos
 **Como** leitor, **quero** que partes e capítulos com subnós reflitam o estado dos filhos, **para** não precisar atualizá-los à mão.
-**Cobre:** RF-003 (regra visível) · **Tamanho:** M · **Depende de:** US-013 · **Bloqueios:** D-07
+**Cobre:** RF-003 (regra visível) · **Tamanho:** M · **Depende de:** US-013
 
 **Critérios de aceite**
 - [ ] Nó com subnós está “concluído” **somente** quando todos os subnós estão concluídos; “em andamento” se ao menos um está iniciado ou concluído; senão “não iniciado”.
 - [ ] Estado de nó pai nunca é gravado: calculado em `src/domain` (função pura) e exibido de forma consistente em todas as telas.
-- [ ] Ação “concluir tudo” em um nó pai marca todos os descendentes como concluídos, com confirmação (conforme D-07).
+- [ ] Ação “concluir tudo” em um nó pai marca todos os descendentes como concluídos, com confirmação. Marcar um pai como concluído conclui todos os descendentes (D-07).
 - [ ] Datas do pai derivadas: início = menor `started_at` dos filhos; conclusão = maior `completed_at`, quando concluído.
 - [ ] Testes unitários em tabela cobrindo árvores de 1, 2 e 3 níveis e casos de borda (pai sem filhos vira folha).

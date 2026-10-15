@@ -1,6 +1,6 @@
 # ADR-0009 — Modelo em árvore e progresso ponderado
 
-- **Status:** Proposto — **depende de D-02 e D-03** em [open-decisions.md](../plan/open-decisions.md)
+- **Status:** Proposto — decisões D-02 (páginas) e D-03 (só concluídas contam) resolvidas em 2026-10-15; ver [open-decisions.md](../plan/open-decisions.md)
 - **Data:** 2026-10-15
 
 ## Contexto
@@ -17,8 +17,8 @@ O livro é uma hierarquia **parte → capítulo → tópico (opcional)**. Cada n
 **Domínio puro** (`src/domain/progress`), sem I/O:
 
 - `resolveStatus(node)`: o estado de um nó pai é derivado dos filhos (todos concluídos ⇒ concluído; algum iniciado/concluído ⇒ em andamento; senão não iniciado). O estado de **folhas** é armazenado; o de **pais é derivado**, nunca gravado — elimina inconsistência.
-- `computeProgress(tree)`: progresso de uma folha é 0, 0,5 ou 1 conforme o estado (a definição de “em andamento” é a decisão D-03); o de um pai é a média dos filhos **ponderada pelo peso**; o do livro é o do nó raiz. Pesos de irmãos são normalizados entre si, então só a proporção importa.
-- **Peso efetivo:** vem da meta estimada do nó. Como a meta pode estar em unidades diferentes (páginas, minutos, peso), a unidade é definida **por livro** (D-02), o que torna os pesos comparáveis. Nó sem meta recebe peso igual ao dos irmãos sem meta (fallback documentado e testado).
+- `computeProgress(tree)`: progresso de uma folha é **1 se concluída e 0 caso contrário** (D-03: só concluídas contam; “em andamento” não soma); o de um pai é a média dos filhos **ponderada pelo peso**; o do livro é o do nó raiz. Pesos de irmãos são normalizados entre si, então só a proporção importa.
+- **Peso efetivo:** vem da meta estimada do nó. A unidade da meta é **sempre páginas** (D-02), para todos os livros, o que torna os pesos comparáveis sem configuração por livro. Nó sem meta recebe peso igual ao dos irmãos sem meta (fallback documentado e testado).
 - Funções puras cobertas por testes unitários com tabelas de casos, incluindo o exemplo do PRD (parte de 40% ⇒ +40%).
 
 **Datas:** `started_at` é registrada na primeira transição para “em andamento”; `completed_at` na transição para “concluído”; voltar atrás limpa a data correspondente.
@@ -34,4 +34,4 @@ O livro é uma hierarquia **parte → capítulo → tópico (opcional)**. Cada n
 ## Consequências
 
 - O cálculo roda no servidor a cada visualização (barato nesse volume).
-- A decisão D-02 (unidade da meta) precisa estar fechada antes da US-011.
+- D-02 estreita o RF-002 do PRD no MVP (só páginas); minutos e peso abstrato ficam como evolução.

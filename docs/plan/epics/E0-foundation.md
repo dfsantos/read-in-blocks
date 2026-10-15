@@ -6,7 +6,7 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 
 ### US-000 — Aprovar PRD, stack e plano
 **Como** responsável pelo produto, **quero** revisar e aprovar o PRD, a stack e este plano, **para** autorizar o início do desenvolvimento.
-**Cobre:** — · **Tamanho:** P · **Depende de:** — · **Bloqueios:** D-01…D-09 (apenas as que você quiser fechar agora)
+**Cobre:** — · **Tamanho:** P · **Depende de:** — · **Bloqueios:** — (D-01, objetivos e métricas, segue aberta e não bloqueia)
 
 **Critérios de aceite**
 - [ ] PRD anexado em `docs/prd/` revisado.
@@ -96,7 +96,7 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 
 ### US-003 — Banco de dados e deploy na Vercel
 **Como** desenvolvedor, **quero** o banco Postgres, as migrações e o deploy contínuo na Vercel funcionando, **para** validar o ambiente real desde o começo.
-**Cobre:** exigência 1 · **Tamanho:** G · **Depende de:** US-002 · **Bloqueios:** D-04
+**Cobre:** exigência 1 · **Tamanho:** G · **Depende de:** US-002
 
 **Critérios de aceite**
 - [ ] Projeto Vercel conectado ao repositório: Preview Deployment por PR e produção a partir de `main`.
@@ -106,6 +106,8 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 - [ ] Página de saúde simples confirma conexão com o banco no ambiente publicado (sem expor dados).
 - [ ] Variáveis de ambiente documentadas; nenhum segredo no repositório.
 - [ ] **Zero Trust:** papéis de banco separados (`app` sem DDL; `migrator` só no deploy), credenciais distintas por ambiente; Preview Deployments com *Deployment Protection* da Vercel; Preview sem segredos de produção.
+
+**Pré-requisitos do responsável (D-04):** conta Vercel com o repositório GitHub conectado e integração Neon (Marketplace). O agente guia o passo a passo; o responsável cria as contas e cadastra as variáveis na Vercel.
 
 **Notas técnicas:** ADR-0001, 0003, 0004, 0010.
 **Fora desta história:** modelos de domínio.

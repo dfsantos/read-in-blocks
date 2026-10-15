@@ -3,7 +3,7 @@
 **Status:** Rascunho v1
 **Versão:** v1.0
 **Data:** 2026-10-15
-**Autor / Responsável:** [PENDENTE] — definir quem assina o PRD.
+**Autor / Responsável:** Diego F. dos Santos
 
 > **Legenda:** [INFERIDO] = dedução do agente, não confirmada pelo stakeholder · [PENDENTE] = informação não obtida na entrevista.
 
