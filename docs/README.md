@@ -32,6 +32,8 @@ docs/
         └── E7-release.md
 ```
 
+> Configuração do agente em [`.claude/`](../.claude) (rules, skills, subagents).
+>
 > Na raiz do repositório, [`CLAUDE.md`](../CLAUDE.md) contém as regras permanentes lidas pelo agente (Conventional Commits, Zero Trust, idioma, processo).
 
 ## Por onde começar a validação

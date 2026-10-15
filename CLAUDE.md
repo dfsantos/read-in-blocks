@@ -52,7 +52,13 @@ Nunca confiar em rede, cliente, sessão, ambiente ou entrada. Verificar explicit
 - Não criar PR a menos que o usuário peça.
 - Decisões técnicas novas ⇒ novo ADR em `docs/adr/`. Não contradizer ADRs aceitos sem propor um ADR substituto.
 
-## 5. Mapa de documentos
+## 5. Rules, skills e subagents (`.claude/`)
+
+- **Rules** (`.claude/rules/`): carregam por caminho — `data-access`, `server-actions`, `i18n`, `domain`, `migrations`, `ui-shadcn`, `docs-ptbr`. Seguir sem exceção.
+- **Skills:** `/start-story US-XXX`, `/finish-story US-XXX`, `new-adr`, `vertical-slice`, `isolation-tests`, `security-checklist`, `resolve-decision`. Preferir a skill ao improviso quando a tarefa coincidir.
+- **Subagents (somente leitura):** `security-reviewer`, `acceptance-reviewer`, `migration-reviewer`. Invocados na finalização de cada história (ver `finish-story`).
+
+## 6. Mapa de documentos
 
 | Assunto | Documento |
 |---|---|

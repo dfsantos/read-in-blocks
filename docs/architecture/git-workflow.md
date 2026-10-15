@@ -52,6 +52,7 @@ Decisão registrada em [ADR-0012](../adr/0012-conventional-commits.md). Vale par
 | `docs` | Documentação em `docs/` |
 | `plan` | Quadro/plano de desenvolvimento |
 | `release` | Publicação em produção |
+| `agent` | Configuração do agente em `.claude/` (rules, skills, subagents) e `CLAUDE.md` |
 
 Novos escopos exigem atualizar esta tabela e a configuração do `commitlint` no mesmo commit.
 
