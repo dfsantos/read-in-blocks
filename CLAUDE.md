@@ -58,6 +58,8 @@ Nunca confiar em rede, cliente, sessão, ambiente ou entrada. Verificar explicit
 - **Skills:** `/start-story US-XXX`, `/finish-story US-XXX`, `new-adr`, `vertical-slice`, `isolation-tests`, `security-checklist`, `resolve-decision`. Preferir a skill ao improviso quando a tarefa coincidir.
 - **Subagents (somente leitura):** `security-reviewer`, `acceptance-reviewer`, `migration-reviewer`. Invocados na finalização de cada história (ver `finish-story`).
 
+- **Hook e permissões** (`.claude/settings.json`): o hook `validate-commit-msg.py` bloqueia commits fora da convenção e a flag de pular hooks; `deny` impede ler/editar `.env*` (exceto `.env.example`) e force push. Se um commit for bloqueado, corrija a mensagem; não contorne.
+
 ## 6. Mapa de documentos
 
 | Assunto | Documento |

@@ -54,7 +54,7 @@ Decisão registrada em [ADR-0012](../adr/0012-conventional-commits.md). Vale par
 | `release` | Publicação em produção |
 | `agent` | Configuração do agente em `.claude/` (rules, skills, subagents) e `CLAUDE.md` |
 
-Novos escopos exigem atualizar esta tabela e a configuração do `commitlint` no mesmo commit.
+Novos escopos exigem atualizar esta tabela, a lista `SCOPES` do hook `.claude/hooks/validate-commit-msg.py` e a configuração do `commitlint` no mesmo commit.
 
 ## Exemplos
 
@@ -96,9 +96,10 @@ chore(deps): bump drizzle-orm
 ## Enforcement
 
 1. **Agente:** regra obrigatória no `CLAUDE.md`.
-2. **Local:** hook `commit-msg` com `commitlint` (`@commitlint/config-conventional` + `scope-enum` desta tabela), instalado na US-001.
-3. **CI:** job que valida todos os commits do PR e o título do PR (US-001).
-4. Merge de PR por *squash* usa o título do PR, que também segue a convenção.
+2. **Agente (mecânico):** hook `PreToolUse` em `.claude/hooks/validate-commit-msg.py` (registrado em `.claude/settings.json`) bloqueia `git commit` com mensagem fora do formato, escopo desconhecido ou `--no-verify`. Mantenha a lista `SCOPES` do script sincronizada com a tabela acima.
+3. **Local:** hook `commit-msg` com `commitlint` (`@commitlint/config-conventional` + `scope-enum` desta tabela), instalado na US-001.
+4. **CI:** job que valida todos os commits do PR e o título do PR (US-001).
+5. Merge de PR por *squash* usa o título do PR, que também segue a convenção.
 
 ## Branches e PRs
 
