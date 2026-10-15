@@ -1,6 +1,6 @@
 # ADR-0010 — Qualidade, testes e CI
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

@@ -76,4 +76,5 @@ As versões que o projeto adota estão em [stack-versions.md](stack-versions.md)
 ## Manutenção
 
 - Pacote novo na stack ⇒ conferir se precisa de alias no hook (`ALIASES` em `require-context7.py`) e atualizar o mapa de arquivos de configuração (`CONFIG_FILES`).
+- Mudou o hook, os aliases ou a lista de escopos ⇒ rodar os testes em `.claude/hooks/tests/` (ver o README da pasta).
 - Mudança nesta política ⇒ ADR substituto.

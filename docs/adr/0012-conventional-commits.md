@@ -1,6 +1,6 @@
 # ADR-0012 — Conventional Commits
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

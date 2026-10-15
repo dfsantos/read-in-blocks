@@ -6,7 +6,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 
 | Marco | ID | História | RF | Tam. | Depende de | Bloqueios | Status | Aprovada em |
 |---|---|---|---|---|---|---|---|---|
-| M0 | [US-000](epics/E0-foundation.md) | Aprovar PRD, stack e plano | — | P | — | — | Em validação | |
+| M0 | [US-000](epics/E0-foundation.md) | Aprovar PRD, stack e plano | — | P | — | — | Aprovada | 2026-10-15 |
 | M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Pendente | |
 | M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Pendente | |
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Pendente | |
@@ -39,10 +39,10 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 29 histórias (1 de aprovação, 27 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** você aprovar a [US-000](epics/E0-foundation.md) (portão de aprovação do planejamento; ver "O que revisar" nela). Todas as decisões (D-01 a D-13) estão resolvidas. Regras permanentes do agente (Conventional Commits, Zero Trust, Context7) estão em [`CLAUDE.md`](../../CLAUDE.md).
+- **Próxima ação:** abrir uma nova sessão e rodar `/start-story US-001` (ver "Como retomar" em [plan/README.md](README.md)). Nenhuma história está em andamento.
 
 ## Registro de aprovações
 
 | Data | História | Observações |
 |---|---|---|
-| | | |
+| 2026-10-15 | US-000 | Aprovada pelo responsável: PRD, stack e versões, ADR-0001 a 0013 aceitos, roadmap e decisões D-01 a D-13. Nenhum código foi iniciado; o desenvolvimento começa em outra sessão. |

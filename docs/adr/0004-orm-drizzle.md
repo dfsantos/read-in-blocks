@@ -1,6 +1,6 @@
 # ADR-0004 — Drizzle ORM
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

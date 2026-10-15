@@ -1,6 +1,6 @@
 # ADR-0006 — Internacionalização com next-intl
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

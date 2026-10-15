@@ -1,6 +1,6 @@
 # ADR-0005 — Better Auth com login social Google
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

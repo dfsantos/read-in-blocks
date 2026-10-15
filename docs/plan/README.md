@@ -47,6 +47,14 @@ Nada além da história corrente é implementado. Se algo fora do escopo for des
 | **M** | Cerca de um dia; um fluxo completo com testes |
 | **G** | Mais de um dia; considerar quebrar se surgirem incertezas |
 
+## Como retomar em uma nova sessão
+
+1. Abrir a sessão neste repositório (o agente lê o `CLAUDE.md` automaticamente) com o servidor MCP **Context7** conectado e `python3` disponível (os hooks em `.claude/hooks/` dependem dele).
+2. Conferir [progress.md](progress.md): nenhuma história em andamento; US-000 aprovada.
+3. Rodar `/start-story US-001`. A skill valida o Definition of Ready, apresenta o plano e só então implementa.
+4. Ao terminar, `/finish-story US-001` leva a história a "Em validação"; só você marca "Aprovada".
+5. Pré-requisitos do responsável que aparecem adiante: contas Vercel/Neon e repositório conectado (US-003), cliente OAuth do Google e lista de e-mails autorizados (US-004).
+
 ## Estrutura do plano
 
 | Documento | Para quê |

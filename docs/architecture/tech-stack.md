@@ -1,6 +1,6 @@
 # Tech stack
 
-**Status:** Proposta para aprovação · **Data:** 2026-10-15
+**Status:** Aprovada (2026-10-15) · **Data:** 2026-10-15
 
 Cada escolha abaixo tem um ADR com contexto, alternativas e consequências. Nenhuma versão está fixada aqui: a história US-001 fixa as versões estáveis vigentes no momento da implementação, **confirmadas no Context7** ([política](stack-docs-policy.md); versões em [stack-versions.md](stack-versions.md)).
 

@@ -1,6 +1,6 @@
 # ADR-0001 — Next.js (App Router) + TypeScript na Vercel
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

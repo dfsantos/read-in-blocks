@@ -21,13 +21,13 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 | Decisões D-01 a D-13 (todas resolvidas) | [open-decisions.md](../open-decisions.md) |
 
 **Critérios de aceite**
-- [ ] PRD anexado em `docs/prd/` revisado.
-- [ ] ADRs 0001–0013 aceitos (status muda de *Proposto* para *Aceito*) ou ajustados.
-- [ ] Stack e versões fixadas revisadas.
-- [ ] Ordem do roadmap aprovada.
+- [x] PRD anexado em `docs/prd/` revisado.
+- [x] ADRs 0001–0013 aceitos (status muda de *Proposto* para *Aceito*) ou ajustados.
+- [x] Stack e versões fixadas revisadas.
+- [x] Ordem do roadmap aprovada.
 - [x] Decisões abertas respondidas (D-01 a D-13, em 2026-10-15).
 
-**Como aprovar:** diga "aprovo a US-000" (ou liste os ajustes). Ao aprovar, o agente marca a US-000 como *Aprovada* em `progress.md` com a data, muda os ADRs para *Aceito* e libera a `/start-story US-001`.
+**Aprovada em 2026-10-15.** Como foi aprovada: diga "aprovo a US-000" (ou liste os ajustes). Ao aprovar, o agente marcou a US-000 como *Aprovada* em `progress.md` com a data, muda os ADRs para *Aceito* e libera a `/start-story US-001`.
 
 **Fora desta história:** qualquer código.
 

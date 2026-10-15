@@ -1,6 +1,6 @@
 # ADR-0003 — PostgreSQL no Neon (Vercel Marketplace)
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

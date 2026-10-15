@@ -1,6 +1,6 @@
 # ADR-0008 — Isolamento de dados por usuário
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

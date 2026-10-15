@@ -2,7 +2,7 @@
 
 Aplicativo web de acompanhamento de leitura que usa a estrutura hierárquica do livro (partes, capítulos e tópicos) como unidade de progresso, com anotações ancoradas em cada capítulo.
 
-> **Estado atual:** fase de planejamento. Nenhum código de aplicação foi escrito ainda.
+> **Estado atual:** planejamento **aprovado** em 2026-10-15 (US-000). Nenhum código de aplicação foi escrito ainda; o desenvolvimento começa pela US-001 em uma nova sessão.
 
 ## Documentação
 

@@ -1,6 +1,6 @@
 # ADR-0009 — Modelo em árvore e progresso ponderado
 
-- **Status:** Proposto — decisões D-02 (páginas) e D-03 (só concluídas contam) resolvidas em 2026-10-15; ver [open-decisions.md](../plan/open-decisions.md)
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

@@ -1,6 +1,6 @@
 # ADR-0011 — Estratégia de segurança Zero Trust
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

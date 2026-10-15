@@ -1,6 +1,6 @@
 # ADR-0013 — Documentação via Context7 antes de qualquer mudança na stack
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
 
 ## Contexto

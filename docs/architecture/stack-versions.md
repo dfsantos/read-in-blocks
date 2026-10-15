@@ -1,6 +1,6 @@
 # Versões da stack
 
-**Status:** Proposta para validação · **Consultado no Context7 em:** 2026-10-15
+**Status:** Aprovada (2026-10-15) · **Consultado no Context7 em:** 2026-10-15
 
 Fonte única das versões que o projeto adota. Cada história de stack (US-001, 002, 003, 004, 007, 019, 022) traz a sua parte desta tabela em **"Versões fixadas"**. O agente instala **exatamente** estas versões e, se uma divergir, para e pergunta (política: [stack-docs-policy.md](stack-docs-policy.md), [ADR-0013](../adr/0013-context7-docs-first.md)).
 
