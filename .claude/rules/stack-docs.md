@@ -8,6 +8,7 @@ Vale para **qualquer** criação ou atualização da stack, em qualquer arquivo.
 4. O que o Context7 retorna **prevalece** sobre a memória do agente. Nunca fixar versão “de cabeça”: confirmar a versão atual/estável no Context7 e conferir requisitos (Node, peer deps, breaking changes).
 5. Nunca editar `pnpm-lock.yaml` à mão.
    Versões aprovadas: `docs/architecture/stack-versions.md` e “Versões fixadas” na história. Instale exatamente essas (sem `^`/`~`); patch a fechar ⇒ consulte o Context7 e registre; “Decisão” ⇒ pergunte antes.
-6. Um hook bloqueia dependências e configs sem consulta prévia. Se for bloqueado: faça a consulta pedida e repita. **Não** contorne, não use comando equivalente para escapar do hook e não edite `.claude/context7-exceptions.json` sem aprovação do usuário.
-7. Registrar no PR a seção “Documentação consultada” (biblioteca, ID Context7, versão adotada).
-8. Se o Context7 não tiver a biblioteca ou estiver indisponível: parar e avisar o usuário, nunca seguir pela memória.
+6. **Somente versões estáveis**: nunca `rc`, `beta`, `alpha`, `canary`, `next`, `nightly`, `dev` ou `x.y.z-sufixo`. Pré-release só com aprovação do usuário.
+7. Um hook bloqueia dependências e configs sem consulta prévia. Se for bloqueado: faça a consulta pedida e repita. **Não** contorne, não use comando equivalente para escapar do hook e não edite `.claude/context7-exceptions.json` sem aprovação do usuário.
+8. Registrar no PR a seção “Documentação consultada” (biblioteca, ID Context7, versão adotada).
+9. Se o Context7 não tiver a biblioteca ou estiver indisponível: parar e avisar o usuário, nunca seguir pela memória.

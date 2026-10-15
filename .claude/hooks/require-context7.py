@@ -12,6 +12,9 @@ A package is "covered" when the session transcript contains a Context7 `query-do
 input mentions the package (or one of its aliases). Packages listed in
 .claude/context7-exceptions.json are allowed (approved by the project owner).
 
+Stable versions only: pre-release specs (rc, beta, alpha, canary, next, nightly, dev, x.y.z-suffix) are
+blocked unless the package is listed under `prereleaseApproved` in the exceptions file.
+
 Exit 0 = allow; exit 2 = block (stderr is shown to the agent).
 """
 import fnmatch
@@ -103,6 +106,39 @@ def load_exceptions() -> set:
         return {e["package"].lower() for e in data.get("exceptions", []) if e.get("package")}
     except Exception:
         return set()
+
+
+def load_prerelease_approved() -> set:
+    path = os.path.join(project_dir(), ".claude", "context7-exceptions.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return {str(x).lower() for x in data.get("prereleaseApproved", [])}
+    except Exception:
+        return set()
+
+
+PRERELEASE_TAGS = r"(?:rc|beta|alpha|canary|next|nightly|dev|experimental|preview|insiders)"
+PRERELEASE_CMD_RE = re.compile(
+    r"(?<=[\w/.-])@(?:" + PRERELEASE_TAGS + r"(?=\s|$)|\d+\.\d+\.\d+-[0-9A-Za-z.-]+)")
+PRERELEASE_VALUE_RE = re.compile(r"^(?:" + PRERELEASE_TAGS + r"|[\^~]?\d+\.\d+\.\d+-[0-9A-Za-z.-]+)$")
+
+
+def prerelease_from_command(command: str) -> list:
+    command = strip_heredocs(command)
+    found = []
+    for tok in command.split():
+        if PRERELEASE_CMD_RE.search(tok):
+            found.append(tok.strip("'\""))
+    return found
+
+
+def prerelease_deps(text: str) -> list:
+    out = []
+    for key, value in re.findall(r'"((?:@[\w.-]+/)?[\w.-]+)"\s*:\s*"([^"]*)"', text):
+        if key not in NON_DEP_KEYS and PRERELEASE_VALUE_RE.match(value):
+            out.append(f"{key}@{value}")
+    return out
 
 
 def consulted_text(transcript_path: str) -> str:
@@ -285,6 +321,19 @@ def main() -> None:
                 needed = [pkg]
     if not needed:
         sys.exit(0)
+
+    approved = load_prerelease_approved()
+    pre = []
+    if tool == "Bash":
+        pre = prerelease_from_command(tool_input.get("command", ""))
+    elif os.path.basename(tool_input.get("file_path", "")) == "package.json":
+        pre = prerelease_deps(new_text(tool, tool_input))
+    pre = [x for x in pre if clean_pkg(x).lower() not in approved]
+    if pre:
+        block("only STABLE versions are allowed (no rc/beta/alpha/canary/next/nightly/dev or x.y.z-suffix):\n"
+              + "\n".join(f"  - {x}" for x in pre)
+              + "\nUse the stable version from docs/architecture/stack-versions.md. A pre-release needs the owner's "
+                "approval recorded under `prereleaseApproved` in .claude/context7-exceptions.json.")
 
     exceptions = load_exceptions()
     haystack = consulted_text(data.get("transcript_path", ""))

@@ -61,7 +61,7 @@ Biblioteca que o Context7 não tem: o agente **informa o usuário** e propõe a 
 }
 ```
 
-Só o responsável aprova. Cada exceção é revisada ao fim do marco. Sem aprovação, o agente não altera esse arquivo.
+Pré-releases aprovadas ficam em `"prereleaseApproved": ["pacote"]`. Só o responsável aprova. Cada exceção é revisada ao fim do marco. Sem aprovação, o agente não altera esse arquivo.
 
 ## Versões aprovadas
 
@@ -70,6 +70,7 @@ As versões que o projeto adota estão em [stack-versions.md](stack-versions.md)
 - Instalar **exatamente** a versão da tabela, com `package.json` sem `^`/`~`.
 - Item “Linha (patch a fechar)”: consultar o Context7 para o patch e registrar na tabela antes de instalar; se não houver, parar e perguntar.
 - Item “Decisão”: não instalar antes da decisão registrada em `open-decisions.md`.
+- **Somente versões estáveis.** Proibido `rc`, `beta`, `alpha`, `canary`, `next`, `nightly`, `dev`, `experimental` e qualquer `x.y.z-sufixo`. O hook bloqueia comando e `package.json`; exceção só via `prereleaseApproved` em `.claude/context7-exceptions.json`, com aprovação do responsável.
 - Divergência entre o que o Context7 retorna e a tabela: parar, informar e propor atualização da tabela (nunca instalar “a mais nova” por conta própria).
 
 ## Manutenção

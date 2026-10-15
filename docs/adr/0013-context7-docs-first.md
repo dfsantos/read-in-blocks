@@ -20,6 +20,8 @@ O projeto depende de bibliotecas que mudam rápido (Next.js, shadcn/ui, Tailwind
 
 **Garantia mecânica (não depende da memória do agente):** hook `PreToolUse` (`.claude/hooks/require-context7.py`) bloqueia os itens 1 a 3 quando o transcript da sessão não contém uma chamada `query-docs` do Context7 que cubra a biblioteca. O bloqueio informa qual biblioteca falta consultar.
 
+**Somente versões estáveis:** o hook também bloqueia pré-releases (`rc`, `beta`, `alpha`, `canary`, `next`, `nightly`, `dev`, `x.y.z-sufixo`) em comandos e em `package.json`; exceção por pacote em `prereleaseApproved`, com aprovação do responsável.
+
 **Exceções:** biblioteca ausente do Context7 só passa se constar em `.claude/context7-exceptions.json`, com motivo, data e aprovação do responsável. O agente **não** acrescenta exceções por conta própria.
 
 **Registro:** a descrição do PR lista, por história, as bibliotecas consultadas (ID Context7 e versão) e as versões efetivamente adotadas.
@@ -27,7 +29,7 @@ O projeto depende de bibliotecas que mudam rápido (Next.js, shadcn/ui, Tailwind
 ## Alternativas consideradas
 
 - **Apenas instrução no `CLAUDE.md`:** depende do agente lembrar; não é garantia. Mantida como camada complementar.
-- **Fixar versões “conhecidas” no plano:** envelhece rápido e reproduz o problema. O plano continua sem fixar versões (a US-001 adota as estáveis vigentes).
+- **Fixar versões “conhecidas” no plano:** envelhece rápido e reproduz o problema. As versões agora são fixadas em [stack-versions.md](../architecture/stack-versions.md), cada uma validada no Context7 e só em versão estável.
 - **Busca na web:** menos precisa por versão e mais sujeita a conteúdo desatualizado ou de terceiros.
 
 ## Consequências

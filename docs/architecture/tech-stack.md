@@ -20,7 +20,7 @@ Cada escolha abaixo tem um ADR com contexto, alternativas e consequências. Nenh
 |---|---|---|
 | Framework | Next.js (App Router) + TypeScript estrito | [0001](../adr/0001-framework-nextjs-on-vercel.md) |
 | Runtime / gerenciador | Node.js LTS + pnpm | [0001](../adr/0001-framework-nextjs-on-vercel.md) |
-| UI | shadcn/ui (Radix) + Tailwind CSS + lucide-react | [0002](../adr/0002-ui-shadcn-tailwind.md) |
+| UI | shadcn/ui (Base UI) + Tailwind CSS + lucide-react | [0002](../adr/0002-ui-shadcn-tailwind.md) |
 | Banco de dados | PostgreSQL (Neon, via Vercel Marketplace) | [0003](../adr/0003-database-postgres-neon.md) |
 | ORM / migrações | Drizzle ORM + drizzle-kit | [0004](../adr/0004-orm-drizzle.md) |
 | Autenticação | Better Auth + Google OAuth | [0005](../adr/0005-authentication-better-auth-google.md) |

@@ -58,7 +58,14 @@ def main() -> None:
     if not re.search(r"(^|[;&|\s(])git\s+(?:-C\s+\S+\s+)?commit\b", command):
         sys.exit(0)
 
-    if re.search(r"\s(--no-verify|-n)(\s|$)", command):
+    # Look for the bypass flag only in the `git commit` invocation itself: drop quoted text and heredocs,
+    # then stop at the next shell separator (other commands such as `grep -n` must not trigger this).
+    commit_pos = re.search(r"(^|[;&|\s(])git\s+(?:-C\s+\S+\s+)?commit\b", command)
+    tail = command[commit_pos.end():] if commit_pos else ""
+    tail = re.sub(r"<<-?\s*['\"]?(\w+)['\"]?\s*\n.*?\n\s*\1\b", " ", tail, flags=re.S)
+    tail = re.sub(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'', '""', tail)
+    tail = re.split(r"&&|\|\||;|\||\n", tail)[0]
+    if re.search(r"(^|\s)(--no-verify|-n)(\s|$)", tail):
         fail("`--no-verify` is not allowed; hooks and commitlint must run.")
 
     # Only inspect what follows `git commit`: earlier heredocs/-m flags belong to other commands.

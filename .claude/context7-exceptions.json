@@ -1,4 +1,5 @@
 {
-  "_comment": "Pacotes ausentes do Context7 aprovados pelo responsavel. O agente NAO adiciona entradas sozinho. Ver docs/architecture/stack-docs-policy.md",
-  "exceptions": []
+  "_comment": "Pacotes ausentes do Context7 e pre-releases aprovados pelo responsavel. O agente NAO adiciona entradas sozinho. Ver docs/architecture/stack-docs-policy.md",
+  "exceptions": [],
+  "prereleaseApproved": []
 }

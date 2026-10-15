@@ -12,6 +12,7 @@ Precisamos de acesso tipado ao Postgres, migrações versionadas e boa execuçã
 - **Drizzle ORM** + **drizzle-kit** para schema em TypeScript e migrações SQL versionadas no repositório (`src/db/migrations`).
 - Consultas complexas (árvore, agregações) podem usar SQL explícito via `sql` do Drizzle, encapsuladas em repositórios.
 - Better Auth usa o adapter do Drizzle, mantendo um único schema.
+- **Versão estável** (D-12): drizzle-orm 0.44.7 + drizzle-kit 0.31.5; a 1.0 em RC (`@rc`) não é usada. Ver [stack-versions.md](../architecture/stack-versions.md).
 
 ## Alternativas consideradas
 

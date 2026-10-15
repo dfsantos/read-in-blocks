@@ -29,6 +29,8 @@ Política: `docs/architecture/stack-docs-policy.md` (ADR-0013). Um hook bloqueia
 
 ## Nunca
 
+- Instalar pré-release (`rc`, `beta`, `alpha`, `canary`, `next`, `nightly`, `dev`, `x.y.z-sufixo`): só versões estáveis.
+
 - Fixar versão sem confirmar no Context7.
 - Usar dependência “porque já conheço” sem consultar nesta sessão.
 - Contornar o hook (comando alternativo, script indireto, edição do lockfile).

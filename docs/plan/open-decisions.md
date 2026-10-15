@@ -14,9 +14,13 @@ Itens que **dependem de você** ou que o PRD deixou sem resposta. Cada um indica
 | D-08 | **Campos extras de livro** (autor, capa, total de páginas): o PRD só exige “cadastrar um livro”. | US-007 | Título obrigatório; autor opcional; sem capa no MVP | Aberta |
 | D-09 | **Exclusão de dados e conta:** não consta no PRD, mas há conteúdo protegido por direitos autorais. | US-009 | Excluir livro apaga em cascata estrutura e anotações (com confirmação). Exclusão de conta fica fora do MVP | Aberta |
 | D-10 | **Quem pode entrar (Zero Trust, acesso negado por padrão):** hoje há um único usuário (PRD §8). | US-004 | **Allowlist de e-mails Google** em variável de ambiente; abrir cadastro a qualquer conta Google exige nova decisão e revisão de segurança | Aberta |
-| D-11 | **Base do shadcn/ui:** a CLI 4.21.0 usa **Base UI** por padrão (desde 2026-07); o ADR-0002 assumiu Radix. | US-001 | **Radix** (`shadcn init -b radix`): maior base de exemplos e menor desvio do ADR-0002. Alternativa: Base UI (padrão atual) | Aberta |
-| D-12 | **Drizzle:** a documentação atual aponta para a **1.0 em release candidate** (`@rc`). A estável referenciada é drizzle-orm 0.44.7 + drizzle-kit 0.31.5. | US-003 | **Estável 0.44.7 + 0.31.5** (versões exatas conhecidas, sem RC em produção). Alternativa: 1.0 RC, com patch a fechar | Aberta |
-| D-13 | **pnpm:** só há tags 11.x indexadas (11.28.5), mas a documentação indica o **pnpm 12 como `latest`**. | US-001 | **pnpm 12.x** (linha corrente; patch a fechar via Context7). Alternativa: 11.28.5, exato e conhecido | Aberta |
+| D-11 | **Base do shadcn/ui:** Base UI (padrão atual da CLI 4.21.0) ou Radix (assumido no ADR-0002). | US-001 | — | **Resolvida (2026-10-15):** usar o **padrão do shadcn = Base UI** (`@base-ui/react`), sem `-b radix`. ADR-0002 ajustado |
+| D-12 | **Drizzle:** 1.0 em release candidate (`@rc`) ou versão estável. | US-003 | — | **Resolvida (2026-10-15):** **estável** — drizzle-orm 0.44.7 + drizzle-kit 0.31.5; sem RC |
+| D-13 | **pnpm:** 11.28.5 (exato) ou linha 12. | US-001 | — | **Resolvida (2026-10-15):** **pnpm 12** (linha estável corrente); patch gravado por `pnpm init` na US-001 |
+
+### Regra permanente (2026-10-15)
+
+**Sempre optar por versões estáveis.** Nada de `rc`, `beta`, `alpha`, `canary`, `next`, `nightly`, `dev` nem versões com sufixo de pré-release. Exceção só com aprovação do responsável (`prereleaseApproved` em `.claude/context7-exceptions.json`). Registrada em ADR-0013 e na política de stack.
 
 ## Como fechar
 
