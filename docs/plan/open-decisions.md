@@ -4,7 +4,7 @@ Itens que **dependem de você** ou que o PRD deixou sem resposta. Cada um indica
 
 | ID | Decisão | Bloqueia | Proposta padrão | Status |
 |---|---|---|---|---|
-| D-01 | **Objetivos e métricas de sucesso** (PRD §4 está `[PENDENTE]`). | Nada técnico; afeta a definição de “MVP bem-sucedido” e eventual instrumentação | Seguir sem métricas; revisitar após M6. Sem analytics no MVP | Aberta |
+| D-01 | **Objetivos e métricas de sucesso** (PRD §4 estava `[PENDENTE]`). | — | — | **Resolvida (2026-10-15):** o responsável será o **primeiro usuário** e avaliará por conta própria se o MVP foi bem-sucedido. **Sem métricas formais nem analytics no MVP**; critério de sucesso = avaliação direta de uso |
 | D-02 | **Unidade da meta (RF-002): páginas, minutos ou peso.** | US-007, US-011, US-016 | — | **Resolvida (2026-10-15):** **páginas**, unidade única para todos os livros (sem escolha por livro). Estreita o RF-002 do PRD no MVP; minutos e peso ficam para depois |
 | D-03 | **Como “em andamento” entra no progresso ponderado (RF-008).** | US-016 | — | **Resolvida (2026-10-15):** **só concluídas contam** (0% ou 100% por folha); “em andamento” não soma ao progresso |
 | D-04 | **Credenciais e contas externas (Google Cloud OAuth, Vercel, Neon, GitHub↔Vercel, domínio).** | US-003, US-004 | — | **Resolvida (2026-10-15):** proposta aceita — o agente guia o passo a passo; o responsável cria as credenciais e as cadastra nas variáveis da Vercel (pré-requisito das US-003/004) |

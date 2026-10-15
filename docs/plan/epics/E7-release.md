@@ -46,4 +46,4 @@ Endurecimento e entrada em produção. Podem ser executadas assim que M6 estiver
 - [ ] Teste de fumaça em produção: login, criar livro, estrutura, estado, anotação.
 - [ ] README atualizado para uso e operação.
 
-**Fora desta história:** observabilidade avançada e métricas (depende de D-01).
+**Fora desta história:** observabilidade avançada e métricas (D-01: sem métricas formais no MVP; o responsável avalia o sucesso pelo uso).

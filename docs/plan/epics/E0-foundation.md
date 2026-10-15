@@ -6,13 +6,28 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 
 ### US-000 — Aprovar PRD, stack e plano
 **Como** responsável pelo produto, **quero** revisar e aprovar o PRD, a stack e este plano, **para** autorizar o início do desenvolvimento.
-**Cobre:** — · **Tamanho:** P · **Depende de:** — · **Bloqueios:** — (D-01, objetivos e métricas, segue aberta e não bloqueia)
+**Cobre:** — · **Tamanho:** P · **Depende de:** — · **Bloqueios:** —
+
+> **O que é esta história:** é o *portão de aprovação* do planejamento, sem código. "Em validação" significa que o pacote de documentos está entregue e aguarda o seu aceite. Nada de desenvolvimento começa antes dela ser **Aprovada**.
+
+**O que revisar**
+| Item | Onde |
+|---|---|
+| Produto (PRD, com autor e decisões D-01, D-02 aplicadas) | [prd-read-in-blocks.md](../../prd/prd-read-in-blocks.md) |
+| Stack e versões fixadas (13 itens exatos, o restante como linha) | [tech-stack.md](../../architecture/tech-stack.md), [stack-versions.md](../../architecture/stack-versions.md) |
+| Decisões técnicas (ADR-0001 a 0013, hoje "Proposto") | [adr/](../../adr/README.md) |
+| Segurança Zero Trust, commits e política do Context7 | [zero-trust.md](../../security/zero-trust.md), [git-workflow.md](../../architecture/git-workflow.md), [stack-docs-policy.md](../../architecture/stack-docs-policy.md) |
+| Histórias, ordem e marcos | [epics/](.), [roadmap.md](../roadmap.md), [progress.md](../progress.md) |
+| Decisões D-01 a D-13 (todas resolvidas) | [open-decisions.md](../open-decisions.md) |
 
 **Critérios de aceite**
 - [ ] PRD anexado em `docs/prd/` revisado.
-- [ ] ADRs 0001–0010 aceitos (status muda de *Proposto* para *Aceito*) ou ajustados.
+- [ ] ADRs 0001–0013 aceitos (status muda de *Proposto* para *Aceito*) ou ajustados.
+- [ ] Stack e versões fixadas revisadas.
 - [ ] Ordem do roadmap aprovada.
-- [ ] Decisões abertas respondidas ou conscientemente adiadas.
+- [x] Decisões abertas respondidas (D-01 a D-13, em 2026-10-15).
+
+**Como aprovar:** diga "aprovo a US-000" (ou liste os ajustes). Ao aprovar, o agente marca a US-000 como *Aprovada* em `progress.md` com a data, muda os ADRs para *Aceito* e libera a `/start-story US-001`.
 
 **Fora desta história:** qualquer código.
 

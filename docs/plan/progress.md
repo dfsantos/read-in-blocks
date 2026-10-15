@@ -39,7 +39,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 29 histórias (1 de aprovação, 27 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** você validar este plano ([US-000](epics/E0-foundation.md)) e responder as [decisões em aberto](open-decisions.md). Regras permanentes do agente (Conventional Commits, Zero Trust) estão em [`CLAUDE.md`](../../CLAUDE.md).
+- **Próxima ação:** você aprovar a [US-000](epics/E0-foundation.md) (portão de aprovação do planejamento; ver "O que revisar" nela). Todas as decisões (D-01 a D-13) estão resolvidas. Regras permanentes do agente (Conventional Commits, Zero Trust, Context7) estão em [`CLAUDE.md`](../../CLAUDE.md).
 
 ## Registro de aprovações
 

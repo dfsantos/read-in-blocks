@@ -32,6 +32,8 @@ O leitor não tem um lugar organizado para guardar, ao longo do tempo, o que que
 
 [PENDENTE] — o stakeholder declarou que, no momento, não há objetivos definidos.
 
+> **Atualização (2026-10-15):** o stakeholder será o primeiro usuário e avaliará pessoalmente se o MVP foi bem-sucedido. Objetivos e métricas formais continuam sem definição e não são exigidos para o MVP.
+
 ### Métricas e Metas
 
 [PENDENTE] — não há métricas definidas. Sem elas, não existe critério objetivo para avaliar se o MVP cumpriu seu propósito.
