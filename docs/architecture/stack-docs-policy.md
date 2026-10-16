@@ -51,13 +51,30 @@ Boas práticas:
 - **`Edit`/`MultiEdit` em `package.json` existente:** o hook aplica a edição sobre o arquivo atual e exige consulta para cada dependência adicionada ou com versão alterada (`dependencies`, `devDependencies`, `optionalDependencies`, `peerDependencies`, `overrides` e `pnpm.overrides`); trocar só a versão também conta. Se não der para calcular (arquivo novo ou JSON inválido), vale o critério antigo: toda dependência citada no texto novo.
 - **Falha fechada:** erro inesperado na análise de `Bash`, `Edit`, `Write` ou `MultiEdit` (inclusive aninhamento excessivo de comandos) bloqueia a ação em vez de liberá-la.
 
+### Arquivos do próprio gate (US-031, [ADR-0015](../adr/0015-context7-gate-self-protection.md))
+
+- `.claude/context7-exceptions.json`, `.claude/hooks/**` (inclusive os testes), `.claude/settings.json`, `.claude/settings.local.json` e `.claude/rules/stack-docs.md` **nunca são alterados pelo agente**: há regras `deny` de `Edit`/`Write` no `.claude/settings.json` e o hook bloqueia também a escrita por Bash (redirecionamento, `tee`, `sed -i`, `cp`/`mv`/`rm`, `git checkout|restore`, `git apply`/`patch`) e por código inline de interpretador (`python3 -c`, `node -e`). Ler, rodar os testes (`python3 .claude/hooks/tests/…`) e `git add`/`commit` continuam livres.
+- Os transcripts de sessão (`~/.claude/projects/**/*.jsonl`), que provam as consultas, também são bloqueados para escrita.
+- **Procedimento do responsável:** o agente propõe a mudança (diff no PR ou texto pronto) e o responsável a aplica fora do agente (editor ou terminal próprio). Histórias que alteram o hook são implementadas numa worktree/branch, enquanto o hook ativo é o da `main`; depois do merge, o arquivo fica protegido também nas worktrees.
+
+### Configuração do gerenciador de pacotes (US-031)
+
+- `pnpm-workspace.yaml` e `.npmrc` exigem consulta ao Context7 do pnpm (`/pnpm/pnpm`); `.yarnrc`/`.yarnrc.yml`, do Yarn; `bunfig.toml`, do Bun.
+- Linhas novas em chaves de cadeia de suprimentos do `pnpm-workspace.yaml` (`allowBuilds`, `minimumReleaseAgeExclude`, `overrides`, `catalog`/`catalogs`, `onlyBuiltDependencies`, `neverBuiltDependencies`, `ignoredBuiltDependencies`, `patchedDependencies`, `packageExtensions`) exigem também a consulta de cada pacote citado. IDs de alerta em `audit.ignore` (`GHSA-…`) só exigem a do pnpm.
+- `registry`/`@escopo:registry` (ou `npmRegistryServer`) diferente de `https://registry.npmjs.org/`, e `--registry` em comandos, são bloqueados sempre: precisam de aprovação do responsável.
+- Escrita por Bash nesses arquivos e `npm|pnpm|yarn config set|delete` são bloqueados; use `Edit`/`Write`.
+
+### Pré-releases e aliases (US-031)
+
+- Pré-release dentro de faixa (`zod@^4.0.0-beta.1`, `~4.0.0-rc.1`, `>=4.0.0-alpha`, `4.0.0-beta.1 - 4.0.0`) e `--tag <pré-release>` (`--tag beta`, `--tag=next`) contam como pré-release, em comandos, `package.json` e `overrides`/`catalog` do `pnpm-workspace.yaml`.
+- Alias `npm:` (`zod@npm:outro`, `"zod": "npm:outro@1"`) instala outro pacote com o nome declarado: só com aprovação do responsável em `aliasesApproved` (`"zod@npm:outro"`) no `.claude/context7-exceptions.json`, e o pacote real (`outro`) precisa de consulta.
+
 Limites conhecidos:
 
 - A análise é estática e heurística: não prova que a consulta tratou do assunto exato, nem que um comando desconhecido não altera arquivos. Scripts que escrevem por conta própria sem citar o arquivo na linha de comando (`node -e`, `python -c`, scripts do `package.json`, `pnpm db:generate`) não são reconhecidos; a regra, a skill e a revisão cobrem.
 - Variáveis, globs e expansões do shell não são resolvidos (`$PM add zod`, `f=package.json; sed -i … $f`, `pnpm add {zod,next}`, `cp x package.js[o]n`), nem alvos que chegam por `xargs` (`echo zod | xargs pnpm add`, `… | xargs sed -i`). Cópia de diretório ou extração de arquivo compactado sobre o projeto (`cp -r /tmp/x/. .`, `rsync -a … ./`, `tar xf …`) e `git checkout|restore` de diretório inteiro ou `git stash pop` também não são vistos.
 - `bash script.sh` não lê o conteúdo do script.
-- O transcript da sessão é a prova da consulta: um agente que o editasse de propósito enganaria o hook. Isso é contornar o hook, proibido pela regra `stack-docs`; não há proteção mecânica.
-- Os arquivos que configuram o próprio gate (`.claude/context7-exceptions.json`, o hook e `.claude/settings.json`) não são protegidos pelo hook; a aprovação do responsável para alterá-los é regra de processo.
+- Mudanças indiretas nos arquivos protegidos, sem citá-los na linha de comando (troca de branch, `git merge`/`pull`/`rebase`, `git stash pop`, scripts executados), não são vistas.
 - Documentação legítima que comece com "not found" (ex.: a página 404 do Next) não conta como consulta; refaça a pergunta de outro jeito.
 - Um conector do Context7 com outro nome de servidor (outra máquina ou plugin, ex.: `mcp__plugin_context7_context7__…`) só conta depois de registrado em `trustedServers`.
 - Consulta por subagent não conta. Faça na sessão principal.
@@ -81,7 +98,7 @@ Biblioteca que o Context7 não tem: o agente **informa o usuário** e propõe a 
 }
 ```
 
-Pré-releases aprovadas ficam em `"prereleaseApproved": ["pacote"]`.
+Pré-releases aprovadas ficam em `"prereleaseApproved": ["pacote"]`; aliases `npm:` aprovados, em `"aliasesApproved": ["alias@npm:pacote-real"]`.
 
 Servidores do Context7 registrados com id gerado (ex.: o conector do Claude Desktop, `mcp__<uuid>__query-docs`) ficam em `trustedServers`:
 
@@ -93,7 +110,7 @@ Servidores do Context7 registrados com id gerado (ex.: o conector do Claude Desk
 }
 ```
 
-Só o responsável aprova. Cada exceção é revisada ao fim do marco. Sem aprovação, o agente não altera esse arquivo.
+Só o responsável aprova, e é ele quem altera esse arquivo (o agente é bloqueado, ADR-0015). Cada exceção é revisada ao fim do marco.
 
 ## Scaffolding com as CLIs oficiais
 
@@ -111,7 +128,7 @@ As versões que o projeto adota estão em [stack-versions.md](stack-versions.md)
 
 ## Manutenção
 
-- Pacote novo na stack ⇒ se o id do Context7 que o documenta não tem o nome do pacote como projeto, incluir o pacote (ou o escopo) em `LIBRARY_IDS` em `require-context7.py`, com o id registrado em [stack-versions.md](stack-versions.md); atualizar o mapa de arquivos de configuração (`CONFIG_FILES`) quando houver arquivo de configuração novo.
-- Conector do Context7 com id novo (outra máquina ou reinstalação do app) ⇒ o hook bloqueia; o agente informa o id e o responsável decide incluí-lo em `trustedServers`.
+- Pacote novo na stack ⇒ se o id do Context7 que o documenta não tem o nome do pacote como projeto, o agente **propõe** ao responsável incluir o pacote (ou o escopo) em `LIBRARY_IDS` em `require-context7.py`, com o id registrado em [stack-versions.md](stack-versions.md); atualizar o mapa de arquivos de configuração (`CONFIG_FILES`) quando houver arquivo de configuração novo.
+- Conector do Context7 com id novo (outra máquina ou reinstalação do app) ⇒ o hook bloqueia; o agente informa o id e o responsável decide incluí-lo em `trustedServers` (ele mesmo edita o arquivo).
 - Mudou o hook, o `LIBRARY_IDS` ou a lista de escopos ⇒ rodar os testes em `.claude/hooks/tests/` (ver o README da pasta).
 - Mudança nesta política ⇒ ADR substituto.

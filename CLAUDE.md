@@ -71,7 +71,7 @@ Nunca confiar em rede, cliente, sessão, ambiente ou entrada. Verificar explicit
 - **Skills:** `/start-story US-XXX`, `/finish-story US-XXX`, `new-adr`, `vertical-slice`, `isolation-tests`, `security-checklist`, `resolve-decision`, `stack-change`. Preferir a skill ao improviso quando a tarefa coincidir.
 - **Subagents (somente leitura):** `security-reviewer`, `acceptance-reviewer`, `migration-reviewer`. Invocados na finalização de cada história (ver `finish-story`).
 
-- **Hooks e permissões** (`.claude/settings.json`): `require-context7.py` bloqueia mudança de stack sem consulta ao Context7; `validate-commit-msg.py` bloqueia commits fora da convenção e a flag de pular hooks; `deny` impede ler/editar `.env*` (exceto `.env.example`) e force push. Se um commit for bloqueado, corrija a mensagem; não contorne.
+- **Hooks e permissões** (`.claude/settings.json`): `require-context7.py` bloqueia mudança de stack sem consulta ao Context7; `validate-commit-msg.py` bloqueia commits fora da convenção e a flag de pular hooks; `deny` impede ler/editar `.env*` (exceto `.env.example`) e force push. Os arquivos do próprio gate (`.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings*.json`, `.claude/rules/stack-docs.md`) e os transcripts de sessão **não são alterados pelo agente** (`deny` + hook, ADR-0015): proponha a mudança e o responsável aplica. Se um commit for bloqueado, corrija a mensagem; não contorne.
 
 ## 7. Mapa de documentos
 
