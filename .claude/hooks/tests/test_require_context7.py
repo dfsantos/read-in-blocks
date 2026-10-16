@@ -7,7 +7,7 @@ ENV = dict(os.environ, CLAUDE_PROJECT_DIR=ROOT)
 
 def transcript(calls):
     """Each call is (name, input) or (name, input, result): result is "ok" (default), "error"
-    (failed call) or None (no result recorded)."""
+    (failed call), None (no result recorded) or any other string (the result text)."""
     f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
     for n, call in enumerate(calls):
         name, inp, result = (call + ("ok",))[:3]
@@ -16,7 +16,8 @@ def transcript(calls):
             {"type": "tool_use", "id": use_id, "name": name, "input": inp}]}}) + "\n")
         if result:
             f.write(json.dumps({"type": "user", "message": {"content": [
-                {"type": "tool_result", "tool_use_id": use_id, "content": "docs",
+                {"type": "tool_result", "tool_use_id": use_id,
+                 "content": "docs" if result in ("ok", "error") else [{"type": "text", "text": result}],
                  "is_error": result == "error"}]}}) + "\n")
     f.close()
     return f.name
@@ -34,6 +35,11 @@ R = "mcp__Context7__resolve-library-id"
 NEXT = [(Q, {"libraryId": "/vercel/next.js", "query": "app router setup"})]
 INTL = [(Q, {"libraryId": "/amannn/next-intl", "query": "setup"})]
 DRIZ = [(Q, {"libraryId": "/drizzle-team/drizzle-orm-docs", "query": "migrations drizzle-kit"})]
+GEN = "mcp__ccffa570-6f0e-44ac-a2df-d30e2cd29738__"
+LUCIDE_ID = "/lucide-icons/lucide"
+RESOLVED_LUCIDE = (R, {"libraryName": "lucide", "query": "icons"},
+                   f"Available Libraries:\n- Title: Lucide\n- Context7-compatible library ID: {LUCIDE_ID}\n")
+VITEST = [(Q, {"libraryId": "/vitest-dev/vitest", "query": "projects"})]
 TIP = [(Q, {"libraryId": "/ueberdosis/tiptap", "query": "code block lowlight"})]
 
 cases = [
@@ -105,6 +111,121 @@ cases = [
     ("redirection is not a package", "Bash", {"command": "pnpm install --frozen-lockfile 2>&1 | tail -3"}, [], 0),
     ("redirect target is not a package", "Bash", {"command": "pnpm install > install.log"}, [], 0),
     ("package before a redirection still checked", "Bash", {"command": "pnpm add zod 2>&1"}, [], 2),
+    # US-030 (1): only the libraryId covers a package, never the free-text query.
+    ("package named only in the query", "Bash", {"command": "pnpm add zod"},
+     [(Q, {"libraryId": "/vercel/next.js", "query": "zod next-intl drizzle tiptap"})], 2),
+    ("one query cannot cover many packages", "Bash", {"command": "pnpm add next-intl zod"},
+     [(Q, {"libraryId": "/amannn/next-intl", "query": "use with zod"})], 2),
+    ("project segment names the package", "Bash", {"command": "pnpm add lowlight"},
+     [(R, {"libraryName": "lowlight", "query": "x"}, "- Context7-compatible library ID: /wooorm/lowlight"),
+      (Q, {"libraryId": "/wooorm/lowlight", "query": "register languages"})], 0),
+    ("docs-site project name normalized", "Bash", {"command": "pnpm add zod"},
+     [(Q, {"libraryId": "/websites/zod_dev", "query": "schemas"})], 0),
+    ("org alone does not cover a package", "Bash", {"command": "pnpm add vercel"},
+     [(Q, {"libraryId": "/vercel/next.js", "query": "deploy"})], 2),
+    ("@types covered by the underlying library", "Bash", {"command": "pnpm add -D @types/react-dom"},
+     [(Q, {"libraryId": "/websites/react_dev", "query": "types"})], 0),
+    ("block message lists consulted ids", "Bash", {"command": "pnpm add zod"}, NEXT, 2),
+    # US-030 (2): the libraryId must come from a successful resolve (or be a known id) and the
+    # result must be real documentation.
+    ("unmapped id without resolve", "Bash", {"command": "pnpm add lucide"},
+     [(Q, {"libraryId": LUCIDE_ID, "query": "icons"})], 2),
+    ("unmapped id after successful resolve", "Bash", {"command": "pnpm add lucide"},
+     [RESOLVED_LUCIDE, (Q, {"libraryId": LUCIDE_ID, "query": "icons"})], 0),
+    ("versioned unmapped id after resolve", "Bash", {"command": "pnpm add lucide"},
+     [RESOLVED_LUCIDE, (Q, {"libraryId": LUCIDE_ID + "/v1.2.0", "query": "icons"})], 0),
+    ("resolve that returned another id", "Bash", {"command": "pnpm add lucide"},
+     [(R, {"libraryName": "lucide", "query": "x"}, "- Context7-compatible library ID: /other/icons"),
+      (Q, {"libraryId": LUCIDE_ID, "query": "icons"})], 2),
+    ("resolve after the query does not count", "Bash", {"command": "pnpm add lucide"},
+     [(Q, {"libraryId": LUCIDE_ID, "query": "icons"}), RESOLVED_LUCIDE], 2),
+    ("failed resolve does not count", "Bash", {"command": "pnpm add lucide"},
+     [(R, {"libraryName": "lucide", "query": "x"}, "error"), (Q, {"libraryId": LUCIDE_ID, "query": "icons"})], 2),
+    ("resolve from untrusted server", "Bash", {"command": "pnpm add lucide"},
+     [("mcp__otherdocs__resolve-library-id", {"libraryName": "lucide"}, f"ID: {LUCIDE_ID}"),
+      (Q, {"libraryId": LUCIDE_ID, "query": "icons"})], 2),
+    ("not-found text without is_error", "Bash", {"command": "pnpm add next-intl"},
+     [(Q, {"libraryId": "/amannn/next-intl", "query": "setup"},
+       'Library "/amannn/next-intl" not found. Please check the library ID.')], 2),
+    ("no documentation found text", "Bash", {"command": "pnpm add next-intl"},
+     [(Q, {"libraryId": "/amannn/next-intl", "query": "setup"}, "No documentation found for this query.")], 2),
+    ("empty result", "Bash", {"command": "pnpm add next-intl"},
+     [(Q, {"libraryId": "/amannn/next-intl", "query": "setup"}, "   ")], 2),
+    ("not found deep inside real docs is fine", "Bash", {"command": "pnpm add next-intl"},
+     [(Q, {"libraryId": "/amannn/next-intl", "query": "setup"}, "x" * 400 + " returns 404 not found")], 0),
+    # US-030 (3): only Context7 servers count.
+    ("untrusted server with well-formed id", "Bash", {"command": "pnpm add next-intl"},
+     [("mcp__otherdocs__query-docs", {"libraryId": "/amannn/next-intl", "query": "setup"})], 2),
+    ("server name containing context7 is not enough", "Bash", {"command": "pnpm add next-intl"},
+     [("mcp__evil-context7__query-docs", {"libraryId": "/amannn/next-intl", "query": "setup"})], 2),
+    ("unknown generated id not trusted", "Bash", {"command": "pnpm add next-intl"},
+     [("mcp__00000000-0000-0000-0000-000000000000__query-docs", {"libraryId": "/amannn/next-intl", "query": "s"})], 2),
+    ("trusted generated id resolve + query", "Bash", {"command": "pnpm add lucide"},
+     [(GEN + "resolve-library-id", {"libraryName": "lucide"}, f"ID: {LUCIDE_ID}"),
+      (GEN + "query-docs", {"libraryId": LUCIDE_ID, "query": "icons"})], 0),
+    # US-030 (4): Bash parser.
+    ("pnpm -w before add", "Bash", {"command": "pnpm -w add zod"}, [], 2),
+    ("pnpm -C dir before add", "Bash", {"command": "pnpm -C . add zod"}, [], 2),
+    ("pnpm --filter before add", "Bash", {"command": "pnpm --filter web add zod"}, [], 2),
+    ("pnpm --filter= before add", "Bash", {"command": "pnpm --filter=web add zod"}, [], 2),
+    ("npm --prefix before install", "Bash", {"command": "npm --prefix . install zod"}, [], 2),
+    ("npm -w takes a value", "Bash", {"command": "npm -w web install zod"}, [], 2),
+    ("yarn workspace add", "Bash", {"command": "yarn workspace web add zod"}, [], 2),
+    ("bun --cwd add", "Bash", {"command": "bun --cwd . add zod"}, [], 2),
+    ("global flags, covered", "Bash", {"command": "pnpm -w add next-intl"}, INTL, 0),
+    ("absolute pnpm path", "Bash", {"command": "/usr/bin/pnpm add zod"}, [], 2),
+    ("relative pnpm path", "Bash", {"command": "./node_modules/.bin/pnpm add zod"}, [], 2),
+    ("corepack pnpm", "Bash", {"command": "corepack pnpm add zod"}, [], 2),
+    ("npx pnpm", "Bash", {"command": "npx pnpm add zod"}, [], 2),
+    ("pnpm dlx pnpm", "Bash", {"command": "pnpm dlx pnpm add zod"}, [], 2),
+    ("pnpm dlx create-next-app still checked", "Bash", {"command": "pnpm dlx create-next-app@latest ."}, [], 2),
+    ("pnpm exec drizzle-kit", "Bash", {"command": "pnpm exec drizzle-kit generate"}, [], 2),
+    ("pnpm exec other bin is fine", "Bash", {"command": "pnpm exec eslint ."}, [], 0),
+    ("bash -c", "Bash", {"command": "bash -c 'pnpm add zod'"}, [], 2),
+    ("sh -c with double quotes", "Bash", {"command": 'sh -c "cd web && pnpm add zod"'}, [], 2),
+    ("bash -lc", "Bash", {"command": "bash -lc 'pnpm add zod'"}, [], 2),
+    ("eval", "Bash", {"command": "eval \"pnpm add zod\""}, [], 2),
+    ("subshell", "Bash", {"command": "(cd web && pnpm add zod)"}, [], 2),
+    ("block", "Bash", {"command": "{ pnpm add zod; }"}, [], 2),
+    ("command substitution", "Bash", {"command": "echo $(pnpm add zod)"}, [], 2),
+    ("backticks", "Bash", {"command": "echo `pnpm add zod`"}, [], 2),
+    ("env and sudo prefixes", "Bash", {"command": "env CI=1 sudo -u me nice -n 5 pnpm add zod"}, [], 2),
+    ("env -i prefix", "Bash", {"command": "env -i pnpm add zod"}, [], 2),
+    ("timeout prefix", "Bash", {"command": "timeout 60 pnpm add zod"}, [], 2),
+    ("xargs", "Bash", {"command": "echo zod | xargs pnpm add"}, [], 0),
+    ("sed -i on package.json", "Bash", {"command": "sed -i 's/1.0/2.0/' package.json"}, [], 2),
+    ("perl -pi on package.json", "Bash", {"command": "perl -pi -e 's/a/b/' package.json"}, [], 2),
+    ("cat > package.json heredoc", "Bash", {"command": "cat > package.json <<'EOF'\n{}\nEOF"}, [], 2),
+    ("echo >> package.json", "Bash", {"command": "echo '{}' >> ./package.json"}, [], 2),
+    ("tee package.json", "Bash", {"command": "echo '{}' | tee package.json"}, [], 2),
+    ("cp over package.json", "Bash", {"command": "cp /tmp/p.json package.json"}, [], 2),
+    ("cp into the project dir", "Bash", {"command": "cp /tmp/x/package.json ."}, [], 2),
+    ("mv package.json", "Bash", {"command": "mv package.json old.json"}, [], 2),
+    ("ln over package.json", "Bash", {"command": "ln -sf /tmp/p.json package.json"}, [], 2),
+    ("dd of=package.json", "Bash", {"command": "dd if=/tmp/p of=package.json"}, [], 2),
+    ("git checkout -- package.json", "Bash", {"command": "git checkout -- package.json"}, [], 2),
+    ("git checkout ref package.json", "Bash", {"command": "git checkout main package.json"}, [], 2),
+    ("git restore package.json", "Bash", {"command": "git restore package.json"}, [], 2),
+    ("git apply patch touching package.json", "Bash",
+     {"command": "git apply <<'EOF'\n--- a/package.json\n+++ b/package.json\nEOF"}, [], 2),
+    ("patch touching tsconfig", "Bash", {"command": "patch -p1 <<'EOF'\n--- a/tsconfig.json\nEOF"}, [], 2),
+    ("git apply of unrelated patch", "Bash", {"command": "git apply <<'EOF'\n--- a/src/x.ts\n+++ b/src/x.ts\nEOF"}, [], 0),
+    ("lockfile written by shell", "Bash", {"command": "git checkout main -- pnpm-lock.yaml"}, NEXT, 2),
+    ("lockfile removed by shell", "Bash", {"command": "rm pnpm-lock.yaml"}, [], 2),
+    ("unknown command naming package.json", "Bash", {"command": "node scripts/bump.js package.json"}, [], 2),
+    ("config written by shell without consult", "Bash", {"command": "cat > vitest.config.ts <<'EOF'\nx\nEOF"}, [], 2),
+    ("config written by shell, consulted", "Bash", {"command": "cat > vitest.config.ts <<'EOF'\nx\nEOF"}, VITEST, 0),
+    ("sed -i on workflow", "Bash", {"command": "sed -i 's/a/b/' .github/workflows/ci.yml"}, [], 2),
+    ("read-only cat/grep/jq", "Bash", {"command": "cat package.json | jq .scripts && grep -n zod package.json"}, [], 0),
+    ("read-only sed -n", "Bash", {"command": "sed -n '1,5p' package.json tsconfig.json"}, [], 0),
+    ("read-only git diff/log/add/commit", "Bash",
+     {"command": "git diff -- package.json && git log -p package.json && git add package.json pnpm-lock.yaml"}, [], 0),
+    ("copy from package.json elsewhere", "Bash", {"command": "cp package.json /tmp/backup.json"}, [], 0),
+    ("read into other file", "Bash", {"command": "jq .version package.json > /tmp/v.txt 2>&1"}, [], 0),
+    ("arrow in a message is not a redirection", "Bash", {"command": "echo 'step -> package.json'"}, [], 0),
+    ("tools reading a config", "Bash", {"command": "pnpm exec tsc -p tsconfig.json && vitest --config vitest.config.ts"}, [], 0),
+    ("find that only lists", "Bash", {"command": "find . -name package.json -not -path '*/node_modules/*'"}, [], 0),
+    ("find -delete", "Bash", {"command": "find . -name tsconfig.json -delete"}, [], 2),
 ]
 
 failed = 0
