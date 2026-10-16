@@ -9,7 +9,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M0 | [US-000](epics/E0-foundation.md) | Aprovar PRD, stack e plano | — | P | — | — | Aprovada | 2026-10-15 |
 | M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Aprovada | 2026-10-16 |
 | M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Aprovada | 2026-10-15 |
-| M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Em desenvolvimento | |
+| M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Aprovada | 2026-10-16 |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
@@ -39,7 +39,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 29 histórias (1 de aprovação, 27 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-003 em desenvolvimento (branch `story/US-003-database-and-deploy`). PR da US-002 ainda não aberto.
+- **Próxima ação:** US-003 aprovada e publicada (PR #13). Nenhuma história em andamento; próxima: `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
 
 ## Registro de aprovações
 
@@ -48,3 +48,4 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | 2026-10-15 | US-000 | Aprovada pelo responsável: PRD, stack e versões, ADR-0001 a 0013 aceitos, roadmap e decisões D-01 a D-13. Nenhum código foi iniciado; o desenvolvimento começa em outra sessão. |
 | 2026-10-16 | US-001 | Aprovada pelo responsável, mantendo os pontos de atenção: patches de versão fechados no npm, ESLint 10 com avisos de peers, ignore do GHSA-vfj7-8cjw-p6xm, minimumReleaseAgeExclude e texto literal até a US-002. PR ainda não aberto. |
 | 2026-10-15 | US-002 | Aprovada pelo responsável, mantendo os pontos de atenção: exceção permanente de `next-intl` em `context7-exceptions.json` (hook não reconhece o servidor Context7 da sessão; reavaliar), `allowBuilds` falso para `@swc/core` e `@parcel/watcher`, detector de literais heurístico. PR ainda não aberto. |
+| 2026-10-16 | US-003 | Aprovada pelo responsável (PR #13 mesclado). Produção: `https://read-in-blocks.vercel.app/api/health` → `{"status":"ok"}`; Preview protegido (302 sem login). Pontos de atenção: ADR-0014 ainda *Proposto*; `MIGRATOR_DATABASE_URL` visível no runtime (risco aceito); GHSA-67mh-4wv8-2f99 (moderada, `esbuild` 0.18.20 via `drizzle-kit`, só dev server, fora do runtime); endurecimentos apontados pelas revisões ainda abertos: papéis pré-existentes sem checagem de atributos/filiação no `roles.sql`, Git Fork Protection a confirmar, corrida de migração e ordem do journal na branch `preview` compartilhada, `REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`, testes de integração restritos a host local, gate do Context7 aceitando qualquer `*__query-docs`, rate limit de `/api/health`. |
