@@ -29,7 +29,7 @@
     "commitlint": "commitlint --edit",
     "prepare": "husky",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node src/db/migrate.ts",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down"
   },
