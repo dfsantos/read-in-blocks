@@ -2,6 +2,7 @@
 
 - **Status:** Aceito (2026-10-15)
 - **Data:** 2026-10-15
+- **Nota:** o driver e a estratégia de banco de preview são definidos pelo [ADR-0014](0014-database-driver-roles-and-deploy-migrations.md) (proposto na US-003).
 
 ## Contexto
 
