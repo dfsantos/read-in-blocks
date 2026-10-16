@@ -33,8 +33,8 @@ Boas práticas:
 `.claude/hooks/require-context7.py` roda antes de `Bash`, `Edit`, `Write` e `MultiEdit`. Ele:
 
 1. Identifica se a ação é de dependência ou de configuração da stack e quais pacotes envolve.
-2. Lê o transcript da sessão e procura chamadas `query-docs` do Context7.
-3. Considera um pacote coberto se alguma dessas chamadas menciona o pacote (ou um alias, ex.: `next` ⇒ `next.js`; `@tiptap/*` ⇒ `tiptap`).
+2. Lê o transcript da sessão e procura chamadas `query-docs` do Context7 (servidor `Context7` ou registrado com id gerado, `mcp__<id>__query-docs`). Só contam chamadas com `libraryId` no formato do Context7 (`/org/projeto` ou `/org/projeto/versão`) **e** com resultado sem erro; chamadas de outros servidores sem esse formato, malformadas ou que falharam não cobrem nada (US-029).
+3. Considera um pacote coberto se o `libraryId` ou a pergunta (`query`) de alguma dessas chamadas menciona o pacote (ou um alias, ex.: `next` ⇒ `next.js`; `@tiptap/*` ⇒ `tiptap`). Redirecionamentos do shell (`2>&1`, `> arquivo`) não são lidos como pacotes.
 4. Bloqueia (exit 2) e lista os pacotes sem cobertura. A resposta orienta a consulta e a repetição do comando.
 
 Limites conhecidos:

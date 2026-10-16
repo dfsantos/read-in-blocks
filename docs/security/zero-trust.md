@@ -18,6 +18,11 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 ### 1. Verificar explicitamente
 
 1. **Autorização no ponto do dado.** O middleware/redirecionamentos são conveniência de UX, **não** controle de segurança. Toda página, Server Action e Route Handler chama `requireUser()` e usa repositórios que exigem `userId`.
+   - **Exceções explícitas** (públicas por design, sem dados de usuário). Toda nova exceção entra nesta lista com justificativa:
+
+     | Rota | Por que é pública | Salvaguardas |
+     |---|---|---|
+     | `GET /api/health` (US-003) | Verificação de disponibilidade do deploy e do banco | Só `{"status":"ok"}`/`{"status":"error"}`, `Cache-Control: no-store`, consulta fixa (uma linha de `app_meta`, tabela técnica sem dados de usuário) com o papel `app`, erro só no log (código do Postgres). Rate limit planejado na US-028 (Vercel Firewall), já que cada chamada abre conexão com o banco. |
 2. **Server Actions são endpoints públicos.** Validam entrada (Zod), autenticam, autorizam e verificam origem (proteção CSRF padrão do Next + checagem de `Origin`).
 3. **Identidade só do servidor.** `userId`, `ownerId`, papéis e preços/pesos nunca vêm de parâmetros, cookies não assinados ou campos de formulário.
 4. **Recurso alheio = inexistente.** Resposta 404 idêntica à de recurso que não existe (sem diferença de mensagem nem de tempo perceptível).
@@ -27,7 +32,7 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 
 ### 2. Menor privilégio
 
-1. **Banco:** dois papéis — `app` (DML apenas, sem DDL/DROP, sem superuser) e `migrator` (DDL, usado só no deploy). Credenciais distintas por ambiente (produção, preview, local).
+1. **Banco:** dois papéis — `app` (DML apenas, sem DDL/DROP, sem superuser) e `migrator` (DDL, usado só no deploy). Credenciais distintas por ambiente (produção, preview, local). Nenhum dos dois tem atributo elevado (`SUPERUSER`, `CREATEDB`, `CREATEROLE`, `REPLICATION`, `BYPASSRLS`) nem pertence a outro papel; `roles.sql` impõe isso (US-029). Funções novas não são executáveis por `PUBLIC`.
 2. **Segredos:** definidos só na Vercel por ambiente; Preview não recebe segredos de produção. Rotacionar em caso de suspeita. `NEXT_PUBLIC_*` nunca contém segredo.
 3. **CI/CD:** `GITHUB_TOKEN` com `permissions: contents: read` por padrão, elevando por job; GitHub Actions de terceiros fixadas por SHA; sem segredos expostos a PRs de forks.
 4. **Dependências:** adicionar o mínimo necessário; lockfile obrigatório (`pnpm install --frozen-lockfile`); Dependabot/audit no CI.
