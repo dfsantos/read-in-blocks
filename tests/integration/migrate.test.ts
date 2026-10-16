@@ -1,7 +1,11 @@
 import { Client } from "pg";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { MIGRATION_LOCK_KEY, runMigrations } from "../../src/db/migrate";
+import {
+  MIGRATION_LOCK_KEY,
+  assertDirectConnection,
+  runMigrations,
+} from "../../src/db/migrate";
 
 import { requireTestEnv } from "./db-env";
 
@@ -46,6 +50,28 @@ describe("runMigrations (deploy migrations under an advisory lock)", () => {
     }, 200);
 
     await expect(run).resolves.toBeUndefined();
+  });
+
+  it.each([
+    "postgres://migrator:secret@ep-cool-name-123-pooler.us-east-2.aws.neon.tech/neondb",
+    "postgres://migrator:secret@ep-cool-name-123.us-east-2.aws.neon.tech/neondb?host=ep-cool-name-123-pooler.us-east-2.aws.neon.tech",
+  ])("refuses a pooled host, which cannot hold the lock: %s", async (url) => {
+    await expect(runMigrations(url)).rejects.toThrow(
+      /^MIGRATOR_DATABASE_URL must use the direct \(non-pooled\) host/,
+    );
+    expect(() => assertDirectConnection(url)).toThrow(
+      expect.objectContaining({
+        message: expect.not.stringContaining("secret"),
+      }),
+    );
+  });
+
+  it("accepts a direct host", () => {
+    expect(() =>
+      assertDirectConnection(
+        "postgres://migrator:secret@ep-cool-name-123.us-east-2.aws.neon.tech/neondb",
+      ),
+    ).not.toThrow();
   });
 
   it("applies each migration once when two runs start together", async () => {

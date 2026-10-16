@@ -30,6 +30,7 @@ export async function runMigrations(
     statementLockTimeout = "10s",
   }: MigrationOptions = {},
 ): Promise<void> {
+  assertDirectConnection(connectionString);
   // One client: the advisory lock belongs to the session that runs the migrations.
   const client = new Client({ connectionString });
   await client.connect();
@@ -44,10 +45,31 @@ export async function runMigrations(
       ]);
       await migrate(drizzle({ client }), { migrationsFolder });
     } finally {
-      await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);
+      // Best effort: closing the session releases the lock anyway, and a failing unlock
+      // (e.g. a dropped connection) must not hide the migration error.
+      await client
+        .query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY])
+        .catch(() => undefined);
     }
   } finally {
     await client.end();
+  }
+}
+
+// A pooled Neon host (PgBouncer, transaction mode) does not keep session state, so the advisory
+// lock and lock_timeout would silently not apply. The error never echoes the URL.
+export function assertDirectConnection(connectionString: string): void {
+  let hosts: string[];
+  try {
+    const url = new URL(connectionString);
+    hosts = [url.hostname, ...url.searchParams.getAll("host")];
+  } catch {
+    throw new Error("MIGRATOR_DATABASE_URL is not a valid URL");
+  }
+  if (hosts.some((host) => host.split(".")[0]?.endsWith("-pooler"))) {
+    throw new Error(
+      "MIGRATOR_DATABASE_URL must use the direct (non-pooled) host, without -pooler",
+    );
   }
 }
 
