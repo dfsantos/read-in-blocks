@@ -7,7 +7,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | Marco | ID | História | RF | Tam. | Depende de | Bloqueios | Status | Aprovada em |
 |---|---|---|---|---|---|---|---|---|
 | M0 | [US-000](epics/E0-foundation.md) | Aprovar PRD, stack e plano | — | P | — | — | Aprovada | 2026-10-15 |
-| M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Em validação | |
+| M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Aprovada | 2026-10-16 |
 | M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Pendente | |
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Pendente | |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
@@ -39,10 +39,11 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 29 histórias (1 de aprovação, 27 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Em validação:** US-001 (branch `story/US-001-project-base`), aguardando a aprovação do responsável. Nenhuma outra história em andamento.
+- **Próxima ação:** abrir uma nova sessão e rodar `/start-story US-002`. Nenhuma história está em andamento.
 
 ## Registro de aprovações
 
 | Data | História | Observações |
 |---|---|---|
 | 2026-10-15 | US-000 | Aprovada pelo responsável: PRD, stack e versões, ADR-0001 a 0013 aceitos, roadmap e decisões D-01 a D-13. Nenhum código foi iniciado; o desenvolvimento começa em outra sessão. |
+| 2026-10-16 | US-001 | Aprovada pelo responsável, mantendo os pontos de atenção: patches de versão fechados no npm, ESLint 10 com avisos de peers, ignore do GHSA-vfj7-8cjw-p6xm, minimumReleaseAgeExclude e texto literal até a US-002. PR ainda não aberto. |
