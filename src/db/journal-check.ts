@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 // Guards the drizzle migration journal against rebases and merges (US-029): drizzle applies a
@@ -78,11 +78,26 @@ function git(...args: string[]): string {
 
 function main(baseRef: string | undefined): number {
   const entries = parseJournal(readFileSync(JOURNAL_PATH, "utf8"));
-  const problems = entries
-    .filter(({ tag }) => !existsSync(`${MIGRATIONS_DIR}/${tag}.sql`))
-    .map(({ tag }) => `${tag}: SQL file not found`);
+  const problems: string[] = [];
+  for (const { idx, tag } of entries) {
+    if (!existsSync(`${MIGRATIONS_DIR}/${tag}.sql`)) {
+      problems.push(`${tag}: SQL file not found`);
+    }
+    const snapshot = `${MIGRATIONS_DIR}/meta/${String(idx).padStart(4, "0")}_snapshot.json`;
+    if (!existsSync(snapshot)) problems.push(`${tag}: ${snapshot} not found`);
+  }
+  const tags = new Set(entries.map(({ tag }) => tag));
+  for (const file of readdirSync(MIGRATIONS_DIR)) {
+    if (file.endsWith(".sql") && !tags.has(file.slice(0, -4))) {
+      problems.push(`${file}: not in the journal (never applied)`);
+    }
+  }
 
   let baseEntries: JournalEntry[] = [];
+  if (baseRef?.startsWith("-")) {
+    console.error("✗ base ref must be a commit or branch, not an option");
+    return 1;
+  }
   if (baseRef) {
     baseEntries = parseJournal(git("show", `${baseRef}:${JOURNAL_PATH}`));
     for (const { tag } of baseEntries) {
