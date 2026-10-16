@@ -1,0 +1,26 @@
+# Local Postgres for development and integration tests (ADR-0003, ADR-0014).
+# Credentials below are for this local container only; never reuse them elsewhere.
+services:
+  postgres:
+    # postgres:17-alpine (17.11), pinned by digest.
+    image: postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      APP_DB_PASSWORD: app_local
+      MIGRATOR_DB_PASSWORD: migrator_local
+    ports:
+      # Bound to loopback only: not reachable from the local network.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - ./src/db/bootstrap:/bootstrap:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  postgres-data:

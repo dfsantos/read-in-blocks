@@ -6,20 +6,27 @@ Aplicativo web de acompanhamento de leitura que usa a estrutura hierárquica do 
 
 ## Desenvolvimento local
 
-Requisitos: Node 24 (`.nvmrc`) e pnpm 12 (`corepack enable` usa a versão de `packageManager`).
+Requisitos: Node 24 (`.nvmrc`), pnpm 12 (`corepack enable` usa a versão de `packageManager`) e Docker (Postgres local).
 
 ```bash
 pnpm install
-cp .env.example .env.local   # sem variáveis obrigatórias por enquanto
-pnpm dev                     # http://localhost:3000
+cp .env.example .env.local   # preencha DATABASE_URL e MIGRATOR_DATABASE_URL com os valores locais indicados
+pnpm db:up                   # Postgres 17 em 127.0.0.1:5432, com os papéis app/migrator
+pnpm db:migrate              # aplica as migrações com o papel migrator
+pnpm dev                     # http://localhost:3000 (saúde: /api/health)
 ```
+
+Banco, papéis, Neon e Vercel: [`docs/architecture/database.md`](docs/architecture/database.md).
 
 | Script                              | Para quê                                                           |
 | ----------------------------------- | ------------------------------------------------------------------ |
 | `pnpm lint`                         | ESLint                                                             |
 | `pnpm typecheck`                    | `tsc --noEmit`                                                     |
 | `pnpm format` / `pnpm format:check` | Prettier                                                           |
-| `pnpm test`                         | Vitest (unitário/integração)                                       |
+| `pnpm test`                         | Vitest (unitário)                                                  |
+| `pnpm test:integration`             | Vitest contra o Postgres local (`TEST_*` em `.env.test.local`)     |
+| `pnpm db:generate` / `db:migrate`   | Gera migração do schema (drizzle-kit) / aplica com o `migrator`    |
+| `pnpm db:up` / `db:down`            | Sobe / derruba o Postgres local (Docker Compose)                   |
 | `pnpm test:e2e`                     | Playwright (primeira vez: `pnpm exec playwright install chromium`) |
 | `pnpm build`                        | Build de produção                                                  |
 
