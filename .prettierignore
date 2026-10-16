@@ -8,3 +8,4 @@ docs
 .claude
 CLAUDE.md
 src/components/ui
+src/db/migrations
