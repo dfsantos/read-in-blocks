@@ -1,0 +1,25 @@
+minimumReleaseAgeExclude:
+  - '@next/env@16.4.2'
+  - '@next/eslint-plugin-next@16.4.2'
+  - '@next/swc-darwin-arm64@16.4.2'
+  - '@next/swc-darwin-x64@16.4.2'
+  - '@next/swc-linux-arm64-gnu@16.4.2'
+  - '@next/swc-linux-arm64-musl@16.4.2'
+  - '@next/swc-linux-x64-gnu@16.4.2'
+  - '@next/swc-linux-x64-musl@16.4.2'
+  - '@next/swc-win32-arm64-msvc@16.4.2'
+  - '@next/swc-win32-x64-msvc@16.4.2'
+  - eslint-config-next@16.4.2
+  - jsdom@30.1.3
+  - next@16.4.2
+
+allowBuilds:
+  unrs-resolver: false
+
+audit:
+  level: high
+  ignore:
+    # braces <=3.0.3 stack-exhaustion DoS, no patched release. Reached only via
+    # glob handling in build/lint tooling (shadcn CLI, eslint-config-next) with
+    # trusted patterns. Re-evaluate when a fix ships (see US-001 notes).
+    - GHSA-vfj7-8cjw-p6xm

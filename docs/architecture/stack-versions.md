@@ -116,6 +116,26 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 7. **Next.js 16 removeu `next lint`:** os scripts de lint usam a CLI do ESLint.
 8. **Suporte a Node 24 na Vercel não foi verificado** (fora do Context7); conferir na US-003 antes de fixar `engines`.
 
+### Versões fechadas na implementação (2026-10-16)
+
+Patches das linhas "a fechar", resolvidos no registro npm dentro das linhas confirmadas no Context7 (o Context7 não indexa esses patches; **sujeito à sua revisão**).
+
+| Pacote | Versão instalada | Observação |
+|---|---|---|
+| `pnpm` | 12.11.2 | tag `latest` do npm; 12.12–12.14 existem, mas não são a tag estável |
+| `next` / `eslint-config-next` | 16.4.2 | `create-next-app@16.4.2` |
+| `react` / `react-dom` | 19.3.0 | do scaffold |
+| `@types/react`, `@types/react-dom`, `@types/node` | 19.3.0, 19.3.0, 24.19.2 | `@types/node` na linha do Node 24 |
+| `@tailwindcss/postcss` / `postcss` | 4.3.3 / 8.5.30 | plugin PostCSS (o scaffold usa `@tailwindcss/turbopack`; mantido o aprovado) |
+| `typescript-eslint` | 8.70.1 | |
+| `vite` | 8.3.4 | `@vitejs/plugin-react` 6.1.2 exige Vite 8 |
+| `@testing-library/react`, `dom`, `jest-dom`, `user-event`, `jsdom` | 16.3.3, 10.4.2, 7.0.1, 14.6.8, 30.1.3 | |
+| `eslint-config-prettier` | 10.1.8 | |
+| shadcn (Base UI `base-nova`) | `shadcn` 4.21.0, `@base-ui/react` 1.9.0, `class-variance-authority` 0.7.1, `cn` 0.4.0, `lucide-react` 1.57.0, `tw-animate-css` 1.4.0 | `cn` é publicado pelo mantenedor do shadcn |
+| `actions/checkout` | SHA `d23441a4…` (v6.1.0) | `gitleaks/gitleaks-action` fixada por SHA `e0c47f4f…` (v3.0.0) |
+
+Pontos de atenção: (1) `eslint-plugin-react`, `-import` e `-jsx-a11y` (via `eslint-config-next`) declaram peer até ESLint 9; o lint roda com ESLint 10, mas `pnpm peers check` avisa. (2) O pnpm 12 gravou `minimumReleaseAgeExclude` para `next@16.4.2` e `jsdom@30.1.3` (versões recentes demais). (3) `pnpm audit` acusa `GHSA-vfj7-8cjw-p6xm` (`braces`, sem correção), ignorado em `pnpm-workspace.yaml` com justificativa.
+
 ## Como esta tabela é mantida
 
 - Mudou uma versão ⇒ nova consulta ao Context7, atualização aqui **e** na tabela da história, no mesmo commit (`docs(docs): ...` ou `build(deps): ...`).
