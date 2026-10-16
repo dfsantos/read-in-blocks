@@ -8,7 +8,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 |---|---|---|---|---|---|---|---|---|
 | M0 | [US-000](epics/E0-foundation.md) | Aprovar PRD, stack e plano | — | P | — | — | Aprovada | 2026-10-15 |
 | M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Aprovada | 2026-10-16 |
-| M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Pendente | |
+| M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Em validação | |
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Pendente | |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
@@ -39,7 +39,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 29 histórias (1 de aprovação, 27 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** abrir uma nova sessão e rodar `/start-story US-002`. Nenhuma história está em andamento.
+- **Próxima ação:** US-002 em validação (branch `story/US-002-i18n`); aguardando aprovação do responsável.
 
 ## Registro de aprovações
 
