@@ -1,6 +1,6 @@
 # ADR-0014 — Driver `pg`, papéis de banco, banco de preview e migrações no deploy
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-16)
 - **Data:** 2026-10-15
 - **Substitui parcialmente:** [ADR-0003](0003-database-postgres-neon.md) (somente o item do driver e a escolha do banco de preview, que o ADR-0003 deixou para a US-003)
 
