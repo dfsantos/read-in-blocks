@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "title": "Read in Blocks",
+    "description": "Acompanhe sua leitura por partes, capítulos e tópicos."
+  },
+  "home": {
+    "title": "Read in Blocks",
+    "description": "Acompanhe sua leitura por partes, capítulos e tópicos.",
+    "body": "O projeto base está pronto. As funcionalidades chegam por história.",
+    "cta": "Em breve",
+    "formatting": {
+      "date": "Data: {value}",
+      "number": "Número: {value}",
+      "percent": "Progresso: {value}"
+    }
+  }
+}

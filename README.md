@@ -25,6 +25,17 @@ pnpm dev                     # http://localhost:3000
 
 Commits seguem Conventional Commits; o hook `commit-msg` (husky + commitlint) bloqueia mensagens fora do padrão. Regras completas em [`CLAUDE.md`](CLAUDE.md).
 
+## Internacionalização
+
+O texto da interface vem sempre de `messages/<locale>.json` (next-intl, [ADR-0006](docs/adr/0006-internationalization-next-intl.md)); componentes não têm literais. Hoje só `pt-BR` está ativo, sem prefixo na URL.
+
+Para adicionar um idioma (por exemplo `en`):
+
+1. Copie `messages/pt-BR.json` para `messages/en.json` e traduza os valores, mantendo as mesmas chaves.
+2. Registre o locale em `src/i18n/routing.ts`: `locales: ["pt-BR", "en"]`. O `defaultLocale` continua `pt-BR`, e com `localePrefix: "as-needed"` as URLs em inglês passam a usar `/en/...`.
+3. Rode `pnpm test`: `src/i18n/messages.test.ts` falha se algum catálogo tiver chaves a mais ou a menos, e `src/i18n/no-literals.test.ts` falha se houver texto de interface em `src/` fora do catálogo.
+4. Se quiser um seletor de idioma, crie uma história própria (fora do escopo da US-002).
+
 ## Documentação
 
 Toda a documentação vive em [`docs/`](docs/README.md):

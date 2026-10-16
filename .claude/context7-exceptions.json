@@ -1,5 +1,10 @@
 {
   "_comment": "Pacotes ausentes do Context7 e pre-releases aprovados pelo responsavel. O agente NAO adiciona entradas sozinho. Ver docs/architecture/stack-docs-policy.md",
-  "exceptions": [],
+  "exceptions": [
+    {
+      "package": "next-intl",
+      "reason": "Consultado no Context7 (/amannn/next-intl, v4.14.7) na US-002, mas o hook nao reconheceu o servidor Context7 da sessao. Aprovado pelo responsavel."
+    }
+  ],
   "prereleaseApproved": []
 }
