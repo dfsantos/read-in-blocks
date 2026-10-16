@@ -99,16 +99,23 @@ LOCKFILES = ("pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb", "b
 
 NON_DEP_KEYS = {"name", "version", "packageManager", "node", "npm", "pnpm", "yarn", "description",
                 "main", "type", "license", "private", "author", "homepage"}
-VERSION_VALUE_RE = re.compile(r'^(?:[\^~<>=*]|\d|latest|next|workspace:|npm:|catalog:|link:|file:|github:)')
-PMS = {"pnpm", "npm", "yarn", "bun"}
+VERSION_VALUE_RE = re.compile(r'^(?:[\^~<>=*]|\d|(?:latest|next)$|workspace:|npm:|catalog:|link:|file:|github:)')
+PMS = {"pnpm", "npm", "yarn", "yarnpkg", "bun"}
+ADD_LIKE = {"add", "install", "i", "in", "ins", "inst", "insta", "instal", "isnt", "isnta", "isntal", "isntall",
+            "it", "install-test", "update", "up", "upgrade", "udpate", "remove", "rm", "r", "uninstall", "un",
+            "unlink"}
+UPDATE_ALL = {"update", "up", "upgrade", "udpate"}
+PM_SUBCOMMANDS = ADD_LIKE | {"dlx", "x", "exec", "create", "init", "pkg", "workspace", "drizzle-kit", "shadcn"}
+MAX_DEPTH = 8
 PM_RUNNERS = {"npx", "bunx", "pnpx"}
 # Flags (before or after the subcommand) that take a separate value. pnpm's `-w` is a boolean
 # (--workspace-root); npm's `-w` takes a workspace name.
 FLAGS_WITH_VALUE = {"--filter", "-F", "--filter-prod", "--prefix", "--cwd", "-C", "--dir", "--workspace",
                     "--workspace-dir", "--registry", "--tag", "--loglevel", "--reporter", "--config"}
 SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
+RESERVED_WORDS = {"if", "then", "elif", "else", "do", "while", "until", "!"}
 WRAPPERS = {"sudo", "doas", "time", "env", "nice", "nohup", "exec", "command", "builtin", "stdbuf",
-            "timeout", "xargs"}
+            "timeout", "xargs", "setsid", "unbuffer"}
 WRAPPER_FLAGS_WITH_VALUE = {
     "sudo": {"-u", "-g", "-C", "-h", "-p", "-U"}, "doas": {"-u", "-C"}, "env": {"-u", "-C"},
     "nice": {"-n"}, "timeout": {"-s", "-k"}, "stdbuf": {"-i", "-o", "-e"},
@@ -117,12 +124,16 @@ WRAPPER_FLAGS_WITH_VALUE = {
 # Commands that only read the files they name (shell redirections are checked separately).
 READ_ONLY = {"cat", "less", "more", "head", "tail", "grep", "egrep", "fgrep", "rg", "ag", "jq", "wc",
              "diff", "cmp", "ls", "stat", "file", "echo", "printf", "test", "[", "realpath", "readlink",
-             "bat", "sort", "uniq", "sha256sum", "md5sum", "basename", "dirname", "code",
+             "bat", "sort", "sha256sum", "md5sum", "basename", "dirname", "code",
              # tools that read a config file passed as an argument
              "tsc", "eslint", "vitest", "playwright", "next", "drizzle-kit", "shadcn", "prettier"}
+# Flags that make a READ_ONLY command write the files it names.
+WRITE_FLAGS = {"sort": {"-o", "--output"}, "prettier": {"--write", "-w"}, "eslint": {"--fix"},
+               "tsc": {"--init"}, "next": {"lint"}}
 IN_PLACE_EDITORS = {"sed", "perl", "awk", "gawk", "ruby"}
 GIT_READ_ONLY = {"diff", "log", "show", "status", "blame", "grep", "ls-files", "add", "commit", "rev-parse",
-                 "cat-file", "shortlog", "whatchanged", "difftool"}
+                 "cat-file", "shortlog", "whatchanged", "difftool", "reset"}  # `reset <path>` only unstages
+GIT_FLAGS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}
 COPY_LIKE = {"cp", "ln", "install", "rsync"}
 PATCHERS = {"patch"}
 GIT_PATCHERS = {"apply", "am"}
@@ -158,19 +169,22 @@ def load_config() -> dict:
 
 
 def load_exceptions(config: dict) -> set:
-    return {str(e["package"]).lower() for e in config.get("exceptions", [])
+    entries = config.get("exceptions", [])
+    return {str(e["package"]).lower() for e in (entries if isinstance(entries, list) else [])
             if isinstance(e, dict) and e.get("package")}
 
 
 def load_prerelease_approved(config: dict) -> set:
-    return {str(x).lower() for x in config.get("prereleaseApproved", [])}
+    entries = config.get("prereleaseApproved", [])
+    return {str(x).lower() for x in (entries if isinstance(entries, list) else [])}
 
 
 def load_trusted_servers(config: dict) -> set:
     """MCP server names whose `resolve-library-id`/`query-docs` tools are Context7: the server named
     "Context7" plus connector ids approved by the owner (e.g. Claude Desktop's generated ids)."""
     servers = {"context7"}
-    for entry in config.get("trustedServers", []):
+    entries = config.get("trustedServers", [])
+    for entry in entries if isinstance(entries, list) else []:
         name = entry.get("server") if isinstance(entry, dict) else entry
         if name:
             servers.add(str(name).lower())
@@ -275,9 +289,13 @@ def consulted_ids(transcript_path: str, trusted: set) -> list:
     return consulted
 
 
-def normalize(name: str) -> str:
-    """Project/package name without docs-site suffixes and punctuation (next.js -> next)."""
-    name = name.lower().lstrip("@")
+def normalize_package(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", name.lower().lstrip("@"))
+
+
+def normalize_project(name: str) -> str:
+    """Context7 project segment without docs-site suffixes and punctuation (next.js -> next)."""
+    name = name.lower()
     stripped = name
     while True:
         shorter = re.sub(r"[-_.]?(?:docs|dev|com|io|org|js|llms(?:-full)?_txt)$", "", stripped)
@@ -304,7 +322,7 @@ def covered(pkg: str, library_ids: list) -> bool:
         for key in keys_for(pkg):
             if any(fnmatch.fnmatch(base, p) for p in LIBRARY_IDS.get(key, [])):
                 return True
-            if project and normalize(project) == normalize(key):
+            if project and normalize_project(project) == normalize_package(key):
                 return True
     return False
 
@@ -324,8 +342,12 @@ def strip_heredocs(command: str) -> str:
 
 
 SHELL_C_RE = re.compile(
-    r"(?:\b(?:ba|z|da|k)?sh\s+(?:-[a-zA-Z]+\s+)*-[a-zA-Z]*c[a-zA-Z]*|\beval)\s+"
-    r"(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\")")
+    r"(?:\b(?:ba|z|da|k)?sh\s+(?:[-+]O?o\s+\S+\s+|-[a-zA-Z]+\s+|--[\w-]+\s+)*-[a-zA-Z]*c[a-zA-Z]*|\beval)\s+"
+    r"\$?(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\")")
+HEREDOC_BODY_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n(.*?)\n\s*\1\b", re.S)
+HERESTRING_RE = re.compile(r"<<<\s*\$?(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\"|(\S+))")
+QUOTED_RE = re.compile(r"\$?'([^']*)'|\"((?:[^\"\\]|\\.)*)\"")
+QUOTED_WITH_SPACE_RE = re.compile(r"'[^'\n]*\s[^'\n]*'|\"(?:[^\"\\\n]|\\.)*\s(?:[^\"\\\n]|\\.)*\"")
 REDIRECT_TARGET_RE = re.compile(r"(?:(?<![-=>])\d*|&)>>?\|?\s*(['\"]?)([^\s'\";&|<>()]+)\1")
 REDIRECT_RE = re.compile(r"\d*(?:>>?|<|&>)&?\|?\s*\S*")
 SEGMENT_SPLIT_RE = re.compile(r"&&|\|\||;|\|&?|&|\n|\$\(|`|\(|\)|(?<![$\w]){|}")
@@ -357,7 +379,7 @@ def split_words(segment: str) -> list:
 def strip_prefixes(words: list) -> list:
     while words:
         name = os.path.basename(words[0])
-        if re.match(r"^\w+=", words[0]):
+        if re.match(r"^\w+=", words[0]) or words[0] in RESERVED_WORDS:
             words = words[1:]
         elif name in WRAPPERS:
             with_value = WRAPPER_FLAGS_WITH_VALUE.get(name, set())
@@ -384,13 +406,21 @@ def non_flag_args(args: list, pm: str = "") -> list:
     return out
 
 
-def analyze_pm(words: list, project: str) -> list:
+def analyze_pm(words: list, project: str, depth: int = 0) -> list:
     pm = os.path.basename(words[0])
-    i = 1
-    while i < len(words) and words[i].startswith("-"):  # global flags before the subcommand
-        flag = words[i]
-        takes_value = "=" not in flag and (flag in FLAGS_WITH_VALUE or (flag == "-w" and pm != "pnpm"))
-        i += 2 if takes_value else 1
+    pm = "yarn" if pm == "yarnpkg" else pm
+    i, after_unknown_flag = 1, False
+    while i < len(words):  # global flags before the subcommand, known or not
+        word = words[i]
+        if word.startswith("-"):
+            takes_value = "=" not in word and (word in FLAGS_WITH_VALUE or (word == "-w" and pm != "pnpm"))
+            after_unknown_flag = "=" not in word and not takes_value
+            i += 2 if takes_value else 1
+        elif word in PM_SUBCOMMANDS or word.startswith("shadcn@") or not after_unknown_flag:
+            break
+        else:  # value of an unknown flag (`--cache /tmp/c`)
+            after_unknown_flag = False
+            i += 1
     if i >= len(words):
         return []
     sub, args = words[i], words[i + 1:]
@@ -400,17 +430,17 @@ def analyze_pm(words: list, project: str) -> list:
     if sub in ("dlx", "x") and rest:
         first = os.path.basename(clean_pkg(rest[0]))
         if first in PMS or first in PM_RUNNERS or first == "corepack":
-            return analyze_words(args_from(args, rest), project)
+            return analyze_words(args_from(args, rest), project, depth + 1)
         return [clean_pkg(rest[0])]
     if sub == "exec" and rest:
-        return analyze_words(args_from(args, rest), project)
-    if sub == "create":
-        return ["create-" + clean_pkg(rest[0])] if rest else []
-    if sub in ("add", "install", "i", "update", "up", "upgrade", "remove", "rm", "uninstall", "un"):
+        return analyze_words(args_from(args, rest), project, depth + 1)
+    if sub in ("create", "init") and rest:  # `npm init vite` runs create-vite
+        return ["create-" + clean_pkg(rest[0])]
+    if sub in ADD_LIKE:
         targets = [clean_pkg(a) for a in rest]
         if targets:
             return targets
-        if sub in ("update", "up", "upgrade"):
+        if sub in UPDATE_ALL:
             return all_declared_deps(project)  # updates everything
         return []
     if sub in ("drizzle-kit", "shadcn") or sub.startswith("shadcn@"):
@@ -423,21 +453,29 @@ def args_from(args: list, rest: list) -> list:
     return args[args.index(rest[0]):]
 
 
-def analyze_words(words: list, project: str) -> list:
+def analyze_words(words: list, project: str, depth: int = 0) -> list:
+    if depth > MAX_DEPTH:
+        raise ValueError("command nesting too deep")
     words = strip_prefixes(words)
     if not words:
         return []
     name = os.path.basename(words[0])
     if name in PMS and len(words) >= 2:
-        return analyze_pm(words, project)
+        return analyze_pm(words, project, depth)
     if name == "corepack":
-        return analyze_words(words[1:], project)
+        return analyze_words(words[1:], project, depth + 1)
+    if name in ("node", "nodejs"):  # node …/pnpm/bin/pnpm.cjs add x
+        rest = non_flag_args(words[1:])
+        script = re.match(r"^(pnpm|npm|yarn|bun)(?:-cli)?\.c?js$", os.path.basename(rest[0])) if rest else None
+        if script:
+            return analyze_words([script.group(1)] + args_from(words[1:], rest)[1:], project, depth + 1)
+        return []
     if name in PM_RUNNERS:
         rest = non_flag_args(words[1:])
         if not rest:
             return []
         if os.path.basename(clean_pkg(rest[0])) in PMS:
-            return analyze_words(args_from(words[1:], rest), project)
+            return analyze_words(args_from(words[1:], rest), project, depth + 1)
         return [clean_pkg(rest[0])]
     if name in ("drizzle-kit", "shadcn") or name.startswith("shadcn@"):
         return [clean_pkg(name)]
@@ -451,14 +489,29 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
         return []
     name = os.path.basename(words[0])
     args = words[1:]
-    if name in PMS or name in PM_RUNNERS or name in SHELLS or name == "corepack":
+    if name in PMS:
+        sub = [a for a in args if not a.startswith("-")]
+        if sub and sub[0] == "pkg" and len(sub) > 1 and sub[1] in ("set", "delete", "fix"):
+            return [("package.json", "package.json")]  # `npm pkg set dependencies.x=1`
+        return []
+    if name in PM_RUNNERS or name in SHELLS or name == "corepack":
         return []
     cited = [k for k in (protected_kind(a) for a in args) if k]
     if name == "git":
-        sub = non_flag_args(args)
-        sub = sub[0] if sub else ""
+        sub, skip = "", False
+        for a in args:
+            if skip:
+                skip = False
+            elif a.startswith("-"):
+                skip = a in GIT_FLAGS_WITH_VALUE
+            else:
+                sub = a
+                break
         if sub in GIT_PATCHERS:
             return patched_files(args, raw_command, project)
+        if sub == "restore" and any(a in ("--staged", "-S") for a in args) \
+                and not any(a in ("--worktree", "-W") for a in args):
+            return []  # only unstages
         return [] if sub in GIT_READ_ONLY else cited
     if name in PATCHERS:
         return patched_files(args, raw_command, project)
@@ -482,6 +535,9 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
             return [k for k in (protected_kind(t) for t in targets[:-1]) if k]
         return []
     if name in READ_ONLY:
+        writes = WRITE_FLAGS.get(name, set())
+        if any(a in writes or any(a.startswith(f + "=") for f in writes if f.startswith("--")) for a in args):
+            return cited
         return []
     return cited  # unknown command naming a protected file: assume it may write it
 
@@ -490,9 +546,11 @@ def patched_files(args: list, raw_command: str, project: str) -> list:
     """A patch touches protected files when the patch text (inline heredoc or patch file) names them."""
     texts = [raw_command]
     for a in non_flag_args(args):
-        try:
-            with open(os.path.join(project, a), encoding="utf-8", errors="replace") as fh:
-                texts.append(fh.read())
+        path = os.path.join(project, a)
+        try:  # regular files only, bounded: never block on a FIFO or a device
+            if os.path.isfile(path) and os.path.getsize(path) <= 1_000_000:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    texts.append(fh.read())
         except Exception:
             pass
     found = []
@@ -504,18 +562,50 @@ def patched_files(args: list, raw_command: str, project: str) -> list:
     return found
 
 
+def stdin_shell(text: str) -> bool:
+    """A shell that reads its script from stdin (`… | sh`, `bash <<EOF`, `bash <<< '…'`)."""
+    for segment in SEGMENT_SPLIT_RE.split(REDIRECT_RE.sub(" ", HERESTRING_RE.sub(" ", text))):
+        words = strip_prefixes(split_words(segment))
+        if words and os.path.basename(words[0]) in SHELLS:
+            args, skip = [], False
+            for a in words[1:]:
+                if skip:
+                    skip = False
+                elif a.startswith(("-", "+")):
+                    skip = a in ("-o", "+o", "-O", "+O")
+                    if "c" in a.lstrip("-+") and not a.startswith("--"):
+                        break  # `-c`: handled by SHELL_C_RE
+                else:
+                    args.append(a)
+            else:
+                if not args or args[0] == "-s":
+                    return True
+    return False
+
+
 def analyze_bash(command: str, project: str):
     """(packages touched by stack commands, protected files written) for a shell command."""
     commands = [command]
     i = 0
-    while i < len(commands):  # `sh -c '…'` and `eval "…"` bodies are analyzed as commands too
-        for single, double in SHELL_C_RE.findall(strip_heredocs(commands[i])):
+    while i < len(commands):
+        if i > 4 * MAX_DEPTH:
+            raise ValueError("command nesting too deep")
+        raw = re.sub(r"\\\n", " ", commands[i])  # line continuations
+        stripped = strip_heredocs(raw)
+        # `sh -c '…'` and `eval "…"` bodies are analyzed as commands too
+        for single, double in SHELL_C_RE.findall(stripped):
             commands.append(single or double.replace('\\"', '"'))
+        if stdin_shell(stripped):  # script fed through stdin: analyze every text that may reach it
+            commands += [body for _, body in HEREDOC_BODY_RE.findall(raw)]
+            commands += ["".join(m) for m in HERESTRING_RE.findall(raw)]
+            commands += ["".join(m) for m in QUOTED_RE.findall(stripped)]
+        commands[i] = raw
         i += 1
     pkgs, edits = [], []
     for raw in commands:
         text = strip_heredocs(raw)
-        for _, target in REDIRECT_TARGET_RE.findall(text):
+        text = re.sub(r"(?m)(^|[\s;&|])#[^\n]*", r"\1", text)  # comments
+        for _, target in REDIRECT_TARGET_RE.findall(QUOTED_WITH_SPACE_RE.sub("''", text)):
             kind = protected_kind(target)
             if kind:
                 edits.append(kind)
@@ -551,6 +641,43 @@ def deps_from_package_json_text(text: str) -> list:
     return list(dict.fromkeys(names))
 
 
+DEP_SECTIONS = ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies")
+
+
+def dep_map(data) -> dict:
+    deps = {}
+    if isinstance(data, dict):
+        for section in DEP_SECTIONS:
+            values = data.get(section)
+            if isinstance(values, dict):
+                deps.update({f"{section}:{k}": v for k, v in values.items()})
+        for key, holder in (("overrides", data), ("overrides", data.get("pnpm") if isinstance(data.get("pnpm"), dict) else {})):
+            values = holder.get(key) if isinstance(holder, dict) else None
+            if isinstance(values, dict):
+                deps.update({f"overrides:{k}": v for k, v in values.items()})
+    return deps
+
+
+def changed_deps_from_edit(tool: str, tool_input: dict):
+    """Dependencies an Edit/MultiEdit adds or changes in an existing package.json (compares the file
+    before and after the edit), or None when that cannot be computed."""
+    try:
+        with open(tool_input.get("file_path", ""), encoding="utf-8") as fh:
+            before = fh.read()
+        after = before
+        edits = [tool_input] if tool == "Edit" else tool_input.get("edits", [])
+        for e in edits:
+            old, new = e.get("old_string", ""), e.get("new_string", "")
+            if not old or old not in after:
+                return None
+            after = after.replace(old, new) if e.get("replace_all") else after.replace(old, new, 1)
+        old_deps, new_deps = dep_map(json.loads(before)), dep_map(json.loads(after))
+    except Exception:
+        return None
+    names = [key.split(":", 1)[1] for key, value in new_deps.items() if old_deps.get(key) != value]
+    return list(dict.fromkeys(names))
+
+
 def new_text(tool: str, tool_input: dict) -> str:
     if tool == "Write":
         return tool_input.get("content", "")
@@ -575,6 +702,18 @@ def main() -> None:
         data = json.load(sys.stdin)
     except Exception:
         sys.exit(0)  # never block on malformed hook input
+    try:
+        check(data)
+    except SystemExit:
+        raise
+    except Exception as exc:  # fail closed: an unexpected error must not let a stack change through
+        if data.get("tool_name") in ("Bash", "Edit", "Write", "MultiEdit"):
+            block(f"the hook could not analyze this action ({type(exc).__name__}); simplify the command "
+                  "or split it, and report the case if it keeps happening.")
+        sys.exit(0)
+
+
+def check(data: dict) -> None:
     tool = data.get("tool_name", "")
     tool_input = data.get("tool_input") or {}
     project = project_dir()
@@ -597,7 +736,8 @@ def main() -> None:
         if base in LOCKFILES:
             block("lockfiles are generated by the package manager and must never be edited by hand.")
         if base == "package.json":
-            needed = deps_from_package_json_text(new_text(tool, tool_input))
+            changed = changed_deps_from_edit(tool, tool_input) if tool in ("Edit", "MultiEdit") else None
+            needed = changed if changed is not None else deps_from_package_json_text(new_text(tool, tool_input))
         else:
             pkg = config_package(path)
             if pkg:

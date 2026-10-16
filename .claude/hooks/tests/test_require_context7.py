@@ -40,6 +40,11 @@ LUCIDE_ID = "/lucide-icons/lucide"
 RESOLVED_LUCIDE = (R, {"libraryName": "lucide", "query": "icons"},
                    f"Available Libraries:\n- Title: Lucide\n- Context7-compatible library ID: {LUCIDE_ID}\n")
 VITEST = [(Q, {"libraryId": "/vitest-dev/vitest", "query": "projects"})]
+PKG_DIR = tempfile.mkdtemp()
+PKG = os.path.join(PKG_DIR, "package.json")
+with open(PKG, "w") as fh:
+    json.dump({"name": "a", "scripts": {"dev": "next dev"}, "dependencies": {"zod": "4.1.12", "next": "16.4.2"}},
+              fh, indent=2)
 TIP = [(Q, {"libraryId": "/ueberdosis/tiptap", "query": "code block lowlight"})]
 
 cases = [
@@ -226,6 +231,56 @@ cases = [
     ("tools reading a config", "Bash", {"command": "pnpm exec tsc -p tsconfig.json && vitest --config vitest.config.ts"}, [], 0),
     ("find that only lists", "Bash", {"command": "find . -name package.json -not -path '*/node_modules/*'"}, [], 0),
     ("find -delete", "Bash", {"command": "find . -name tsconfig.json -delete"}, [], 2),
+    # US-030 security review: reserved words, stdin scripts, continuations, fail-closed, pkg set.
+    ("if before the command", "Bash", {"command": "if pnpm add zod; then echo ok; fi"}, [], 2),
+    ("negation", "Bash", {"command": "! pnpm add zod"}, [], 2),
+    ("while/do loop", "Bash", {"command": "while true; do pnpm add zod; break; done"}, [], 2),
+    ("for/do loop", "Bash", {"command": "for f in a; do pnpm add zod; done"}, [], 2),
+    ("if reading package.json is fine", "Bash", {"command": "if grep -q zod package.json; then echo yes; fi"}, [], 0),
+    ("script piped to sh", "Bash", {"command": "echo 'pnpm add zod' | sh"}, [], 2),
+    ("heredoc fed to bash", "Bash", {"command": "bash <<'EOF'\npnpm add zod\nEOF"}, [], 2),
+    ("here-string fed to bash", "Bash", {"command": "bash <<< 'pnpm add zod'"}, [], 2),
+    ("bash -o value before -c", "Bash", {"command": "bash -o pipefail -c 'pnpm add zod'"}, [], 2),
+    ("ansi-c quoted -c", "Bash", {"command": "bash -c $'pnpm add zod'"}, [], 2),
+    ("bash running a script file is not stdin", "Bash", {"command": "echo 'pnpm add zod' && bash scripts/x.sh"}, [], 0),
+    ("line continuation hides subcommand", "Bash", {"command": "pnpm \\\n  add zod"}, [], 2),
+    ("line continuation, covered", "Bash", {"command": "pnpm add -D \\\n  next-intl"}, INTL, 0),
+    ("trailing comment is not a package", "Bash", {"command": "pnpm add next-intl # pin it"}, INTL, 0),
+    ("deep nesting fails closed", "Bash", {"command": "corepack " * 1200 + "pnpm add zod"}, [], 2),
+    ("npm pkg set dependency", "Bash", {"command": "npm pkg set dependencies.zod=4.0.0"}, [], 2),
+    ("pnpm pkg delete", "Bash", {"command": "pnpm pkg delete dependencies.zod"}, [], 2),
+    ("npm pkg get is fine", "Bash", {"command": "npm pkg get version"}, [], 0),
+    ("npm init <x> runs create-x", "Bash", {"command": "npm init vite@latest app"}, [], 2),
+    ("Edit changing only a version", "Edit", {"file_path": PKG, "old_string": "4.1.12", "new_string": "4.2.0"}, [], 2),
+    ("Edit changing only a version, covered", "Edit", {"file_path": PKG, "old_string": "4.1.12", "new_string": "4.2.0"},
+     [(Q, {"libraryId": "/colinhacks/zod", "query": "v4.2"})], 0),
+    ("Edit of scripts in a real package.json", "Edit", {"file_path": PKG, "old_string": '"next dev"',
+        "new_string": '"next dev --turbo"'}, [], 0),
+    ("script value starting with next is not a version", "Edit", {"file_path": "/x/package.json",
+        "new_string": '"dev": "next dev --turbo"'}, [], 0),
+    ("npm aliases", "Bash", {"command": "npm in zod"}, [], 2),
+    ("npm typo alias", "Bash", {"command": "npm isntall zod"}, [], 2),
+    ("npm r", "Bash", {"command": "npm r zod"}, [], 2),
+    ("yarnpkg", "Bash", {"command": "yarnpkg add zod"}, [], 2),
+    ("setsid wrapper", "Bash", {"command": "setsid pnpm add zod"}, [], 2),
+    ("node running the pnpm script", "Bash", {"command": "node /usr/lib/node_modules/pnpm/bin/pnpm.cjs add zod"}, [], 2),
+    ("unknown global flag with value", "Bash", {"command": "npm --cache /tmp/c install zod"}, [], 2),
+    ("pnpm unknown flag with value", "Bash", {"command": "pnpm --workspace-concurrency 2 add zod"}, [], 2),
+    ("pnpm run is not a stack change", "Bash", {"command": "pnpm --silent run build"}, [], 0),
+    ("sort -o writes", "Bash", {"command": "sort -o package.json package.json"}, [], 2),
+    ("prettier --write on a config", "Bash", {"command": "prettier --write tsconfig.json"}, [], 2),
+    ("eslint --fix on a config", "Bash", {"command": "eslint --fix eslint.config.mjs"}, [], 2),
+    ("tsc --init", "Bash", {"command": "tsc --init tsconfig.json"}, [], 2),
+    ("prettier --check is fine", "Bash", {"command": "prettier --check package.json"}, [], 0),
+    ("git restore --staged only unstages", "Bash", {"command": "git restore --staged package.json"}, [], 0),
+    ("git reset path only unstages", "Bash", {"command": "git reset HEAD package.json"}, [], 0),
+    ("git -c before log", "Bash", {"command": "git -c core.pager=cat log -- package.json"}, [], 0),
+    ("git restore --staged --worktree writes", "Bash", {"command": "git restore --staged --worktree package.json"}, [], 2),
+    ("git stash push changes the file", "Bash", {"command": "git stash push package.json"}, [], 2),
+    ("redirect inside quotes is text", "Bash", {"command": "echo 'see > package.json'"}, [], 0),
+    ("quoted redirect target still caught", "Bash", {"command": 'echo {} > "package.json"'}, [], 2),
+    ("normalize only the project", "Bash", {"command": "pnpm add reactjs"},
+     [(Q, {"libraryId": "/facebook/react", "query": "x"})], 2),
 ]
 
 failed = 0
