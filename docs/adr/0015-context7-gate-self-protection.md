@@ -18,10 +18,10 @@ O ADR-0013 garante por hook (`.claude/hooks/require-context7.py`) que toda mudan
 Opção C, escolhida pelo responsável em 2026-10-16 (US-031): **duas barreiras para os arquivos do gate**, mais verificação da configuração do gerenciador.
 
 1. **`deny` no `.claude/settings.json`** para `Edit` e `Write` em `.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings.json`, `.claude/settings.local.json` e `.claude/rules/stack-docs.md`.
-2. **Bloqueio no hook** para os mesmos arquivos, também por Bash (redirecionamento, `tee`, `sed -i`, `cp`/`mv`/`rm`, `git checkout|restore`, `git apply`/`patch`, código inline de interpretador) e para os transcripts de sessão (`~/.claude/projects/**/*.jsonl`). Leitura continua livre.
+2. **Bloqueio no hook** para os mesmos arquivos, além de `.mcp.json` e `~/.claude.json` (registram servidores MCP), também por Bash (redirecionamento, `tee`, `sed -i`, programa de `sed`/`awk`, `cp`/`mv`/`ln`/`rm`, cópia para o diretório, `git checkout|restore`, `git apply`/`patch`, código de interpretador por argumento, heredoc ou pipe), com caminhos normalizados e destinos de `cd` considerados; e para os transcripts de sessão (`~/.claude/projects/**/*.jsonl`). Leitura continua livre. A análise falha fechada (erro ou mais de 20 s ⇒ bloqueia).
 3. **Procedimento:** o agente só **propõe** mudanças nesses arquivos (diff no PR ou texto); o responsável aplica fora do agente (editor ou terminal próprio). Isso vale também para histórias que mexem no hook: a implementação é feita numa worktree ou branch enquanto o hook ativo é o da `main`, e o novo bloqueio passa a valer depois do merge.
 4. **Configuração do gerenciador:** `pnpm-workspace.yaml`, `.npmrc`, `.yarnrc`, `.yarnrc.yml` e `bunfig.toml` são configuração da stack (consulta ao Context7 do gerenciador); pacotes novos citados nas chaves de cadeia de suprimentos exigem a própria consulta; `registry` diferente do npm público é bloqueado; escrita por Bash nesses arquivos é bloqueada (usar `Edit`/`Write`).
-5. **Versões e aliases:** pré-release em faixa e `--tag <pré-release>` são tratados como pré-release; alias `npm:` só com aprovação do responsável em `aliasesApproved` e com o pacote real coberto.
+5. **Versões e aliases:** pré-release em faixa e `--tag <pré-release>` são tratados como pré-release; alias `npm:` e especificações `github:`/git/URL só com aprovação do responsável em `aliasesApproved` (no alias, com o pacote real coberto).
 
 ## Alternativas consideradas
 
@@ -34,4 +34,4 @@ Opção C, escolhida pelo responsável em 2026-10-16 (US-031): **duas barreiras 
 - O agente não consegue mais afrouxar o gate por conta própria; toda mudança no hook, nos testes do hook, nas exceções ou nas permissões passa pelo responsável.
 - Histórias futuras que alterem o hook precisam de worktree/branch (o bloqueio vale para o hook ativo da `main`) e da aplicação final pelo responsável quando o arquivo já estiver protegido no ambiente em uso.
 - Alguns comandos legítimos ficam bloqueados por conservadorismo (ex.: `node -e` que lê `package.json`); a política lista os casos e as alternativas.
-- Continuam fora do alcance: mudanças indiretas sem citar o arquivo (troca de branch, `git stash pop`, scripts executados) e qualquer ação fora do agente.
+- Continuam fora do alcance: mudanças indiretas sem citar o arquivo (troca de branch, `git stash pop`, scripts executados), código carregado pelo próprio Python do hook (site-packages do usuário) e qualquer ação fora do agente. Fica proposto ao responsável rodar o hook com `python3 -I` e `onFailure: "block"` no `.claude/settings.json`.

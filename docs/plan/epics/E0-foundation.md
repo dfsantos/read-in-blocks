@@ -236,24 +236,25 @@ Como o gate passa a proteger os próprios arquivos (`.claude/context7-exceptions
 **Critérios de aceite**
 
 *Arquivos do gate protegidos (conforme a decisão)*
-- [ ] `Edit`/`Write`/`MultiEdit` em `.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings.json` e `.claude/rules/stack-docs.md` são bloqueados, com mensagem pedindo a ação do responsável.
-- [ ] Escrita por Bash nesses arquivos (redirecionamento, `tee`, `sed -i`, `cp`/`mv`/`ln`, `git checkout|restore`, `git apply`/`patch`) também é bloqueada (opções B/C). Leitura (`cat`, `grep`, `jq`, `git diff|log`) continua livre.
-- [ ] Escrita por Bash no transcript da sessão (`transcript_path`, `~/.claude/projects/**`) é bloqueada, fechando a forja de consulta registrada como limite na US-030.
-- [ ] A política documenta o procedimento do responsável para alterar esses arquivos.
+- [x] `Edit`/`Write`/`MultiEdit` em `.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings.json` e `.claude/rules/stack-docs.md` são bloqueados, com mensagem pedindo a ação do responsável.
+- [x] Escrita por Bash nesses arquivos (redirecionamento, `tee`, `sed -i`, `cp`/`mv`/`ln`, `git checkout|restore`, `git apply`/`patch`) também é bloqueada (opções B/C). Leitura (`cat`, `grep`, `jq`, `git diff|log`) continua livre.
+- [x] Escrita por Bash no transcript da sessão (`transcript_path`, `~/.claude/projects/**`) é bloqueada, fechando a forja de consulta registrada como limite na US-030.
+- [x] A política documenta o procedimento do responsável para alterar esses arquivos.
 
 *Configuração do gerenciador de pacotes*
-- [ ] `pnpm-workspace.yaml`, `.npmrc`, `.yarnrc`, `.yarnrc.yml` e `bunfig.toml` (raiz e subpastas) entram em `CONFIG_FILES`, editados por ferramenta ou por Bash.
-- [ ] Mudança nos controles de cadeia de suprimentos do `pnpm-workspace.yaml` (`allowBuilds`, `minimumReleaseAgeExclude`, `minimumReleaseAge`, `audit.ignore`, `overrides`, `catalog`/`catalogs`, `onlyBuiltDependencies`, `neverBuiltDependencies`) e qualquer `registry`/`@escopo:registry` no `.npmrc` exigem consulta ao Context7 do pnpm (`/pnpm/pnpm`), com cada pacote novo citado coberto como dependência.
-- [ ] `registry` diferente de `https://registry.npmjs.org/` em `.npmrc` é bloqueado sempre, com mensagem pedindo aprovação do responsável.
+- [x] `pnpm-workspace.yaml`, `.npmrc`, `.yarnrc`, `.yarnrc.yml` e `bunfig.toml` (raiz e subpastas) entram em `CONFIG_FILES`, editados por ferramenta ou por Bash.
+- [x] Mudança nos controles de cadeia de suprimentos do `pnpm-workspace.yaml` (`allowBuilds`, `minimumReleaseAgeExclude`, `minimumReleaseAge`, `audit.ignore`, `overrides`, `catalog`/`catalogs`, `onlyBuiltDependencies`, `neverBuiltDependencies`) e qualquer `registry`/`@escopo:registry` no `.npmrc` exigem consulta ao Context7 do pnpm (`/pnpm/pnpm`), com cada pacote novo citado coberto como dependência.
+- [x] `registry` diferente de `https://registry.npmjs.org/` em `.npmrc` é bloqueado sempre, com mensagem pedindo aprovação do responsável.
 
 *Pré-releases e aliases*
-- [ ] Pré-release com faixa é detectada em comando e em `package.json`: `zod@^4.0.0-beta.1`, `zod@~4.0.0-rc.1`, `>=4.0.0-alpha`, `4.0.0-beta.1 - 4.0.0`.
-- [ ] `--tag <pré-release>` (`npm install zod --tag beta`, `pnpm add zod --tag next`) é bloqueado como pré-release.
-- [ ] Alias `npm:` (`pnpm add zod@npm:outro@1.0.0`, `"zod": "npm:outro@1"` no `package.json`, `overrides` com `npm:`) exige a cobertura do pacote **real** (`outro`) e, por padrão, é bloqueado com mensagem pedindo aprovação do responsável (o nome declarado engana a revisão).
+- [x] Pré-release com faixa é detectada em comando e em `package.json`: `zod@^4.0.0-beta.1`, `zod@~4.0.0-rc.1`, `>=4.0.0-alpha`, `4.0.0-beta.1 - 4.0.0`.
+- [x] `--tag <pré-release>` (`npm install zod --tag beta`, `pnpm add zod --tag next`) é bloqueado como pré-release.
+- [x] Alias `npm:` (`pnpm add zod@npm:outro@1.0.0`, `"zod": "npm:outro@1"` no `package.json`, `overrides` com `npm:`) exige a cobertura do pacote **real** (`outro`) e, por padrão, é bloqueado com mensagem pedindo aprovação do responsável (o nome declarado engana a revisão).
 
 *Testes e documentação*
-- [ ] Casos novos em `.claude/hooks/tests/test_require_context7.py` para cada item (bloqueio e liberação), e toda a suíte de `.claude/hooks/tests/` passando.
-- [ ] [stack-docs-policy.md](../../architecture/stack-docs-policy.md) atualizado (arquivos protegidos, procedimento do responsável, configuração do gerenciador, pré-releases e aliases); os limites que deixarem de existir saem da lista.
+- [x] Casos novos em `.claude/hooks/tests/test_require_context7.py` para cada item (bloqueio e liberação), e toda a suíte de `.claude/hooks/tests/` passando.
+- [x] [stack-docs-policy.md](../../architecture/stack-docs-policy.md) atualizado (arquivos protegidos, procedimento do responsável, configuração do gerenciador, pré-releases e aliases); os limites que deixarem de existir saem da lista.
 
+**Implementação:** além dos critérios, a revisão de segurança levou a proteger `.mcp.json` e `~/.claude.json` (registram servidores MCP), tratar especificações `github:`/git/URL como o alias `npm:`, verificar as chaves do pnpm dentro do `package.json`, bloquear `dangerouslyAllowAllBuilds: true` e falhar fechado após 20 s de análise. Ficam como proposta ao responsável (arquivo protegido): `python3 -I` e `onFailure: "block"` no hook em `.claude/settings.json`.
 **Notas técnicas:** ADR-0011 e ADR-0013. Nenhuma dependência nova (Python da biblioteca padrão). Leitura de YAML sem biblioteca: o hook compara as chaves de nível superior por texto, de forma conservadora (na dúvida, exige a consulta). Se a decisão escolher a opção A ou C, a mudança no `.claude/settings.json` é feita pelo responsável, ou pelo agente com aprovação explícita registrada na história.
 **Fora desta história:** verificação equivalente no CI (o hook protege o agente, não o repositório); conteúdo de scripts executados (`bash script.sh`, `node -e`); globs e expansões do shell.
