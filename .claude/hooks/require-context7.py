@@ -38,6 +38,7 @@ import json
 import os
 import re
 import shlex
+import signal
 import sys
 
 # package (or scope) -> Context7 library ids (fnmatch patterns on /org/project) that document it.
@@ -120,8 +121,14 @@ REGISTRY_RE = re.compile(r"(?im)^\s*(?:@[\w.-]+:)?(?:registry|npmRegistryServer)
 GATE_FILE_RE = re.compile(
     r"(?:^|[/'\"\s(=:])\.claude/(?:hooks\b|context7-exceptions\.json\b|settings(?:\.local)?\.json\b"
     r"|rules/stack-docs\.md\b)")
+GATE_EXTRA_RE = re.compile(r"(?:^|/)\.(?:mcp|claude)\.json$")  # MCP servers: a fake "Context7" would be trusted
 TRANSCRIPT_RE = re.compile(r"\.claude/projects/\S*\.jsonl\b")
-INTERPRETERS = {"python", "python3", "node", "nodejs"}
+INTERPRETERS = {"python", "python3", "node", "nodejs", "perl", "ruby", "deno"}
+PYTHON_READ_MODULES = {"unittest", "pytest", "py_compile", "compileall", "json.tool"}
+NON_REGISTRY_SOURCE_RE = re.compile(r"^(?:github:|gitlab:|bitbucket:|git\+|git:|git@|https?:|ssh:)", re.I)
+TIME_LIMIT_SECONDS = 20
+# Set per hook run: directories the command `cd`s into, and the session transcript's file name.
+CONTEXT = {"cd_dirs": [], "transcript": ""}
 LOCKFILES = ("pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb", "bun.lock")
 
 NON_DEP_KEYS = {"name", "version", "packageManager", "node", "npm", "pnpm", "yarn", "description",
@@ -149,7 +156,8 @@ WRAPPER_FLAGS_WITH_VALUE = {
     "xargs": {"-I", "-L", "-n", "-P", "-s", "-d", "-E", "-a"},
 }
 # Commands that only read the files they name (shell redirections are checked separately).
-READ_ONLY = {"cat", "less", "more", "head", "tail", "grep", "egrep", "fgrep", "rg", "ag", "jq", "wc",
+READ_ONLY = {"cat", "less", "more", "head", "tail", "grep", "egrep", "fgrep", "rg", "ag", "jq", "wc", "nl",
+             "cd", "pushd", "popd", "tree", "du", "shellcheck", "gh",
              "diff", "cmp", "ls", "stat", "file", "echo", "printf", "test", "[", "realpath", "readlink",
              "bat", "sort", "sha256sum", "md5sum", "basename", "dirname", "code",
              # tools that read a config file passed as an argument
@@ -226,11 +234,13 @@ def load_trusted_servers(config: dict) -> set:
 PRERELEASE_TAGS = r"(?:rc|beta|alpha|canary|next|nightly|dev|experimental|preview|insiders)"
 PRERELEASE_CMD_RE = re.compile(
     r"(?<=[\w/.-])@(?:" + PRERELEASE_TAGS + r"(?=[\s'\"]|$)|[\^~<>=v\s]*\d+\.\d+\.\d+-[0-9A-Za-z.-]+)")
-PRERELEASE_TAG_RE = re.compile(r"^" + PRERELEASE_TAGS + r"$")
+PRERELEASE_TAG_RE = re.compile(r"^" + PRERELEASE_TAGS + r"(?:[-.]?\d+)*$")
 PRERELEASE_IN_VALUE_RE = re.compile(r"\d+\.\d+\.\d+-[0-9A-Za-z]")
-ALIAS_IN_TOKEN_RE = re.compile(r"^((?:@[\w.-]+/)?[\w.-]+)@npm:((?:@[\w.-]+/)?[\w.-]+)")
-ALIAS_IN_JSON_RE = re.compile(r'"((?:@[\w.-]+/)?[\w.-]+)"\s*:\s*"npm:((?:@[\w.-]+/)?[\w.-]+)')
-ALIAS_IN_YAML_RE = re.compile(r"((?:@[\w.-]+/)?[\w.-]+)['\"]?\s*:\s*['\"]?npm:((?:@[\w.-]+/)?[\w.-]+)")
+SOURCE_PREFIX = r"(?:npm:|github:|gitlab:|bitbucket:|git\+|git:|git@|https?:|ssh:)"
+SOURCE_IN_JSON_RE = re.compile(r'"((?:@[\w.-]+/)?[\w.-]+)"\s*:\s*"(' + SOURCE_PREFIX + r'[^"]*)"', re.I)
+SOURCE_IN_YAML_RE = re.compile(
+    r"((?:@[\w.-]+/)?[\w.-]+)['\"]?\s*:\s*['\"]?(" + SOURCE_PREFIX + r"[^'\"\s,}]*)", re.I)
+DANGEROUS_BUILDS_RE = re.compile(r"""['"]?dangerouslyAllowAllBuilds['"]?\s*:\s*true""")
 
 
 def prerelease_from_command(command: str) -> list:
@@ -247,8 +257,44 @@ def prerelease_from_command(command: str) -> list:
     return found
 
 
+SPEC_RE = re.compile(r"^(@?[^@\s]+)@(.+)$", re.S)
+
+
+def specs_from_words(words: list) -> list:
+    """(name, spec) for every `name@spec` word of a command (quotes already removed by shlex)."""
+    out = []
+    for word in words:
+        m = SPEC_RE.match(word)
+        if m and not re.search(r"\s", m.group(1)):
+            out.append((m.group(1), m.group(2)))
+    return out
+
+
+def prerelease_from_words(words: list) -> list:
+    found = [f"{n}@{v}" for n, v in specs_from_words(words) if is_prerelease_value(v)]
+    for n, word in enumerate(words):
+        tag = word.split("=", 1)[1] if word.startswith("--tag=") else (
+            words[n + 1] if word == "--tag" and n + 1 < len(words) else "")
+        if PRERELEASE_TAG_RE.match(tag):
+            found.append(f"--tag {tag}")
+    return found
+
+
+def sources_from_words(words: list) -> list:
+    """(alias, real source) for `name@npm:other` and `name@github:…`/URL specs."""
+    out = []
+    for name, spec in specs_from_words(words):
+        if spec.lower().startswith("npm:"):
+            out.append((name, "npm:" + clean_pkg(spec[4:])))
+        elif NON_REGISTRY_SOURCE_RE.match(spec):
+            out.append((name, spec))
+    return out
+
+
 def is_prerelease_value(value: str) -> bool:
     value = value.strip().strip("'\"")
+    if value.lower().startswith("npm:") and "@" in value[4:].lstrip("@"):
+        value = value.rsplit("@", 1)[1]
     return bool(PRERELEASE_TAG_RE.match(value) or PRERELEASE_IN_VALUE_RE.search(value))
 
 
@@ -269,22 +315,30 @@ def prerelease_yaml(lines: list) -> list:
     return out
 
 
-def aliases_from_command(command: str) -> list:
-    return [m.groups() for t in strip_heredocs(command).split() if (m := ALIAS_IN_TOKEN_RE.match(t.strip("'\"")))]
+def sources_from_text(regex, text: str) -> list:
+    """(name, source) for `npm:` aliases and non-registry specs found in config text."""
+    out = []
+    for name, spec in regex.findall(text):
+        out.append((name, "npm:" + clean_pkg(spec[4:]) if spec.lower().startswith("npm:") else spec))
+    return out
 
 
 def non_default(found: list) -> list:
     return [r for r in found if r.rstrip("/") + "/" != DEFAULT_REGISTRY]
 
 
-def config_registries(text: str) -> list:
-    """Non-default registries set by package-manager config text."""
-    return non_default(REGISTRY_RE.findall(text))
+def config_registries(text: str, toml: bool = False) -> list:
+    """Non-default registries set by package-manager config text (any URL value in bunfig.toml)."""
+    found = REGISTRY_RE.findall(text)
+    if toml:
+        found += re.findall(r"""https?://[^\s'"]+""", text)
+    return non_default(found)
 
 
 def command_registries(command: str) -> list:
-    """Non-default registries passed to a command with --registry."""
-    found = []
+    """Non-default registries passed to a command with --registry or through the environment."""
+    found = re.findall(r"(?i)\b(?:npm|pnpm|yarn|bun)_config_[\w@:/.-]*registry[\w-]*\s*=\s*['\"]?([^\s'\"]+)", command)
+    found += re.findall(r"(?i)\b(?:YARN_NPM_REGISTRY_SERVER|BUN_CONFIG_REGISTRY)\s*=\s*['\"]?([^\s'\"]+)", command)
     tokens = [t.strip("'\"") for t in strip_heredocs(command).split()]
     for n, tok in enumerate(tokens):
         if tok.startswith("--registry="):
@@ -422,11 +476,11 @@ def strip_heredocs(command: str) -> str:
 
 
 SHELL_C_RE = re.compile(
-    r"(?:\b(?:ba|z|da|k)?sh\s+(?:[-+]O?o\s+\S+\s+|-[a-zA-Z]+\s+|--[\w-]+\s+)*-[a-zA-Z]*c[a-zA-Z]*|\beval)\s+"
+    r"(?:\b(?:ba|z|da|k)?sh\s+(?:[-+]O?o\s+(?![-+])\S+\s+|-(?!O?o\s)[a-zA-Z]+\s+|--[\w-]+\s+)*-[a-zA-Z]*c[a-zA-Z]*|\beval)\s+"
     r"\$?(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\")")
 # Inline code run by an interpreter (`python3 -c "…"`, `node -e '…'`): it may write any file it names.
 INLINE_CODE_RE = re.compile(
-    r"\b(?:python3?|node(?:js)?|perl|ruby|deno|bun)\s+(?:-[\w-]+\s+)*(?:-c|-e|--eval|-p|--print|eval)\s+"
+    r"\b(?:python3?|node(?:js)?|perl|ruby|deno|bun)\s+(?:-[\w-]+\s+)*?(?:-[A-Za-z]*[cep]|--eval|--print|eval)\s+"
     r"\$?(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\")")
 HEREDOC_BODY_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n(.*?)\n\s*\1\b", re.S)
 HERESTRING_RE = re.compile(r"<<<\s*\$?(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\"|(\S+))")
@@ -441,10 +495,23 @@ def protected_kind(token: str):
     """('gate'|'transcript'|'lockfile'|'package.json'|'pm-config'|'config', name) for a path to a protected
     file, else None."""
     token = token.strip("'\"")
+    candidates = [token]
+    if token and not token.startswith(("/", "~", "-")):
+        candidates += [os.path.join(d, token) for d in CONTEXT["cd_dirs"]]
+    for candidate in candidates:
+        kind = protected_kind_of(candidate)
+        if kind:
+            return kind
+    return None
+
+
+def protected_kind_of(token: str):
     norm = token.replace("\\", "/")
-    if GATE_FILE_RE.search(norm) or GATE_FILE_RE.search("/" + norm):
+    if norm and not norm.startswith("-"):
+        norm = os.path.normpath(os.path.expanduser(norm)) if "=" not in norm else norm
+    if GATE_FILE_RE.search(norm) or GATE_FILE_RE.search("/" + norm) or GATE_EXTRA_RE.search(norm):
         return ("gate", token)
-    if TRANSCRIPT_RE.search(norm):
+    if TRANSCRIPT_RE.search(norm) or (CONTEXT["transcript"] and os.path.basename(norm) == CONTEXT["transcript"]):
         return ("transcript", token)
     if "=" in token:
         token = token.split("=", 1)[1]  # of=package.json, --file=...
@@ -455,7 +522,7 @@ def protected_kind(token: str):
         return ("lockfile", base)
     if base == "package.json":
         return ("package.json", base)
-    if base in PM_CONFIG_FILES:
+    if base in PM_CONFIG_FILES or (base == "rc" and os.path.basename(os.path.dirname(token)) == "pnpm"):
         return ("pm-config", base)
     pkg = config_package(token)
     return ("config", pkg) if pkg else None
@@ -484,14 +551,14 @@ def strip_prefixes(words: list) -> list:
     return words
 
 
-def non_flag_args(args: list, pm: str = "") -> list:
+def non_flag_args(args: list, pm: str = "", extra_value_flags: set = frozenset()) -> list:
     out, skip = [], False
     for a in args:
         if skip:
             skip = False
             continue
         if a.startswith("-"):
-            if "=" not in a and (a in FLAGS_WITH_VALUE or (a == "-w" and pm != "pnpm")):
+            if "=" not in a and (a in FLAGS_WITH_VALUE or a in extra_value_flags or (a == "-w" and pm != "pnpm")):
                 skip = True
             continue
         out.append(a)
@@ -582,19 +649,26 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
     name = os.path.basename(words[0])
     args = words[1:]
     if name in PMS:
-        sub = [a for a in args if not a.startswith("-")]
+        sub = non_flag_args(args, name, extra_value_flags={"--location", "-L", "--userconfig", "--globalconfig"})
         if sub and sub[0] == "pkg" and len(sub) > 1 and sub[1] in ("set", "delete", "fix"):
             return [("package.json", "package.json")]  # `npm pkg set dependencies.x=1`
-        if sub and sub[0] == "config" and len(sub) > 1 and sub[1] in ("set", "delete", "rm", "edit", "unset"):
+        if sub and (sub[0] in ("set", "unset")  # `npm set` = `npm config set`
+                    or (sub[0] == "config" and len(sub) > 1 and sub[1] in ("set", "delete", "rm", "edit", "unset"))):
             return [("pm-config", ".npmrc")]  # writes .npmrc / .yarnrc
         return []
     if name in PM_RUNNERS or name in SHELLS or name == "corepack":
         return []
     cited = [k for k in (protected_kind(a) for a in args) if k]
-    if name in INTERPRETERS and cited and not any(a in ("-c", "-e", "-m", "-p", "--eval", "--print") for a in args):
-        rest = non_flag_args(args)  # `python3 .claude/hooks/tests/x.py` runs the script, it does not write it
-        if rest and protected_kind(rest[0]) and not any(protected_kind(a) for a in rest[1:]):
-            return []
+    if name in INTERPRETERS and cited:
+        if args and not args[0].startswith("-") and protected_kind(args[0]) \
+                and not any(protected_kind(a) for a in args[1:]):
+            return []  # `python3 .claude/hooks/tests/x.py` runs the script, it does not write it
+        if name.startswith("python") and "-m" in args[:-1]:
+            module_at = args.index("-m") + 1
+            positional = [a for a in args[module_at + 1:] if not a.startswith("-")]
+            if args[module_at] in PYTHON_READ_MODULES and (args[module_at] != "json.tool" or len(positional) <= 1):
+                return []  # `python3 -m unittest …`, `python3 -m json.tool file`
+        return cited
     if name == "git":
         sub, skip = "", False
         for a in args:
@@ -613,6 +687,19 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
         return [] if sub in GIT_READ_ONLY else cited
     if name in PATCHERS:
         return patched_files(args, raw_command, project)
+    if name in ("sed", "awk", "gawk", "mawk"):  # program text that writes a file (`w file`, `print > "file"`)
+        inner = [k for a in args for t in re.findall(r"[\w./~@-]+", a)
+                 if t != a.strip("'\"") and (k := protected_kind(t))]
+        if inner:
+            return inner
+    if name == "ln":  # a link to a protected file lets later writes reach it
+        linked = [k for k in (protected_kind(t) for t in non_flag_args(args, extra_value_flags={"-t", "--target-directory"})) if k]
+        if linked:
+            return linked
+    if name in COPY_LIKE:
+        into = copy_destinations(args, project)
+        if into:
+            return into
     if not cited:
         return []
     if name in IN_PLACE_EDITORS:
@@ -620,37 +707,74 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
                        for a in args)
         return cited if in_place else []
     if name == "find":
-        return cited if any(a in ("-delete", "-exec", "-execdir", "-ok", "-okdir") for a in args) else []
+        if "-delete" in args:
+            return cited
+        for flag in ("-exec", "-execdir", "-ok", "-okdir"):
+            if flag in args:
+                runs = args[args.index(flag) + 1:args.index(flag) + 2]
+                if not runs or os.path.basename(runs[0]) not in READ_ONLY:
+                    return cited
+        return []
     if name in COPY_LIKE:
-        targets = non_flag_args(args)
-        if not targets:
-            return []
-        dest = targets[-1]
-        dest_kind = protected_kind(dest)
-        if dest_kind:
-            return [dest_kind]
-        if dest in (".", "..") or dest.endswith("/") or os.path.isdir(os.path.join(project, dest)):
-            return [k for k in (protected_kind(t) for t in targets[:-1]) if k]
         return []
     if name in READ_ONLY:
         writes = WRITE_FLAGS.get(name, set())
         if any(a in writes or any(a.startswith(f + "=") for f in writes if f.startswith("--")) for a in args):
             return cited
         return []
-    return cited  # unknown command naming a protected file: assume it may write it
+    # Unknown command naming a protected file: assume it may write it. Paths inside multi-word text
+    # arguments (messages, descriptions) are not file arguments.
+    return [k for k in (protected_kind(a) for a in args if not re.search(r"\s", a)) if k]
+
+
+def copy_destinations(args: list, project: str) -> list:
+    """Protected files that cp/ln/install/rsync would create or overwrite, including copies into a
+    directory (`cp x .claude/`, `cp -t .claude/hooks x`)."""
+    target_dir, rest, skip = None, [], False
+    for n, a in enumerate(args):
+        if skip:
+            skip = False
+            continue
+        if a in ("-t", "--target-directory") and n + 1 < len(args):
+            target_dir, skip = args[n + 1], True
+        elif a.startswith("--target-directory="):
+            target_dir = a.split("=", 1)[1]
+        elif not a.startswith("-"):
+            rest.append(a)
+    if target_dir is None:
+        if len(rest) < 2:
+            return []
+        dest, sources = rest[-1], rest[:-1]
+        if protected_kind(dest):
+            return [protected_kind(dest)]
+    else:
+        dest, sources = target_dir, rest
+    dest_path = os.path.join(project, os.path.expanduser(dest))
+    is_dir = target_dir is not None or dest.endswith("/") or dest in (".", "..") or os.path.isdir(dest_path) \
+        or os.path.basename(os.path.normpath(dest)) in (".claude", "hooks", "rules", "projects")
+    if not is_dir:
+        return []
+    found = [protected_kind(os.path.join(dest, os.path.basename(os.path.normpath(src)))) for src in sources]
+    found += [protected_kind(src) for src in sources if dest in (".", "..")]
+    return [k for k in found if k]
 
 
 def patched_files(args: list, raw_command: str, project: str) -> list:
     """A patch touches protected files when the patch text (inline heredoc or patch file) names them."""
     texts = [raw_command]
-    for a in non_flag_args(args):
-        path = os.path.join(project, a)
+    candidates = non_flag_args(args)
+    candidates += [m[1] for m in re.findall(r"(?<![<\d])<\s*(['\"]?)([^\s'\"<>|;&()]+)\1", strip_heredocs(raw_command))]
+    candidates += re.findall(r"[\w./~-]+\.(?:diff|patch|mbox|eml)\b", raw_command)
+    for a in dict.fromkeys(candidates):
+        path = os.path.join(project, os.path.expanduser(a))
         try:  # regular files only, bounded: never block on a FIFO or a device
             if os.path.isfile(path) and os.path.getsize(path) <= 1_000_000:
                 with open(path, encoding="utf-8", errors="replace") as fh:
                     texts.append(fh.read())
         except Exception:
             pass
+    if len(texts) == 1 and "<<" not in raw_command and "--check" not in args:
+        return [("patch-unknown", "")]  # patch read from somewhere the hook cannot inspect
     found = []
     for text in texts:
         for token in re.findall(r"[\w./@-]+", text):
@@ -660,11 +784,11 @@ def patched_files(args: list, raw_command: str, project: str) -> list:
     return found
 
 
-def stdin_shell(text: str) -> bool:
-    """A shell that reads its script from stdin (`… | sh`, `bash <<EOF`, `bash <<< '…'`)."""
+def stdin_shell(text: str, names: set = SHELLS) -> bool:
+    """A shell (or interpreter) that reads its script from stdin (`… | sh`, `bash <<EOF`, `python3 - <<<…`)."""
     for segment in SEGMENT_SPLIT_RE.split(REDIRECT_RE.sub(" ", HERESTRING_RE.sub(" ", text))):
         words = strip_prefixes(split_words(segment))
-        if words and os.path.basename(words[0]) in SHELLS:
+        if words and os.path.basename(words[0]) in names:
             args, skip = [], False
             for a in words[1:]:
                 if skip:
@@ -676,9 +800,15 @@ def stdin_shell(text: str) -> bool:
                 else:
                     args.append(a)
             else:
-                if not args or args[0] == "-s":
+                if not args or args[0] in ("-s", "-"):
                     return True
     return False
+
+
+def stdin_texts(raw: str, stripped: str) -> list:
+    return ([body for _, body in HEREDOC_BODY_RE.findall(raw)]
+            + ["".join(m) for m in HERESTRING_RE.findall(raw)]
+            + ["".join(m) for m in QUOTED_RE.findall(stripped)])
 
 
 def analyze_bash(command: str, project: str):
@@ -694,13 +824,24 @@ def analyze_bash(command: str, project: str):
         for single, double in SHELL_C_RE.findall(stripped):
             commands.append(single or double.replace('\\"', '"'))
         if stdin_shell(stripped):  # script fed through stdin: analyze every text that may reach it
-            commands += [body for _, body in HEREDOC_BODY_RE.findall(raw)]
-            commands += ["".join(m) for m in HERESTRING_RE.findall(raw)]
-            commands += ["".join(m) for m in QUOTED_RE.findall(stripped)]
+            commands += stdin_texts(raw, stripped)
         commands[i] = raw
         i += 1
-    pkgs, edits = [], []
+    pkgs, edits, all_words = [], [], []
+    CONTEXT["cd_dirs"] = list(dict.fromkeys(
+        os.path.expanduser(m[1]) for c in commands
+        for m in re.findall(r"(?:^|[\s;&|(])(?:cd|pushd)\s+(['\"]?)([^\s'\";&|()]+)\1", strip_heredocs(c))))
     for raw in commands:
+        stripped = strip_heredocs(raw)
+        if stdin_shell(stripped, INTERPRETERS):  # code fed to an interpreter through stdin
+            for text in stdin_texts(raw, stripped):
+                edits += [k for t in re.findall(r"[\w./~@-]+", text) if (k := protected_kind(t))]
+        if re.search(r"(?:^|[\s;&|(/])(?:g|m)?awk\b|(?:^|[\s;&|(/])sed\b", stripped):
+            for single, double in QUOTED_RE.findall(stripped):  # awk/sed program text naming a file
+                program = single or double
+                if re.search(r"\s", program) or "w " in program:
+                    edits += [k for t in re.findall(r"[\w./~@-]+", program) if (k := protected_kind(t))]
+        all_words += split_words(stripped)  # whole-command words keep quoted specs (`'zod@^3 || 4-beta'`) intact
         for single, double in INLINE_CODE_RE.findall(strip_heredocs(raw)):
             for token in re.findall(r"[\w./~@-]+", single or double):
                 kind = protected_kind(token)
@@ -717,9 +858,10 @@ def analyze_bash(command: str, project: str):
             words = split_words(segment)
             if not words:
                 continue
+            all_words += words
             pkgs += analyze_words(words, project)
             edits += edited_files(words, raw, project)
-    return list(dict.fromkeys(p for p in pkgs if p)), list(dict.fromkeys(edits))
+    return list(dict.fromkeys(p for p in pkgs if p)), list(dict.fromkeys(edits)), all_words
 
 
 def all_declared_deps(project: str) -> list:
@@ -754,10 +896,18 @@ def dep_map(data) -> dict:
             values = data.get(section)
             if isinstance(values, dict):
                 deps.update({f"{section}:{k}": v for k, v in values.items()})
-        for key, holder in (("overrides", data), ("overrides", data.get("pnpm") if isinstance(data.get("pnpm"), dict) else {})):
-            values = holder.get(key) if isinstance(holder, dict) else None
+        pnpm = data.get("pnpm") if isinstance(data.get("pnpm"), dict) else {}
+        for key, holder in (("overrides", data), ("overrides", pnpm)):
+            values = holder.get(key)
             if isinstance(values, dict):
                 deps.update({f"overrides:{k}": v for k, v in values.items()})
+        for key in ("allowBuilds", "patchedDependencies", "onlyBuiltDependencies", "neverBuiltDependencies",
+                    "ignoredBuiltDependencies", "trustPolicyExclude"):  # pnpm supply-chain controls
+            values = pnpm.get(key)
+            if isinstance(values, dict):
+                deps.update({f"pnpm.{key}:{k}": v for k, v in values.items()})
+            elif isinstance(values, list):
+                deps.update({f"pnpm.{key}:{clean_pkg(str(k))}": True for k in values})
     return deps
 
 
@@ -801,14 +951,24 @@ def added_lines(tool: str, tool_input: dict) -> list:
     return out
 
 
+FLOW_NAME_RE = re.compile(r"""['"]?((?:@[\w.-]+/)?[\w.-]+(?:@[^'"\s,:\]}]+)?)['"]?\s*(?=[:,\]}])""")
+
+
 def workspace_packages(lines: list) -> list:
     """Packages that new lines of pnpm-workspace.yaml name under supply-chain keys."""
     names = []
     for section, line in lines:
         if section != "?" and section not in WORKSPACE_PACKAGE_KEYS:
             continue
-        if re.match(r"^[A-Za-z][\w-]*\s*:", line) and section != "?":
+        header = re.match(r"^[A-Za-z][\w-]*\s*:(.*)$", line)
+        if header and section != "?":
+            inline = header.group(1)  # flow style: `onlyBuiltDependencies: [x]`, `allowBuilds: {x: true}`
+            if "[" in inline or "{" in inline:
+                names += [clean_pkg(n) for n in FLOW_NAME_RE.findall(inline)
+                          if n.lower() not in ("true", "false", "null") and not re.fullmatch(r"[\d.]+", n)]
             continue  # the key itself
+        if section == "catalogs" and re.match(r"^\s{1,4}[\w.-]+\s*:\s*$", line):
+            continue  # a named catalog, not a package
         m = re.match(r"^\s*(?:-\s*)?['\"]?((?:@[\w.-]+/)?[\w.-]+(?:@[^'\"\s:]+)?)", line)
         if m and not re.match(r"^(?:GHSA|CVE)-", m.group(1), re.I):
             names.append(clean_pkg(m.group(1)))
@@ -848,12 +1008,19 @@ def config_package(path: str):
     return None
 
 
+def on_timeout(signum, frame):
+    raise TimeoutError("analysis took too long")
+
+
 def main() -> None:
     try:
         data = json.load(sys.stdin)
     except Exception:
         sys.exit(0)  # never block on malformed hook input
     try:
+        if hasattr(signal, "SIGALRM"):  # a hook that times out does not block, so fail closed first
+            signal.signal(signal.SIGALRM, on_timeout)
+            signal.alarm(TIME_LIMIT_SECONDS)
         check(data)
     except SystemExit:
         raise
@@ -869,13 +1036,14 @@ def check(data: dict) -> None:
     tool_input = data.get("tool_input") or {}
     project = project_dir()
     config = load_config()
-    needed, aliases, pre_extra = [], [], []
+    needed, sources, pre_extra = [], [], []
+    CONTEXT["transcript"] = os.path.basename(str(data.get("transcript_path") or ""))
     owner_only = ("is part of the Context7 gate itself (ADR-0015). The agent never changes it, through tools or\n"
                   "the shell: propose the change (diff or text) and ask the project owner to apply it.")
 
     if tool == "Bash":
         command = tool_input.get("command", "")
-        needed, edits = analyze_bash(command, project)
+        needed, edits, words = analyze_bash(command, project)
         if any(kind == "gate" for kind, _ in edits):
             block("this command writes, moves, restores or patches a file that " + owner_only)
         if any(kind == "transcript" for kind, _ in edits):
@@ -887,6 +1055,9 @@ def check(data: dict) -> None:
             block("this command writes, moves, restores or patches package.json through the shell, so the\n"
                   "dependencies it sets cannot be checked. Use the package manager (`pnpm add …`) or the\n"
                   "Edit/Write tools, after the Context7 lookup for each dependency.")
+        if any(kind == "patch-unknown" for kind, _ in edits):
+            block("this command applies a patch the hook cannot inspect (read from stdin or a pipe). Save the patch to\n"
+                  "a file and pass it as an argument, or use the Edit/Write tools.")
         if any(kind == "pm-config" for kind, _ in edits):
             block("this command writes package-manager config (pnpm-workspace.yaml, .npmrc, .yarnrc*, bunfig.toml or\n"
                   "`… config set`) through the shell, so its supply-chain settings cannot be checked. Use the\n"
@@ -896,50 +1067,58 @@ def check(data: dict) -> None:
             block("only the default npm registry (https://registry.npmjs.org/) is allowed; another registry needs the "
                   "owner's approval:\n" + "\n".join(f"  - {r}" for r in bad))
         needed += [pkg for kind, pkg in edits if kind == "config" and pkg not in needed]
-        aliases = aliases_from_command(command)
+        sources = sources_from_words(words + strip_heredocs(command).split())
+        pre_extra = prerelease_from_words(words)
     elif tool in ("Edit", "Write", "MultiEdit"):
         path = tool_input.get("file_path", "")
         base = os.path.basename(path)
-        if protected_kind(path) and protected_kind(path)[0] == "gate":
+        kind = protected_kind(path)
+        if kind and kind[0] == "gate":
             block(f"{path} " + owner_only)
-        if TRANSCRIPT_RE.search(path.replace("\\", "/")) or path == data.get("transcript_path"):
+        if (kind and kind[0] == "transcript") or path == data.get("transcript_path"):
             block("session transcripts are the proof of the Context7 lookups and must never be written by the agent.")
         if base in LOCKFILES:
             block("lockfiles are generated by the package manager and must never be edited by hand.")
         if base == "package.json":
-            changed = changed_deps_from_edit(tool, tool_input) if tool in ("Edit", "MultiEdit") else None
+            changed = changed_deps_from_edit(tool, tool_input)
             needed = changed if changed is not None else deps_from_package_json_text(new_text(tool, tool_input))
-            aliases = ALIAS_IN_JSON_RE.findall(new_text(tool, tool_input))
+            sources = sources_from_text(SOURCE_IN_JSON_RE, new_text(tool, tool_input))
+            if DANGEROUS_BUILDS_RE.search(new_text(tool, tool_input)):
+                block("`dangerouslyAllowAllBuilds: true` runs every dependency's install scripts; only the owner sets it.")
         elif base in PM_CONFIG_FILES:
             lines = added_lines(tool, tool_input)
-            bad = config_registries("\n".join(line for _, line in lines))
+            added = "\n".join(line for _, line in lines)
+            if DANGEROUS_BUILDS_RE.search(added):
+                block("`dangerouslyAllowAllBuilds: true` runs every dependency's install scripts; only the owner sets it.")
+            bad = config_registries(added, toml=base == "bunfig.toml")
             if bad:
                 block("only the default npm registry (https://registry.npmjs.org/) is allowed; another registry needs "
                       "the owner's approval:\n" + "\n".join(f"  - {r}" for r in bad))
             needed = [config_package(path)]
             if base == "pnpm-workspace.yaml":
                 needed += [p for p in workspace_packages(lines) if p not in needed]
-                aliases = ALIAS_IN_YAML_RE.findall("\n".join(line for _, line in lines))
+                sources = sources_from_text(SOURCE_IN_YAML_RE, added)
                 pre_extra = prerelease_yaml([line for section, line in lines
                                              if section in ("overrides", "catalog", "catalogs", "?")])
         else:
             pkg = config_package(path)
             if pkg:
                 needed = [pkg]
-    approved_aliases = load_aliases_approved(config)
-    unapproved = [f"{a}@npm:{r}" for a, r in aliases if f"{a}@npm:{r}".lower() not in approved_aliases]
+    approved_sources = load_aliases_approved(config)
+    unapproved = list(dict.fromkeys(f"{n}@{src}" for n, src in sources if f"{n}@{src}".lower() not in approved_sources))
     if unapproved:
-        block("`npm:` aliases install a different package than the declared name and need the owner's approval\n"
-              "under `aliasesApproved` in .claude/context7-exceptions.json:\n"
+        block("`npm:` aliases and git/URL specs install something other than the registry package with the declared\n"
+              "name and need the owner's approval under `aliasesApproved` in .claude/context7-exceptions.json:\n"
               + "\n".join(f"  - {x}" for x in unapproved))
-    needed += [r for _, r in aliases if r not in needed]
+    needed += [src[4:] for _, src in sources if src.lower().startswith("npm:") and src[4:] not in needed]
     if not needed:
         sys.exit(0)
 
     approved = load_prerelease_approved(config)
     pre = []
     if tool == "Bash":
-        pre = prerelease_from_command(tool_input.get("command", ""))
+        pre = prerelease_from_command(tool_input.get("command", "")) + pre_extra
+        pre_extra = []
     elif os.path.basename(tool_input.get("file_path", "")) == "package.json":
         pre = prerelease_deps(new_text(tool, tool_input))
     pre += pre_extra
