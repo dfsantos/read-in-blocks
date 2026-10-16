@@ -21,13 +21,16 @@ export function requireTestEnv(name: TestEnvName): string {
 // Integration tests write and delete rows: never let them reach a remote database
 // (e.g. a Neon branch), even by mistake. Errors never echo the URL (it holds a password).
 export function assertLocalDatabaseUrl(name: string, value: string): void {
-  let host: string;
+  let url: URL;
   try {
-    host = new URL(value).hostname;
+    url = new URL(value);
   } catch {
     throw new Error(`${name} is not a valid URL`);
   }
-  if (!LOCAL_HOSTS.has(host)) {
+  // pg reads ?host= / ?hostaddr= before the URL host, so they could point elsewhere.
+  const overridesHost =
+    url.searchParams.has("host") || url.searchParams.has("hostaddr");
+  if (!LOCAL_HOSTS.has(url.hostname) || overridesHost) {
     throw new Error(
       `${name} must point to a local database (localhost, 127.0.0.1 or ::1)`,
     );

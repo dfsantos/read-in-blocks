@@ -18,6 +18,8 @@ describe("assertLocalDatabaseUrl", () => {
     "postgres://app:secret@localhost.attacker.example/db",
     "postgres://app:secret@10.0.0.5:5432/db",
     "postgres://app:secret@postgres:5432/db",
+    "postgres://app:secret@localhost:5432/db?host=ep-x.neon.tech",
+    "postgres://app:secret@localhost:5432/db?hostaddr=10.0.0.5",
     "not a url",
   ])("refuses %s without echoing it", (url) => {
     let message = "";
