@@ -181,3 +181,37 @@ _Patches fechados na implementação: ver "Versões fechadas na implementação"
 
 **Notas técnicas:** ADR-0011, 0013, 0014. Nenhuma dependência nova. `migrate()` e `pg` já estavam na stack; Context7 consultado antes do primeiro uso. O `vercel.json` não mudou (`pnpm db:migrate` passou a executar `src/db/migrate.ts`).
 **Fora desta história:** regras de firewall/rate limit em si (US-028); RLS (US-006); promover o ADR-0014 a *Aceito* (decisão do responsável, pode ocorrer junto).
+
+---
+
+### US-030 — Endurecimento restante do gate do Context7
+**Como** desenvolvedor, **quero** que o hook `require-context7.py` só libere uma mudança de stack quando houver consulta real ao Context7 sobre aquele pacote, **para** que a garantia do ADR-0013 não possa ser satisfeita por acidente ou contornada por variações de comando.
+**Cobre:** ADR-0011, ADR-0013 · **Tamanho:** M · **Depende de:** US-029 · **Bloqueios:** —
+
+> O ID é um identificador, não a ordem: proposta para o marco M1, logo após a US-029 e antes da US-004. Origem: pontos de média/baixa severidade da revisão de segurança da US-029, deixados fora do escopo aprovado. Só mexe em ferramentas do agente (`.claude/`) e na documentação; nenhuma mudança na aplicação, no banco ou na stack.
+
+**Critérios de aceite**
+
+*Cobertura pelo `libraryId`, não pelo texto livre*
+- [ ] Um pacote só conta como consultado quando o **`libraryId`** da chamada `query-docs` corresponde a ele: pelo próprio caminho (`/org/projeto`) ou por um mapa explícito pacote → IDs Context7 conhecidos (evolução do `ALIASES`). O texto livre de `query` deixa de cobrir pacotes: uma única consulta citando vários nomes na pergunta não libera nenhum deles.
+- [ ] Pacote sem ID mapeado e cujo nome não aparece no caminho do `libraryId` continua bloqueado, com mensagem dizendo qual ID foi consultado e como registrar o mapeamento.
+
+*Consulta "bem-sucedida" de verdade*
+- [ ] Um `query-docs` só conta se houver, **na mesma sessão e antes dele**, um `resolve-library-id` bem-sucedido que tenha retornado aquele `libraryId` (ou, se o mapa do item anterior já fixa o ID, o resultado do `query-docs` não for uma resposta de "não encontrado").
+- [ ] Resultados com texto de biblioteca/documentação não encontrada (ex.: "No library found", "not found", resultado vazio) não cobrem nada, mesmo sem `is_error`. Os padrões ficam numa lista no hook, com teste.
+
+*Somente o servidor Context7*
+- [ ] Só contam ferramentas `mcp__Context7__query-docs`/`resolve-library-id` e as de conectores com ID listado explicitamente (ex.: `mcp__<uuid>__…` do Claude Desktop) numa lista de servidores permitidos versionada em `.claude/` (alteração da lista só com aprovação do responsável, como as demais exceções). Qualquer outro `mcp__*__query-docs` é ignorado, mesmo com `libraryId` bem formado.
+
+*Parser de Bash*
+- [ ] Detecta instalação com flags globais antes do subcomando: `pnpm -w add zod`, `pnpm -C . add zod`, `pnpm --filter web add zod`, `npm --prefix . install zod` e equivalentes de `yarn`/`bun`.
+- [ ] Detecta o gerenciador por caminho absoluto ou relativo (`/usr/bin/pnpm`, `./node_modules/.bin/pnpm`), via `corepack pnpm …`, `npx pnpm …`/`pnpm dlx pnpm …`, e dentro de `bash -c '…'`/`sh -c "…"`, subshells `( … )`, blocos `{ …; }`, `$( … )` e após `env VAR=… `, `sudo`, `time`, `nice`.
+- [ ] Edição de `package.json` ou de arquivo de configuração da stack (`CONFIG_FILES`) feita por Bash é tratada como edição: `sed -i`/`perl -i`, redirecionamento (`>`, `>>`, `tee`) para o arquivo, `cp`/`mv`/`ln` sobre ele, `git checkout|restore -- package.json`, `git apply`/`patch`. Na dúvida (comando que cita o arquivo e não é só leitura), bloquear com mensagem pedindo a consulta ou o uso de `Edit`.
+- [ ] Comandos só de leitura que citam esses arquivos (`cat`, `grep`, `jq`, `git diff`, `git log`) continuam liberados.
+
+*Testes e documentação*
+- [ ] Um caso em `.claude/hooks/tests/test_require_context7.py` para cada item acima (bloqueio e liberação), e toda a suíte de `.claude/hooks/tests/` passando.
+- [ ] [stack-docs-policy.md](../../architecture/stack-docs-policy.md) atualizado: o que conta como consulta (servidor, `resolve` + `query`, `libraryId`), onde fica o mapa pacote → ID e a lista de servidores, e o que o parser cobre e o que **não** cobre (limite assumido de uma análise estática).
+
+**Notas técnicas:** ADR-0011 (verificar explicitamente, menor privilégio) e ADR-0013. Nenhuma dependência nova (Python da biblioteca padrão). O hook continua *fail-closed* para mudança de stack e *fail-open* para comandos que não a tocam. Nenhum ADR novo previsto; se a regra de "consulta" mudar o que o ADR-0013 diz, atualizar o ADR na própria história.
+**Fora desta história:** garantir o conteúdo da consulta (se a pergunta foi pertinente); bloquear scripts arbitrários que editem arquivos por linguagem própria (`node -e`, `python -c`), registrado como limite conhecido na política; verificação no CI (o hook é proteção do agente, não do repositório).

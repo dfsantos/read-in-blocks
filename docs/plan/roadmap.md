@@ -7,7 +7,7 @@ A ordem busca **entregar valor ponta a ponta o mais cedo possível** (um leitor 
 | Marco | Resultado verificável | Histórias |
 |---|---|---|
 | **M0 — Aprovação do plano** | PRD, stack e plano aceitos | US-000 |
-| **M1 — Esqueleto no ar** | App vazio em pt-BR, com banco, CI e deploy na Vercel funcionando | US-001 a US-003, US-029 |
+| **M1 — Esqueleto no ar** | App vazio em pt-BR, com banco, CI e deploy na Vercel funcionando | US-001 a US-003, US-029, US-030 |
 | **M2 — Acesso privado** | Login com Google (allowlist), rotas protegidas, isolamento de dados, cabeçalhos de segurança | US-004 a US-006, US-028 |
 | **M3 — Biblioteca e estrutura** | Cadastrar livros e montar a hierarquia (RF-001, RF-002, RF-009 parcial) | US-007 a US-012 |
 | **M4 — Acompanhar leitura** | Estados, datas, sumário interativo, painel ponderado (RF-003, 004, 008) | US-013 a US-016 |
