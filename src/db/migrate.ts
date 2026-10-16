@@ -60,7 +60,10 @@ async function main(): Promise<void> {
   console.log("Migrations applied.");
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main().catch((error: unknown) => {
     // Postgres and Drizzle errors carry the failing statement, never the connection string.
     console.error(
