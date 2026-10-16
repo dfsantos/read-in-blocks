@@ -1,6 +1,6 @@
 # ADR-0015 — Autoproteção do gate do Context7 e da configuração do gerenciador de pacotes
 
-- **Status:** Proposto (2026-10-16)
+- **Status:** Aceito (2026-10-16)
 - **Data:** 2026-10-16
 - **Complementa:** [ADR-0013](0013-context7-docs-first.md) e [ADR-0011](0011-zero-trust-security.md)
 
