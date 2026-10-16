@@ -20,8 +20,16 @@ A package is "covered" when the session transcript contains a successful Context
 Packages listed under `exceptions` in .claude/context7-exceptions.json are allowed (approved by the
 project owner).
 
-Stable versions only: pre-release specs (rc, beta, alpha, canary, next, nightly, dev, x.y.z-suffix) are
-blocked unless the package is listed under `prereleaseApproved` in the exceptions file.
+Stable versions only: pre-release specs (rc, beta, alpha, canary, next, nightly, dev, x.y.z-suffix, also
+inside ranges such as ^4.0.0-beta.1, and `--tag <pre-release>`) are blocked unless the package is listed
+under `prereleaseApproved` in the exceptions file. `npm:` aliases (zod@npm:other) are blocked unless the
+alias is listed under `aliasesApproved`; the real package must then be covered.
+
+Self-protection (US-031, ADR-0015): the files that configure this gate (.claude/context7-exceptions.json,
+.claude/hooks/**, .claude/settings*.json, .claude/rules/stack-docs.md) and the session transcripts are never
+written by the agent, through tools or the shell. Package-manager config (pnpm-workspace.yaml, .npmrc,
+.yarnrc*, bunfig.toml) needs a lookup, packages it newly names must be covered, non-default registries are
+blocked, and shell writes to it are blocked.
 
 Exit 0 = allow; exit 2 = block (stderr is shown to the agent).
 """
@@ -70,6 +78,7 @@ LIBRARY_IDS = {
     "@commitlint": ["/conventional-changelog/commitlint"],
     "@typescript-eslint": ["/typescript-eslint/typescript-eslint"],
     "typescript": ["/microsoft/typescript"],
+    "pnpm": ["/pnpm/pnpm"],
     "github actions": ["/websites/github_en*", "/actions/*"],
     "dependabot": ["/websites/github_en*", "/dependabot/*"],
 }
@@ -94,7 +103,25 @@ CONFIG_FILES = [
     ("*/.github/workflows/*.yml", "github actions"),
     ("*/.github/workflows/*.yaml", "github actions"),
     ("*/.github/dependabot.yml", "dependabot"),
+    ("pnpm-workspace.yaml", "pnpm"),
+    (".npmrc", "pnpm"),
+    (".yarnrc", "yarn"),
+    (".yarnrc.yml", "yarn"),
+    ("bunfig.toml", "bun"),
 ]
+PM_CONFIG_FILES = {"pnpm-workspace.yaml", ".npmrc", ".yarnrc", ".yarnrc.yml", "bunfig.toml"}
+# pnpm-workspace.yaml keys whose entries name packages (supply-chain controls)
+WORKSPACE_PACKAGE_KEYS = {"allowBuilds", "minimumReleaseAgeExclude", "overrides", "catalog", "catalogs",
+                          "onlyBuiltDependencies", "neverBuiltDependencies", "ignoredBuiltDependencies",
+                          "patchedDependencies", "packageExtensions", "trustPolicyExclude"}
+DEFAULT_REGISTRY = "https://registry.npmjs.org/"
+REGISTRY_RE = re.compile(r"(?im)^\s*(?:@[\w.-]+:)?(?:registry|npmRegistryServer)\s*[=:]\s*['\"]?([^'\"\s]+)")
+# Files that configure the gate itself, and session transcripts (the proof of a lookup).
+GATE_FILE_RE = re.compile(
+    r"(?:^|[/'\"\s(=:])\.claude/(?:hooks\b|context7-exceptions\.json\b|settings(?:\.local)?\.json\b"
+    r"|rules/stack-docs\.md\b)")
+TRANSCRIPT_RE = re.compile(r"\.claude/projects/\S*\.jsonl\b")
+INTERPRETERS = {"python", "python3", "node", "nodejs"}
 LOCKFILES = ("pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb", "bun.lock")
 
 NON_DEP_KEYS = {"name", "version", "packageManager", "node", "npm", "pnpm", "yarn", "description",
@@ -179,6 +206,11 @@ def load_prerelease_approved(config: dict) -> set:
     return {str(x).lower() for x in (entries if isinstance(entries, list) else [])}
 
 
+def load_aliases_approved(config: dict) -> set:
+    entries = config.get("aliasesApproved", [])
+    return {str(x).lower() for x in (entries if isinstance(entries, list) else [])}
+
+
 def load_trusted_servers(config: dict) -> set:
     """MCP server names whose `resolve-library-id`/`query-docs` tools are Context7: the server named
     "Context7" plus connector ids approved by the owner (e.g. Claude Desktop's generated ids)."""
@@ -193,25 +225,73 @@ def load_trusted_servers(config: dict) -> set:
 
 PRERELEASE_TAGS = r"(?:rc|beta|alpha|canary|next|nightly|dev|experimental|preview|insiders)"
 PRERELEASE_CMD_RE = re.compile(
-    r"(?<=[\w/.-])@(?:" + PRERELEASE_TAGS + r"(?=\s|$)|\d+\.\d+\.\d+-[0-9A-Za-z.-]+)")
-PRERELEASE_VALUE_RE = re.compile(r"^(?:" + PRERELEASE_TAGS + r"|[\^~]?\d+\.\d+\.\d+-[0-9A-Za-z.-]+)$")
+    r"(?<=[\w/.-])@(?:" + PRERELEASE_TAGS + r"(?=[\s'\"]|$)|[\^~<>=v\s]*\d+\.\d+\.\d+-[0-9A-Za-z.-]+)")
+PRERELEASE_TAG_RE = re.compile(r"^" + PRERELEASE_TAGS + r"$")
+PRERELEASE_IN_VALUE_RE = re.compile(r"\d+\.\d+\.\d+-[0-9A-Za-z]")
+ALIAS_IN_TOKEN_RE = re.compile(r"^((?:@[\w.-]+/)?[\w.-]+)@npm:((?:@[\w.-]+/)?[\w.-]+)")
+ALIAS_IN_JSON_RE = re.compile(r'"((?:@[\w.-]+/)?[\w.-]+)"\s*:\s*"npm:((?:@[\w.-]+/)?[\w.-]+)')
+ALIAS_IN_YAML_RE = re.compile(r"((?:@[\w.-]+/)?[\w.-]+)['\"]?\s*:\s*['\"]?npm:((?:@[\w.-]+/)?[\w.-]+)")
 
 
 def prerelease_from_command(command: str) -> list:
     command = strip_heredocs(command)
     found = []
-    for tok in command.split():
+    tokens = [t.strip("'\"") for t in command.split()]
+    for n, tok in enumerate(tokens):
         if PRERELEASE_CMD_RE.search(tok):
-            found.append(tok.strip("'\""))
+            found.append(tok)
+        tag = tok.split("=", 1)[1] if tok.startswith("--tag=") else (
+            tokens[n + 1] if tok == "--tag" and n + 1 < len(tokens) else "")
+        if PRERELEASE_TAG_RE.match(tag):
+            found.append(f"--tag {tag}")
     return found
+
+
+def is_prerelease_value(value: str) -> bool:
+    value = value.strip().strip("'\"")
+    return bool(PRERELEASE_TAG_RE.match(value) or PRERELEASE_IN_VALUE_RE.search(value))
 
 
 def prerelease_deps(text: str) -> list:
     out = []
     for key, value in re.findall(r'"((?:@[\w.-]+/)?[\w.-]+)"\s*:\s*"([^"]*)"', text):
-        if key not in NON_DEP_KEYS and PRERELEASE_VALUE_RE.match(value):
+        if key not in NON_DEP_KEYS and is_prerelease_value(value):
             out.append(f"{key}@{value}")
     return out
+
+
+def prerelease_yaml(lines: list) -> list:
+    out = []
+    for line in lines:
+        m = re.match(r"^\s*(?:-\s*)?['\"]?((?:@[\w.-]+/)?[\w.-]+)['\"]?\s*:\s*(.+)$", line)
+        if m and is_prerelease_value(m.group(2)):
+            out.append(f"{m.group(1)}@{m.group(2).strip()}")
+    return out
+
+
+def aliases_from_command(command: str) -> list:
+    return [m.groups() for t in strip_heredocs(command).split() if (m := ALIAS_IN_TOKEN_RE.match(t.strip("'\"")))]
+
+
+def non_default(found: list) -> list:
+    return [r for r in found if r.rstrip("/") + "/" != DEFAULT_REGISTRY]
+
+
+def config_registries(text: str) -> list:
+    """Non-default registries set by package-manager config text."""
+    return non_default(REGISTRY_RE.findall(text))
+
+
+def command_registries(command: str) -> list:
+    """Non-default registries passed to a command with --registry."""
+    found = []
+    tokens = [t.strip("'\"") for t in strip_heredocs(command).split()]
+    for n, tok in enumerate(tokens):
+        if tok.startswith("--registry="):
+            found.append(tok.split("=", 1)[1])
+        elif tok == "--registry" and n + 1 < len(tokens):
+            found.append(tokens[n + 1])
+    return non_default(found)
 
 
 # --- transcript: which Context7 libraries were really consulted -----------------------------------
@@ -344,6 +424,10 @@ def strip_heredocs(command: str) -> str:
 SHELL_C_RE = re.compile(
     r"(?:\b(?:ba|z|da|k)?sh\s+(?:[-+]O?o\s+\S+\s+|-[a-zA-Z]+\s+|--[\w-]+\s+)*-[a-zA-Z]*c[a-zA-Z]*|\beval)\s+"
     r"\$?(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\")")
+# Inline code run by an interpreter (`python3 -c "…"`, `node -e '…'`): it may write any file it names.
+INLINE_CODE_RE = re.compile(
+    r"\b(?:python3?|node(?:js)?|perl|ruby|deno|bun)\s+(?:-[\w-]+\s+)*(?:-c|-e|--eval|-p|--print|eval)\s+"
+    r"\$?(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\")")
 HEREDOC_BODY_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n(.*?)\n\s*\1\b", re.S)
 HERESTRING_RE = re.compile(r"<<<\s*\$?(?:'([^']*)'|\"((?:[^\"\\]|\\.)*)\"|(\S+))")
 QUOTED_RE = re.compile(r"\$?'([^']*)'|\"((?:[^\"\\]|\\.)*)\"")
@@ -354,8 +438,14 @@ SEGMENT_SPLIT_RE = re.compile(r"&&|\|\||;|\|&?|&|\n|\$\(|`|\(|\)|(?<![$\w]){|}")
 
 
 def protected_kind(token: str):
-    """('lockfile'|'package.json'|'config', package) for a path to a protected file, else None."""
+    """('gate'|'transcript'|'lockfile'|'package.json'|'pm-config'|'config', name) for a path to a protected
+    file, else None."""
     token = token.strip("'\"")
+    norm = token.replace("\\", "/")
+    if GATE_FILE_RE.search(norm) or GATE_FILE_RE.search("/" + norm):
+        return ("gate", token)
+    if TRANSCRIPT_RE.search(norm):
+        return ("transcript", token)
     if "=" in token:
         token = token.split("=", 1)[1]  # of=package.json, --file=...
     if not token or token.startswith("-"):
@@ -365,6 +455,8 @@ def protected_kind(token: str):
         return ("lockfile", base)
     if base == "package.json":
         return ("package.json", base)
+    if base in PM_CONFIG_FILES:
+        return ("pm-config", base)
     pkg = config_package(token)
     return ("config", pkg) if pkg else None
 
@@ -493,10 +585,16 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
         sub = [a for a in args if not a.startswith("-")]
         if sub and sub[0] == "pkg" and len(sub) > 1 and sub[1] in ("set", "delete", "fix"):
             return [("package.json", "package.json")]  # `npm pkg set dependencies.x=1`
+        if sub and sub[0] == "config" and len(sub) > 1 and sub[1] in ("set", "delete", "rm", "edit", "unset"):
+            return [("pm-config", ".npmrc")]  # writes .npmrc / .yarnrc
         return []
     if name in PM_RUNNERS or name in SHELLS or name == "corepack":
         return []
     cited = [k for k in (protected_kind(a) for a in args) if k]
+    if name in INTERPRETERS and cited and not any(a in ("-c", "-e", "-m", "-p", "--eval", "--print") for a in args):
+        rest = non_flag_args(args)  # `python3 .claude/hooks/tests/x.py` runs the script, it does not write it
+        if rest and protected_kind(rest[0]) and not any(protected_kind(a) for a in rest[1:]):
+            return []
     if name == "git":
         sub, skip = "", False
         for a in args:
@@ -603,6 +701,11 @@ def analyze_bash(command: str, project: str):
         i += 1
     pkgs, edits = [], []
     for raw in commands:
+        for single, double in INLINE_CODE_RE.findall(strip_heredocs(raw)):
+            for token in re.findall(r"[\w./~@-]+", single or double):
+                kind = protected_kind(token)
+                if kind:
+                    edits.append(kind)
         text = strip_heredocs(raw)
         text = re.sub(r"(?m)(^|[\s;&|])#[^\n]*", r"\1", text)  # comments
         for _, target in REDIRECT_TARGET_RE.findall(QUOTED_WITH_SPACE_RE.sub("''", text)):
@@ -658,11 +761,18 @@ def dep_map(data) -> dict:
     return deps
 
 
-def changed_deps_from_edit(tool: str, tool_input: dict):
-    """Dependencies an Edit/MultiEdit adds or changes in an existing package.json (compares the file
-    before and after the edit), or None when that cannot be computed."""
+def apply_edit(tool: str, tool_input: dict):
+    """(file before, file after) for an Edit/MultiEdit/Write, or None when it cannot be computed.
+    A Write to a missing file starts from an empty file."""
+    path = tool_input.get("file_path", "")
     try:
-        with open(tool_input.get("file_path", ""), encoding="utf-8") as fh:
+        if tool == "Write":
+            before = ""
+            if os.path.isfile(path):
+                with open(path, encoding="utf-8") as fh:
+                    before = fh.read()
+            return before, tool_input.get("content", "")
+        with open(path, encoding="utf-8") as fh:
             before = fh.read()
         after = before
         edits = [tool_input] if tool == "Edit" else tool_input.get("edits", [])
@@ -671,7 +781,48 @@ def changed_deps_from_edit(tool: str, tool_input: dict):
             if not old or old not in after:
                 return None
             after = after.replace(old, new) if e.get("replace_all") else after.replace(old, new, 1)
-        old_deps, new_deps = dep_map(json.loads(before)), dep_map(json.loads(after))
+        return before, after
+    except Exception:
+        return None
+
+
+def added_lines(tool: str, tool_input: dict) -> list:
+    """Lines of the file after the edit that were not in it before, each with its top-level YAML key."""
+    texts = apply_edit(tool, tool_input)
+    before, after = texts if texts else ("", new_text(tool, tool_input))
+    old = set(before.splitlines())
+    out, section = [], None if texts else "?"
+    for line in after.splitlines():
+        header = re.match(r"^([A-Za-z][\w-]*)\s*:", line)
+        if header:
+            section = header.group(1)
+        if line not in old:
+            out.append((section, line))
+    return out
+
+
+def workspace_packages(lines: list) -> list:
+    """Packages that new lines of pnpm-workspace.yaml name under supply-chain keys."""
+    names = []
+    for section, line in lines:
+        if section != "?" and section not in WORKSPACE_PACKAGE_KEYS:
+            continue
+        if re.match(r"^[A-Za-z][\w-]*\s*:", line) and section != "?":
+            continue  # the key itself
+        m = re.match(r"^\s*(?:-\s*)?['\"]?((?:@[\w.-]+/)?[\w.-]+(?:@[^'\"\s:]+)?)", line)
+        if m and not re.match(r"^(?:GHSA|CVE)-", m.group(1), re.I):
+            names.append(clean_pkg(m.group(1)))
+    return list(dict.fromkeys(n for n in names if n))
+
+
+def changed_deps_from_edit(tool: str, tool_input: dict):
+    """Dependencies an Edit/MultiEdit adds or changes in an existing package.json (compares the file
+    before and after the edit), or None when that cannot be computed."""
+    texts = apply_edit(tool, tool_input)
+    if not texts:
+        return None
+    try:
+        old_deps, new_deps = dep_map(json.loads(texts[0])), dep_map(json.loads(texts[1]))
     except Exception:
         return None
     names = [key.split(":", 1)[1] for key, value in new_deps.items() if old_deps.get(key) != value]
@@ -718,10 +869,17 @@ def check(data: dict) -> None:
     tool_input = data.get("tool_input") or {}
     project = project_dir()
     config = load_config()
-    needed = []
+    needed, aliases, pre_extra = [], [], []
+    owner_only = ("is part of the Context7 gate itself (ADR-0015). The agent never changes it, through tools or\n"
+                  "the shell: propose the change (diff or text) and ask the project owner to apply it.")
 
     if tool == "Bash":
-        needed, edits = analyze_bash(tool_input.get("command", ""), project)
+        command = tool_input.get("command", "")
+        needed, edits = analyze_bash(command, project)
+        if any(kind == "gate" for kind, _ in edits):
+            block("this command writes, moves, restores or patches a file that " + owner_only)
+        if any(kind == "transcript" for kind, _ in edits):
+            block("session transcripts are the proof of the Context7 lookups and must never be written by the agent.")
         if any(kind == "lockfile" for kind, _ in edits):
             block("lockfiles are generated by the package manager and must never be edited by hand "
                   "(this command writes, moves, restores or patches one).")
@@ -729,19 +887,52 @@ def check(data: dict) -> None:
             block("this command writes, moves, restores or patches package.json through the shell, so the\n"
                   "dependencies it sets cannot be checked. Use the package manager (`pnpm add …`) or the\n"
                   "Edit/Write tools, after the Context7 lookup for each dependency.")
+        if any(kind == "pm-config" for kind, _ in edits):
+            block("this command writes package-manager config (pnpm-workspace.yaml, .npmrc, .yarnrc*, bunfig.toml or\n"
+                  "`… config set`) through the shell, so its supply-chain settings cannot be checked. Use the\n"
+                  "Edit/Write tools, after the Context7 lookup of the package manager.")
+        bad = command_registries(command)
+        if bad:
+            block("only the default npm registry (https://registry.npmjs.org/) is allowed; another registry needs the "
+                  "owner's approval:\n" + "\n".join(f"  - {r}" for r in bad))
         needed += [pkg for kind, pkg in edits if kind == "config" and pkg not in needed]
+        aliases = aliases_from_command(command)
     elif tool in ("Edit", "Write", "MultiEdit"):
         path = tool_input.get("file_path", "")
         base = os.path.basename(path)
+        if protected_kind(path) and protected_kind(path)[0] == "gate":
+            block(f"{path} " + owner_only)
+        if TRANSCRIPT_RE.search(path.replace("\\", "/")) or path == data.get("transcript_path"):
+            block("session transcripts are the proof of the Context7 lookups and must never be written by the agent.")
         if base in LOCKFILES:
             block("lockfiles are generated by the package manager and must never be edited by hand.")
         if base == "package.json":
             changed = changed_deps_from_edit(tool, tool_input) if tool in ("Edit", "MultiEdit") else None
             needed = changed if changed is not None else deps_from_package_json_text(new_text(tool, tool_input))
+            aliases = ALIAS_IN_JSON_RE.findall(new_text(tool, tool_input))
+        elif base in PM_CONFIG_FILES:
+            lines = added_lines(tool, tool_input)
+            bad = config_registries("\n".join(line for _, line in lines))
+            if bad:
+                block("only the default npm registry (https://registry.npmjs.org/) is allowed; another registry needs "
+                      "the owner's approval:\n" + "\n".join(f"  - {r}" for r in bad))
+            needed = [config_package(path)]
+            if base == "pnpm-workspace.yaml":
+                needed += [p for p in workspace_packages(lines) if p not in needed]
+                aliases = ALIAS_IN_YAML_RE.findall("\n".join(line for _, line in lines))
+                pre_extra = prerelease_yaml([line for section, line in lines
+                                             if section in ("overrides", "catalog", "catalogs", "?")])
         else:
             pkg = config_package(path)
             if pkg:
                 needed = [pkg]
+    approved_aliases = load_aliases_approved(config)
+    unapproved = [f"{a}@npm:{r}" for a, r in aliases if f"{a}@npm:{r}".lower() not in approved_aliases]
+    if unapproved:
+        block("`npm:` aliases install a different package than the declared name and need the owner's approval\n"
+              "under `aliasesApproved` in .claude/context7-exceptions.json:\n"
+              + "\n".join(f"  - {x}" for x in unapproved))
+    needed += [r for _, r in aliases if r not in needed]
     if not needed:
         sys.exit(0)
 
@@ -751,6 +942,7 @@ def check(data: dict) -> None:
         pre = prerelease_from_command(tool_input.get("command", ""))
     elif os.path.basename(tool_input.get("file_path", "")) == "package.json":
         pre = prerelease_deps(new_text(tool, tool_input))
+    pre += pre_extra
     pre = [x for x in pre if clean_pkg(x).lower() not in approved]
     if pre:
         block("only STABLE versions are allowed (no rc/beta/alpha/canary/next/nightly/dev or x.y.z-suffix):\n"
