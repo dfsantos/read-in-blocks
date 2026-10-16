@@ -141,6 +141,15 @@ def prerelease_deps(text: str) -> list:
     return out
 
 
+def is_context7_query(tool_name: str) -> bool:
+    """Context7 query tool, whether the MCP server is named "Context7" or registered under a
+    generated id (e.g. mcp__<uuid>__query-docs, as in Claude Desktop connectors)."""
+    name = tool_name.lower()
+    if "context7" in name and "query" in name:
+        return True
+    return name.startswith("mcp__") and name.endswith("__query-docs")
+
+
 def consulted_text(transcript_path: str) -> str:
     """Concatenate lowercase inputs of every Context7 query-docs call in the session."""
     chunks = []
@@ -156,8 +165,7 @@ def consulted_text(transcript_path: str) -> str:
                     continue
                 for part in content:
                     if (isinstance(part, dict) and part.get("type") == "tool_use"
-                            and "context7" in str(part.get("name", "")).lower()
-                            and "query" in str(part.get("name", "")).lower()):
+                            and is_context7_query(str(part.get("name", "")))):
                         chunks.append(json.dumps(part.get("input") or {}).lower())
     except Exception:
         return ""

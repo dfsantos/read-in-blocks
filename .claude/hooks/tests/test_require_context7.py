@@ -72,6 +72,13 @@ cases = [
         "content": '{"dependencies":{"zod":"4.0.0-beta.1"}}'}, [(Q, {"libraryId": "/colinhacks/zod", "query": "z"})], 2),
     ("package.json stable exact ok", "Write", {"file_path": "/x/package.json",
         "content": '{"dependencies":{"zod":"4.6.5"}}'}, [(Q, {"libraryId": "/colinhacks/zod", "query": "z"})], 0),
+    ("context7 server under generated id", "Write", {"file_path": "/x/vitest.config.ts", "content": "x"},
+     [("mcp__ccffa570-6f0e-44ac-a2df-d30e2cd29738__query-docs",
+       {"libraryId": "/vitest-dev/vitest", "query": "projects"})], 0),
+    ("generated-id resolve only (not query)", "Write", {"file_path": "/x/vitest.config.ts", "content": "x"},
+     [("mcp__ccffa570-6f0e-44ac-a2df-d30e2cd29738__resolve-library-id", {"libraryName": "vitest"})], 2),
+    ("non-mcp tool named query-docs ignored", "Write", {"file_path": "/x/vitest.config.ts", "content": "x"},
+     [("fake__query-docs", {"libraryId": "/vitest-dev/vitest", "query": "projects"})], 2),
 ]
 
 failed = 0
