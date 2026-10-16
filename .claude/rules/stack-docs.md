@@ -12,3 +12,7 @@ Vale para **qualquer** criação ou atualização da stack, em qualquer arquivo.
 7. Um hook bloqueia dependências e configs sem consulta prévia. Se for bloqueado: faça a consulta pedida e repita. **Não** contorne, não use comando equivalente para escapar do hook e não edite `.claude/context7-exceptions.json` sem aprovação do usuário.
 8. Registrar no PR a seção “Documentação consultada” (biblioteca, ID Context7, versão adotada).
 9. Se o Context7 não tiver a biblioteca ou estiver indisponível: parar e avisar o usuário, nunca seguir pela memória.
+
+## Scaffolding com as CLIs oficiais
+
+**Scaffolding pelas CLIs oficiais.** Criar e configurar a stack com a CLI oficial de cada ferramenta (`create-next-app`, `shadcn init` e `shadcn add`, `drizzle-kit`, `husky init`, `pnpm init`), usando a versão da tabela de versões e as flags confirmadas no Context7. Depois, ajustar ao padrão do projeto (pasta `src/`, versões exatas sem `^`/`~`, estrutura de [conventions.md](docs/architecture/conventions.md)). **Nunca escrever à mão** o que uma CLI gera: `components.json`, componentes em `src/components/ui`, migrações do `drizzle-kit`, lockfile. Se a raiz tiver conflito de arquivos, gerar em pasta temporária e trazer os arquivos **sem sobrescrever** `README.md`, `CLAUDE.md`, `docs/` e `.claude/`.

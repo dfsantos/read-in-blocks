@@ -63,6 +63,10 @@ Biblioteca que o Context7 não tem: o agente **informa o usuário** e propõe a 
 
 Pré-releases aprovadas ficam em `"prereleaseApproved": ["pacote"]`. Só o responsável aprova. Cada exceção é revisada ao fim do marco. Sem aprovação, o agente não altera esse arquivo.
 
+## Scaffolding com as CLIs oficiais
+
+**Scaffolding pelas CLIs oficiais.** Criar e configurar a stack com a CLI oficial de cada ferramenta (`create-next-app`, `shadcn init` e `shadcn add`, `drizzle-kit`, `husky init`, `pnpm init`), usando a versão da tabela de versões e as flags confirmadas no Context7. Depois, ajustar ao padrão do projeto (pasta `src/`, versões exatas sem `^`/`~`, estrutura de [conventions.md](../architecture/conventions.md)). **Nunca escrever à mão** o que uma CLI gera: `components.json`, componentes em `src/components/ui`, migrações do `drizzle-kit`, lockfile. Se a raiz tiver conflito de arquivos, gerar em pasta temporária e trazer os arquivos **sem sobrescrever** `README.md`, `CLAUDE.md`, `docs/` e `.claude/`.
+
 ## Versões aprovadas
 
 As versões que o projeto adota estão em [stack-versions.md](stack-versions.md), validadas no Context7 e espelhadas em cada história de stack ("Versões fixadas"). Regras:

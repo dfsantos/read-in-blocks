@@ -47,6 +47,7 @@ Nunca confiar em rede, cliente, sessão, ambiente ou entrada. Verificar explicit
 - Um hook bloqueia o que não tiver consulta prévia na sessão. Se bloquear: consulte e repita; não contorne. Biblioteca fora do Context7 ou Context7 indisponível ⇒ parar e avisar o usuário; `.claude/context7-exceptions.json` só com aprovação dele.
 - **Sempre versões estáveis:** nunca `rc`, `beta`, `alpha`, `canary`, `next`, `nightly`, `dev` ou `x.y.z-sufixo`; o hook bloqueia. Exceção só com aprovação do usuário.
 - **Versões aprovadas:** [`docs/architecture/stack-versions.md`](docs/architecture/stack-versions.md) (espelhadas em “Versões fixadas” nas histórias). Instalar exatamente essas, sem `^`/`~`; patch “a fechar” ⇒ consultar o Context7 e registrar; item “Decisão” ⇒ não instalar antes da decisão do usuário.
+- **Scaffolding pelas CLIs oficiais** (`create-next-app`, `shadcn init/add`, `drizzle-kit`, `husky init`, `pnpm init`) com as flags confirmadas no Context7; depois ajustar ao padrão do projeto. Nunca escrever à mão o que a CLI gera; em conflito na raiz, gerar em pasta temporária sem sobrescrever `README.md`, `CLAUDE.md`, `docs/`, `.claude/`.
 - Registrar no PR a tabela “Documentação consultada” (biblioteca, ID Context7, versão adotada). Skill: `stack-change`.
 
 ## 4. Idioma

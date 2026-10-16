@@ -48,6 +48,7 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 - [ ] **Conventional Commits:** `commitlint` com `scope-enum` de [git-workflow.md](../../architecture/git-workflow.md), hook `commit-msg` local e job no CI validando commits e título do PR.
 - [ ] **Segurança da cadeia de suprimentos:** lockfile com `--frozen-lockfile`, Dependabot, `pnpm audit` e secret scanning no CI; GitHub Actions fixadas por SHA; `permissions` mínimas no workflow.
 - [ ] Template de PR com o checklist de segurança Zero Trust, a lista de critérios de aceite e a seção **“Documentação consultada”** (biblioteca, ID Context7, versão adotada).
+- [ ] **Scaffolding pelas CLIs oficiais:** projeto gerado com `create-next-app` (versão fixada da tabela) e shadcn via `shadcn init -t next` (Base UI, padrão da CLI), com as flags confirmadas no Context7. Depois, ajustes ao padrão do projeto (`src/`, versões exatas, estrutura de pastas das convenções). Nenhum arquivo gerado por CLI escrito à mão; em caso de conflito na raiz, gerar em pasta temporária e trazer os arquivos sem sobrescrever `README.md`, `CLAUDE.md`, `docs/` e `.claude/`.
 - [ ] **Context7 primeiro:** versões de Next.js, Tailwind, shadcn, ESLint, Vitest, Playwright e demais pacotes foram escolhidas após consulta ao Context7 (ADR-0013), não de memória.
 
 **Notas técnicas:** ADR-0001, 0002, 0010, 0013. Versões estáveis vigentes na data da implementação, confirmadas no Context7.

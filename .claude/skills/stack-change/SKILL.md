@@ -18,7 +18,7 @@ Política: `docs/architecture/stack-docs-policy.md` (ADR-0013). Um hook bloqueia
    - instalação e configuração recomendadas para o caso de uso do projeto;
    - breaking changes recentes, APIs descontinuadas, guia de migração se for upgrade;
    - segurança: opções de configuração relevantes ao Zero Trust (cookies, CSP, validação).
-4. **Executar** o comando/edição a partir do que foi retornado. Para dependências: fixar a versão confirmada, usar o gerenciador (`pnpm`) e deixar o lockfile ser atualizado por ele. Nunca editar o lockfile à mão.
+4. **Executar** o comando/edição a partir do que foi retornado. **Prefira sempre a CLI oficial** da ferramenta (`create-next-app`, `shadcn init/add`, `drizzle-kit`, `husky init`, `pnpm init`) com as flags confirmadas no Context7; só depois ajuste ao padrão do projeto (`src/`, versões exatas, estrutura). Nunca escreva à mão o que a CLI gera (`components.json`, `src/components/ui`, migrações do `drizzle-kit`, lockfile); em conflito na raiz, gere em pasta temporária e traga os arquivos sem sobrescrever `README.md`, `CLAUDE.md`, `docs/` e `.claude/`. Para dependências: fixar a versão confirmada, usar o gerenciador (`pnpm`) e deixar o lockfile ser atualizado por ele. Nunca editar o lockfile à mão.
 5. **Verificar:** rodar `typecheck`, `lint`, `test` e `build` aplicáveis. Se a documentação indicar passo adicional (migração de config, codemod), executar.
 6. **Registrar:** adicionar à descrição do PR/resumo da história a tabela “Documentação consultada”:
 
