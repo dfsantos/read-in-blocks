@@ -8,7 +8,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 |---|---|---|---|---|---|---|---|---|
 | M0 | [US-000](epics/E0-foundation.md) | Aprovar PRD, stack e plano | — | P | — | — | Aprovada | 2026-10-15 |
 | M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Aprovada | 2026-10-16 |
-| M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Em validação | |
+| M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Aprovada | 2026-10-15 |
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Pendente | |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
@@ -39,7 +39,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 29 histórias (1 de aprovação, 27 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-002 em validação (branch `story/US-002-i18n`); aguardando aprovação do responsável.
+- **Próxima ação:** US-002 aprovada. Nenhuma história em andamento; próxima: abrir uma nova sessão e rodar `/start-story US-003`. PR da US-002 ainda não aberto.
 
 ## Registro de aprovações
 
@@ -47,3 +47,4 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 |---|---|---|
 | 2026-10-15 | US-000 | Aprovada pelo responsável: PRD, stack e versões, ADR-0001 a 0013 aceitos, roadmap e decisões D-01 a D-13. Nenhum código foi iniciado; o desenvolvimento começa em outra sessão. |
 | 2026-10-16 | US-001 | Aprovada pelo responsável, mantendo os pontos de atenção: patches de versão fechados no npm, ESLint 10 com avisos de peers, ignore do GHSA-vfj7-8cjw-p6xm, minimumReleaseAgeExclude e texto literal até a US-002. PR ainda não aberto. |
+| 2026-10-15 | US-002 | Aprovada pelo responsável, mantendo os pontos de atenção: exceção permanente de `next-intl` em `context7-exceptions.json` (hook não reconhece o servidor Context7 da sessão; reavaliar), `allowBuilds` falso para `@swc/core` e `@parcel/watcher`, detector de literais heurístico. PR ainda não aberto. |
