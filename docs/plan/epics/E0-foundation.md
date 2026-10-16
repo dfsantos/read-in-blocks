@@ -221,11 +221,11 @@ _Patches fechados na implementação: ver "Versões fechadas na implementação"
 
 ### US-031 — Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes
 **Como** responsável pelo projeto, **quero** que o agente não consiga afrouxar o gate do Context7 nem os controles da cadeia de suprimentos sem a minha ação, **para** que as garantias do ADR-0011 e do ADR-0013 não dependam só da disciplina do agente.
-**Cobre:** ADR-0011, ADR-0013 · **Tamanho:** M · **Depende de:** US-030 · **Bloqueios:** decisão sobre como o responsável altera os arquivos do gate (ver abaixo)
+**Cobre:** ADR-0011, ADR-0013, ADR-0015 · **Tamanho:** M · **Depende de:** US-030 · **Bloqueios:** —
 
 > O ID é um identificador, não a ordem: proposta para o marco M1, antes da US-004. Origem: pontos abertos da revisão de segurança da US-030, registrados em [progress.md](../progress.md). Só mexe em ferramentas do agente (`.claude/`) e na documentação.
 
-**Decisão pendente (o responsável escolhe antes do início)**
+**Decisão (resolvida em 2026-10-16: opção C, escolhida pelo responsável, que autorizou também a alteração do `.claude/settings.json` pelo agente nesta história)**
 
 Como o gate passa a proteger os próprios arquivos (`.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings.json`, `.claude/rules/stack-docs.md`) sem impedir o responsável de mantê-los:
 - **Opção A — regras `deny` no `.claude/settings.json`** (`Edit`/`Write` nesses caminhos). Mais simples, mas não cobre escrita por Bash. O responsável edita fora do agente ou desliga a regra temporariamente.

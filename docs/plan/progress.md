@@ -12,7 +12,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Aprovada | 2026-10-16 |
 | M1 | [US-029](epics/E0-foundation.md) | Endurecimento do banco, das migrações e do gate do Context7 | — | G | US-003 | — | Aprovada | 2026-10-16 |
 | M1 | [US-030](epics/E0-foundation.md) | Endurecimento restante do gate do Context7 | — | M | US-029 | — | Aprovada | 2026-10-16 |
-| M1 | [US-031](epics/E0-foundation.md) | Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes | — | M | US-030 | Decisão (opção A/B/C) | Pendente | |
+| M1 | [US-031](epics/E0-foundation.md) | Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes | — | M | US-030 | — | Em desenvolvimento | |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
@@ -42,7 +42,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 32 histórias (1 de aprovação, 30 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-029 e US-030 aprovadas em 2026-10-16 (branch `story/US-030-context7-gate-hardening`, que contém a US-029; ainda sem PR). Os pontos abertos da revisão da US-030 viraram a **US-031** (proposta em 2026-10-16), que aguarda a autorização do responsável e a escolha da opção A/B/C de proteção dos arquivos do gate. Depois dela (ou no lugar dela, se o responsável preferir), `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
+- **Próxima ação:** US-031 (proteção do próprio gate e da configuração do gerenciador) **em desenvolvimento** desde 2026-10-16, na branch `story/US-031-gate-self-protection` (a partir da `story/US-030-context7-gate-hardening`, aprovada e sem PR). Opção C escolhida pelo responsável: `deny` no `.claude/settings.json` + bloqueio no hook. Depois, `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
 
 ## Registro de aprovações
 
