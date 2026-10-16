@@ -216,3 +216,44 @@ _Patches fechados na implementação: ver "Versões fechadas na implementação"
 **Implementação:** a lista `trustedServers` nasce com o conector do Context7 desta instalação do Claude Desktop (`ccffa570-…`), incluído dentro do escopo autorizado; ids novos dependem do responsável. Pacotes cujo id do Context7 não tem o nome do pacote como projeto ficam em `LIBRARY_IDS` no hook (ids de [stack-versions.md](../../architecture/stack-versions.md)). Por conservadorismo, comandos desconhecidos que citam `package.json` (ex.: `python3 -m json.tool package.json`) são bloqueados. A revisão de segurança da história apontou desvios dentro do escopo, já corrigidos: palavras reservadas do shell, script enviado ao `sh` pela entrada padrão, continuação de linha, falha fechada em erro interno, `npm pkg set`, `Edit` que troca só a versão no `package.json`, apelidos do npm e flags globais desconhecidas, comandos de leitura com flag de escrita e bloqueios indevidos de `git restore --staged`/`git reset`. Os pontos fora do escopo estão em [progress.md](../progress.md).
 **Notas técnicas:** ADR-0011 (verificar explicitamente, menor privilégio) e ADR-0013. Nenhuma dependência nova (Python da biblioteca padrão). O hook continua *fail-closed* para mudança de stack e *fail-open* para comandos que não a tocam. Nenhum ADR novo previsto; se a regra de "consulta" mudar o que o ADR-0013 diz, atualizar o ADR na própria história.
 **Fora desta história:** garantir o conteúdo da consulta (se a pergunta foi pertinente); bloquear scripts arbitrários que editem arquivos por linguagem própria (`node -e`, `python -c`), registrado como limite conhecido na política; verificação no CI (o hook é proteção do agente, não do repositório).
+
+---
+
+### US-031 — Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes
+**Como** responsável pelo projeto, **quero** que o agente não consiga afrouxar o gate do Context7 nem os controles da cadeia de suprimentos sem a minha ação, **para** que as garantias do ADR-0011 e do ADR-0013 não dependam só da disciplina do agente.
+**Cobre:** ADR-0011, ADR-0013 · **Tamanho:** M · **Depende de:** US-030 · **Bloqueios:** decisão sobre como o responsável altera os arquivos do gate (ver abaixo)
+
+> O ID é um identificador, não a ordem: proposta para o marco M1, antes da US-004. Origem: pontos abertos da revisão de segurança da US-030, registrados em [progress.md](../progress.md). Só mexe em ferramentas do agente (`.claude/`) e na documentação.
+
+**Decisão pendente (o responsável escolhe antes do início)**
+
+Como o gate passa a proteger os próprios arquivos (`.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings.json`, `.claude/rules/stack-docs.md`) sem impedir o responsável de mantê-los:
+- **Opção A — regras `deny` no `.claude/settings.json`** (`Edit`/`Write` nesses caminhos). Mais simples, mas não cobre escrita por Bash. O responsável edita fora do agente ou desliga a regra temporariamente.
+- **Opção B — bloqueio no próprio hook** (`Edit`/`Write`/`MultiEdit` e escrita por Bash, com o mesmo detector de escrita da US-030). A mensagem pede ao responsável que faça a mudança. Uma história que precise alterar o hook (como esta) roda com o hook ativo da `main`, que só protege depois do merge.
+- **Opção C — A + B** (recomendada): `deny` como primeira barreira e o hook para cobrir o Bash.
+- Em qualquer opção, o agente pode **propor** a mudança (diff no PR ou texto para o responsável aplicar), mas não aplicá-la.
+
+**Critérios de aceite**
+
+*Arquivos do gate protegidos (conforme a decisão)*
+- [ ] `Edit`/`Write`/`MultiEdit` em `.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings.json` e `.claude/rules/stack-docs.md` são bloqueados, com mensagem pedindo a ação do responsável.
+- [ ] Escrita por Bash nesses arquivos (redirecionamento, `tee`, `sed -i`, `cp`/`mv`/`ln`, `git checkout|restore`, `git apply`/`patch`) também é bloqueada (opções B/C). Leitura (`cat`, `grep`, `jq`, `git diff|log`) continua livre.
+- [ ] Escrita por Bash no transcript da sessão (`transcript_path`, `~/.claude/projects/**`) é bloqueada, fechando a forja de consulta registrada como limite na US-030.
+- [ ] A política documenta o procedimento do responsável para alterar esses arquivos.
+
+*Configuração do gerenciador de pacotes*
+- [ ] `pnpm-workspace.yaml`, `.npmrc`, `.yarnrc`, `.yarnrc.yml` e `bunfig.toml` (raiz e subpastas) entram em `CONFIG_FILES`, editados por ferramenta ou por Bash.
+- [ ] Mudança nos controles de cadeia de suprimentos do `pnpm-workspace.yaml` (`allowBuilds`, `minimumReleaseAgeExclude`, `minimumReleaseAge`, `audit.ignore`, `overrides`, `catalog`/`catalogs`, `onlyBuiltDependencies`, `neverBuiltDependencies`) e qualquer `registry`/`@escopo:registry` no `.npmrc` exigem consulta ao Context7 do pnpm (`/pnpm/pnpm`), com cada pacote novo citado coberto como dependência.
+- [ ] `registry` diferente de `https://registry.npmjs.org/` em `.npmrc` é bloqueado sempre, com mensagem pedindo aprovação do responsável.
+
+*Pré-releases e aliases*
+- [ ] Pré-release com faixa é detectada em comando e em `package.json`: `zod@^4.0.0-beta.1`, `zod@~4.0.0-rc.1`, `>=4.0.0-alpha`, `4.0.0-beta.1 - 4.0.0`.
+- [ ] `--tag <pré-release>` (`npm install zod --tag beta`, `pnpm add zod --tag next`) é bloqueado como pré-release.
+- [ ] Alias `npm:` (`pnpm add zod@npm:outro@1.0.0`, `"zod": "npm:outro@1"` no `package.json`, `overrides` com `npm:`) exige a cobertura do pacote **real** (`outro`) e, por padrão, é bloqueado com mensagem pedindo aprovação do responsável (o nome declarado engana a revisão).
+
+*Testes e documentação*
+- [ ] Casos novos em `.claude/hooks/tests/test_require_context7.py` para cada item (bloqueio e liberação), e toda a suíte de `.claude/hooks/tests/` passando.
+- [ ] [stack-docs-policy.md](../../architecture/stack-docs-policy.md) atualizado (arquivos protegidos, procedimento do responsável, configuração do gerenciador, pré-releases e aliases); os limites que deixarem de existir saem da lista.
+
+**Notas técnicas:** ADR-0011 e ADR-0013. Nenhuma dependência nova (Python da biblioteca padrão). Leitura de YAML sem biblioteca: o hook compara as chaves de nível superior por texto, de forma conservadora (na dúvida, exige a consulta). Se a decisão escolher a opção A ou C, a mudança no `.claude/settings.json` é feita pelo responsável, ou pelo agente com aprovação explícita registrada na história.
+**Fora desta história:** verificação equivalente no CI (o hook protege o agente, não o repositório); conteúdo de scripts executados (`bash script.sh`, `node -e`); globs e expansões do shell.
