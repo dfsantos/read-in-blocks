@@ -16,6 +16,7 @@ minimumReleaseAgeExclude:
 allowBuilds:
   '@parcel/watcher': false
   '@swc/core': false
+  esbuild: false
   unrs-resolver: false
 
 audit:
