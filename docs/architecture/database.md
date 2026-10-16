@@ -60,7 +60,23 @@ Passo a passo para fazer uma vez. Não cole senhas em issues, PRs ou chats.
 
 1. Vercel → **Storage → Create Database → Neon** (Marketplace), região próxima da região das funções da Vercel.
 2. Ao conectar ao projeto, **desmarque *Preview* e *Development*** e desative a criação automática de branch por Preview: usamos uma branch `preview` fixa (ADR-0014).
-3. A integração cria variáveis com a credencial do **dono** (ex.: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`). Elas têm DDL: **não** são usadas pela aplicação. Depois do passo 4, remova-as do projeto ou renomeie para não sombrear as nossas (as nossas também se chamam `DATABASE_URL`).
+3. A integração cria cerca de 17 variáveis com a credencial do **dono** (`DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `PG*`, `POSTGRES_*`, `NEON_*`) em Preview e Production. Elas têm DDL e **não** são usadas pela aplicação: o script do passo seguinte as remove. Desligue a sincronização de variáveis da integração (Integrations → Neon → Manage → Projects) para que não voltem e, como a senha do dono ficou exposta nessas variáveis, redefina a senha do `neondb_owner` no Neon.
+
+### Atalho: `scripts/setup-database.sh` (recomendado)
+
+Faz os passos 3 a 5 de uma vez e pode ser repetido para **rotacionar** todas as senhas:
+
+```bash
+./scripts/setup-database.sh
+```
+
+- Pede `vercel login`/`vercel link` se necessário e as connection strings do `neondb_owner` das branches `main` e `preview` (entrada oculta).
+- Gera as senhas de `app` e `migrator` localmente (`openssl rand`), aplica `roles.sql` e `ALTER ROLE … PASSWORD` em cada branch, testa as conexões e grava `DATABASE_URL` e `MIGRATOR_DATABASE_URL` como *Sensitive* em Production e Preview, conferindo cada gravação.
+- Remove as variáveis da integração Neon listadas acima.
+- Nenhuma senha é exibida nem passada como argumento de linha de comando.
+- Requer `psql` (libpq 16+), `openssl`, `python3` e `pnpm`; usa `pnpm dlx vercel@64.3.1`.
+
+Os passos 3 a 5 abaixo descrevem o mesmo processo manualmente.
 
 ### 3. Papéis na branch `main` (produção)
 
