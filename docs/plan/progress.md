@@ -10,8 +10,8 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Aprovada | 2026-10-16 |
 | M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Aprovada | 2026-10-15 |
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Aprovada | 2026-10-16 |
-| M1 | [US-029](epics/E0-foundation.md) | Endurecimento do banco, das migrações e do gate do Context7 | — | G | US-003 | — | Em desenvolvimento | |
-| M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Em desenvolvimento | |
+| M1 | [US-029](epics/E0-foundation.md) | Endurecimento do banco, das migrações e do gate do Context7 | — | G | US-003 | — | Em validação | |
+| M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
 | M2 | [US-028](epics/E1-authentication-and-privacy.md) | Cabeçalhos de segurança e proteção de requisições | RF-010 | M | US-005 | — | Pendente | |
@@ -40,7 +40,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 30 histórias (1 de aprovação, 28 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-003 aprovada e publicada (PR #13). US-029 (endurecimento apontado pelas revisões da US-003) em desenvolvimento, autorizada pelo responsável em 2026-10-16 com os itens opcionais; depois dela, `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
+- **Próxima ação:** US-003 aprovada e publicada (PR #13). US-029 (endurecimento apontado pelas revisões da US-003) **em validação** desde 2026-10-16 (branch `story/US-029-db-hardening`). Para aprovar: reexecutar `scripts/setup-database.sh` nas branches `main` e `preview` do Neon e confirmar; aceitar ou não a decisão de manter `pnpm dlx vercel@64.3.1` (pin como `devDependency` quebraria o `pnpm audit`). Pontos abertos das revisões (média/baixa, fora do escopo aprovado): o gate do Context7 ainda aceita qualquer `mcp__*__query-docs` com `libraryId` bem formado e casa pacotes pelo texto livre da `query`; não detecta flags globais antes do subcomando (`pnpm -w add`), subshells nem edições de `package.json` via Bash. Depois dela, `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
 
 ## Registro de aprovações
 
