@@ -23,14 +23,14 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 |---|---|---|---|---|
 | `Node.js` | **24 (LTS)** | 🟡 Linha (patch a fechar) | `/nodejs/node` | CHANGELOG: v24 é LTS até 2028-04 (v22 até 2027-04; v26 é Current). Atende todos os mínimos abaixo. Patch não indexado: usar `24` em `.nvmrc` e `engines`. |
 | `pnpm` | **12.x (linha estável corrente)** | 🟡 Linha (patch a fechar) | `/pnpm/pnpm` | Docs: a tag `latest` do npm aponta para o pnpm 12 (aceita Node 18 a 26). Sem tag 12.x indexada: o patch é resolvido por `pnpm init` na US-001 e gravado em `packageManager` (exato) e `devEngines.packageManager` (`>=12.0.0 <13.0.0`). Decisão D-13. |
-| `typescript` | **6.0.2** | ✅ Fixada | `/microsoft/typescript; /typescript-eslint/typescript-eslint` | Existem v6.0.2 e v7.0.2 (compilador nativo). typescript-eslint suporta `>=4.8.4 <6.1.0` e **falha ao importar com TS 7**. Next exige TS ≥5.1.0. Logo: 6.0.2. |
+| `typescript` | **6.0.3** | ✅ Fixada | `/microsoft/typescript; /typescript-eslint/typescript-eslint` | Existem v6.0.2 e v7.0.2 (compilador nativo). typescript-eslint suporta `>=4.8.4 <6.1.0` e **falha ao importar com TS 7**. Next exige TS ≥5.1.0. Logo: 6.0.2. |
 
 ## CI (GitHub Actions)
 
 | Pacote | Versão | Status | Fonte (Context7) | Evidência / compatibilidade |
 |---|---|---|---|---|
-| `actions/checkout (GitHub Action)` | **v6 (fixar por SHA na US-001)** | 🟡 Linha (patch a fechar) | `/pnpm/pnpm` | Exemplo oficial de CI do pnpm usa `actions/checkout@v6`. O SHA do commit é resolvido na US-001. |
-| `pnpm/setup (GitHub Action)` | **v2.0.0 — SHA c9883cc79df532ad1a7b81bf9ab944ceb090d65c** | ✅ Fixada | `/pnpm/pnpm` | Exemplo oficial de CI do pnpm. Instala pnpm e Node (`runtime: node@24`) e lê a versão de `packageManager`/`devEngines`. |
+| `actions/checkout (GitHub Action)` | **v7.0.1 — SHA 3d3c42e5aac5ba805825da76410c181273ba90b1** | ✅ Fixada | `/pnpm/pnpm` | Exemplo oficial de CI do pnpm usa `actions/checkout@v6`. O SHA do commit é resolvido na US-001. |
+| `pnpm/setup (GitHub Action)` | **v3.1.1 — SHA a0881977cd8ea73b1ed212236c99ca10dcc80cf4** | ✅ Fixada | `/pnpm/pnpm` | Exemplo oficial de CI do pnpm. Instala pnpm e Node (`runtime: node@24`) e lê a versão de `packageManager`/`devEngines`. |
 
 ## Framework
 
@@ -48,16 +48,16 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 | `tailwindcss` | **4.3.3** | ✅ Fixada | `/tailwindlabs/tailwindcss.com` | Lockfile do repositório oficial fixa 4.3.3 (maior versão encontrada); site é `v4.tailwindcss.com`. Navegadores: Chrome 111, Safari 16.4, Firefox 128. |
 | `@tailwindcss/postcss` | **4.3.x (alinhar ao tailwindcss)** | 🟡 Linha (patch a fechar) | `/websites/tailwindcss` | Plugin PostCSS é o caminho de integração com Next.js. Patch a confirmar na US-001. |
 | `postcss` | **a fechar na US-001** | 🟡 Linha (patch a fechar) | `/websites/tailwindcss` | Requisito do plugin `@tailwindcss/postcss`; Context7 não informa versão. |
-| `shadcn (CLI)` | **4.21.0** | ✅ Fixada | `/shadcn-ui/ui` | Tag `shadcn@4.21.0`. `init -t next` com o **padrão da CLI: Base UI** (changelog 2026-07; D-11). Sem `-b radix`. |
+| `shadcn (CLI)` | **4.21.4** | ✅ Fixada | `/shadcn-ui/ui` | Tag `shadcn@4.21.0`. `init -t next` com o **padrão da CLI: Base UI** (changelog 2026-07; D-11). Sem `-b radix`. |
 | `@base-ui/react, class-variance-authority, lucide-react, tw-animate-css, sonner` | **definidas pela CLI shadcn 4.21.0** | 🟡 Linha (patch a fechar) | `/shadcn-ui/ui` | Base `base` mapeia para `@base-ui/react` (Radix usaria `radix-ui`). Diferenças de API: `render` no lugar de `asChild`, presença via `data-open`/`data-closed`. Versões resultantes são registradas no PR e comparadas com esta tabela. |
 
 ## Qualidade e testes
 
 | Pacote | Versão | Status | Fonte (Context7) | Evidência / compatibilidade |
 |---|---|---|---|---|
-| `eslint` | **10.5.0** | ✅ Fixada | `/eslint/eslint; /typescript-eslint/typescript-eslint` | Tag v10.5.0. typescript-eslint declara peer `^8.57 || ^9 || ^10`. Requer `eslint-config-next` ≥16.4.0. |
-| `typescript-eslint` | **8.70.x** | 🟡 Linha (patch a fechar) | `/typescript-eslint/typescript-eslint` | Guard do código-fonte cita 8.70 (bloqueia TS ≥7). Patch a fechar na US-001. |
-| `prettier` | **3.8.3** | ✅ Fixada | `/prettier/prettier` | Maior tag indexada (3.6.2, 3.8.3). |
+| `eslint` | **10.12.0** | ✅ Fixada | `/eslint/eslint; /typescript-eslint/typescript-eslint` | Tag v10.5.0. typescript-eslint declara peer `^8.57 || ^9 || ^10`. Requer `eslint-config-next` ≥16.4.0. |
+| `typescript-eslint` | **8.71.2** | ✅ Fixada | `/typescript-eslint/typescript-eslint` | Guard do código-fonte cita 8.70 (bloqueia TS ≥7). Patch a fechar na US-001. |
+| `prettier` | **3.9.10** | ✅ Fixada | `/prettier/prettier` | Maior tag indexada (3.6.2, 3.8.3). |
 | `vitest` | **5.0.3** | ✅ Fixada | `/vitest-dev/vitest` | Tag v5.0.3. Exige Node ≥22.12 (ok com 24) e Vite ≥6.4. Vitest 4 (v4.1.6) é a alternativa se o Vite ficar em 5. |
 | `vite` | **^6.4 || ^7 || ^8 (peer do Vitest)** | 🟡 Linha (patch a fechar) | `/vitest-dev/vitest` | Versão exata não indexada; fechar na US-001. |
 | `@testing-library/react, jest-dom, user-event, jsdom` | **a fechar na US-001** | 🟡 Linha (patch a fechar) | `/testing-library/react-testing-library` | Context7 só lista tag antiga (v11_0_2) para o RTL; precisa de versão compatível com React 19. |
@@ -133,6 +133,8 @@ Patches das linhas "a fechar", resolvidos no registro npm dentro das linhas conf
 | `eslint-config-prettier` | 10.1.8 | |
 | shadcn (Base UI `base-nova`) | `shadcn` 4.21.0, `@base-ui/react` 1.9.0, `class-variance-authority` 0.7.1, `cn` 0.4.0, `lucide-react` 1.57.0, `tw-animate-css` 1.4.0 | `cn` é publicado pelo mantenedor do shadcn |
 | `actions/checkout` | SHA `d23441a4…` (v6.1.0) | `gitleaks/gitleaks-action` fixada por SHA `e0c47f4f…` (v3.0.0) |
+
+Atualizações do Dependabot (2026-10-16, PRs #3 a #9, revisadas no Context7 e nas notas de release): `typescript` 6.0.3, `eslint` 10.12.0, `prettier` 3.9.10, `typescript-eslint` 8.71.2, `actions/checkout` v7.0.1 (SHA `3d3c42e5…`), `pnpm/setup` v3.1.1 (SHA `a0881977…`) e `shadcn` 4.21.4 (a 4.21.5 existe; o Context7 não traz notas das 4.21.x). As linhas das tabelas acima refletem essas versões.
 
 Pontos de atenção: (1) `eslint-plugin-react`, `-import` e `-jsx-a11y` (via `eslint-config-next`) declaram peer até ESLint 9; o lint roda com ESLint 10, mas `pnpm peers check` avisa. (2) O pnpm 12 gravou `minimumReleaseAgeExclude` para `next@16.4.2` e `jsdom@30.1.3` (versões recentes demais). (3) `pnpm audit` acusa `GHSA-vfj7-8cjw-p6xm` (`braces`, sem correção), ignorado em `pnpm-workspace.yaml` com justificativa.
 

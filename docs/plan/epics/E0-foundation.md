@@ -59,7 +59,7 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 |---|---|---|---|
 | `Node.js` | **24 (LTS)** | 🟡 Linha (patch a fechar) | `/nodejs/node` |
 | `pnpm` | **12.x (linha estável corrente)** | 🟡 Linha (patch a fechar) | `/pnpm/pnpm` |
-| `typescript` | **6.0.2** | ✅ Fixada | `/microsoft/typescript; /typescript-eslint/typescript-eslint` |
+| `typescript` | **6.0.3** | ✅ Fixada | `/microsoft/typescript; /typescript-eslint/typescript-eslint` |
 | `next` | **16.4.0 ou superior da linha 16** | 🟡 Linha (patch a fechar) | `/vercel/next.js` |
 | `eslint-config-next` | **mesma versão do `next`** | 🟡 Linha (patch a fechar) | `/vercel/next.js` |
 | `react / react-dom` | **19.x** | 🟡 Linha (patch a fechar) | `/websites/react_dev; /vercel/next.js` |
@@ -67,13 +67,13 @@ Infraestrutura mínima para entregar fatias verticais com segurança. Persona: *
 | `tailwindcss` | **4.3.3** | ✅ Fixada | `/tailwindlabs/tailwindcss.com` |
 | `@tailwindcss/postcss` | **4.3.x (alinhar ao tailwindcss)** | 🟡 Linha (patch a fechar) | `/websites/tailwindcss` |
 | `postcss` | **a fechar na US-001** | 🟡 Linha (patch a fechar) | `/websites/tailwindcss` |
-| `shadcn (CLI)` | **4.21.0** | ✅ Fixada | `/shadcn-ui/ui` |
+| `shadcn (CLI)` | **4.21.4** | ✅ Fixada | `/shadcn-ui/ui` |
 | `@base-ui/react, class-variance-authority, lucide-react, tw-animate-css, sonner` | **definidas pela CLI shadcn 4.21.0** | 🟡 Linha (patch a fechar) | `/shadcn-ui/ui` |
-| `actions/checkout (GitHub Action)` | **v6 (fixar por SHA na US-001)** | 🟡 Linha (patch a fechar) | `/pnpm/pnpm` |
-| `pnpm/setup (GitHub Action)` | **v2.0.0 — SHA c9883cc79df532ad1a7b81bf9ab944ceb090d65c** | ✅ Fixada | `/pnpm/pnpm` |
-| `eslint` | **10.5.0** | ✅ Fixada | `/eslint/eslint; /typescript-eslint/typescript-eslint` |
-| `typescript-eslint` | **8.70.x** | 🟡 Linha (patch a fechar) | `/typescript-eslint/typescript-eslint` |
-| `prettier` | **3.8.3** | ✅ Fixada | `/prettier/prettier` |
+| `actions/checkout (GitHub Action)` | **v7.0.1 — SHA 3d3c42e5aac5ba805825da76410c181273ba90b1** | ✅ Fixada | `/pnpm/pnpm` |
+| `pnpm/setup (GitHub Action)` | **v3.1.1 — SHA a0881977cd8ea73b1ed212236c99ca10dcc80cf4** | ✅ Fixada | `/pnpm/pnpm` |
+| `eslint` | **10.12.0** | ✅ Fixada | `/eslint/eslint; /typescript-eslint/typescript-eslint` |
+| `typescript-eslint` | **8.71.2** | ✅ Fixada | `/typescript-eslint/typescript-eslint` |
+| `prettier` | **3.9.10** | ✅ Fixada | `/prettier/prettier` |
 | `vitest` | **5.0.3** | ✅ Fixada | `/vitest-dev/vitest` |
 | `vite` | **^6.4 || ^7 || ^8 (peer do Vitest)** | 🟡 Linha (patch a fechar) | `/vitest-dev/vitest` |
 | `@testing-library/react, jest-dom, user-event, jsdom` | **a fechar na US-001** | 🟡 Linha (patch a fechar) | `/testing-library/react-testing-library` |
