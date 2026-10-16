@@ -11,7 +11,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Aprovada | 2026-10-15 |
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Aprovada | 2026-10-16 |
 | M1 | [US-029](epics/E0-foundation.md) | Endurecimento do banco, das migrações e do gate do Context7 | — | G | US-003 | — | Aprovada | 2026-10-16 |
-| M1 | [US-030](epics/E0-foundation.md) | Endurecimento restante do gate do Context7 | — | M | US-029 | — | Em desenvolvimento | |
+| M1 | [US-030](epics/E0-foundation.md) | Endurecimento restante do gate do Context7 | — | M | US-029 | — | Em validação | |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
@@ -41,7 +41,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 31 histórias (1 de aprovação, 29 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-029 aprovada pelo responsável em 2026-10-16. US-030 (endurecimento restante do gate do Context7) **em desenvolvimento** na branch `story/US-030-context7-gate-hardening`, criada a partir da `story/US-029-db-hardening`. Depois dela, `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
+- **Próxima ação:** US-030 (endurecimento restante do gate do Context7) **em validação** desde 2026-10-16, na branch `story/US-030-context7-gate-hardening` (criada a partir da `story/US-029-db-hardening`, aprovada e ainda sem PR). Para validar: rodar `python3 .claude/hooks/tests/test_require_context7.py` (172 casos) e ler a política atualizada. Pontos abertos da revisão de segurança, fora do escopo aprovado e dependentes de decisão do responsável: (a) o gate não protege os próprios arquivos (`.claude/context7-exceptions.json`, o hook e `.claude/settings.json`); proteger exige decidir como o responsável altera esses arquivos; (b) `pnpm-workspace.yaml`, `.npmrc`, `.yarnrc*` e `bunfig.toml` fora de `CONFIG_FILES` (controles da cadeia de suprimentos); (c) pré-release com faixa (`zod@^4.0.0-beta.1`), `--tag beta` e alias `npm:` (`zod@npm:outro`) não detectados. Depois, `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
 
 ## Registro de aprovações
 
