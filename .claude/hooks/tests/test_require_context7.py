@@ -6,10 +6,18 @@ ENV = dict(os.environ, CLAUDE_PROJECT_DIR=ROOT)
 
 
 def transcript(calls):
+    """Each call is (name, input) or (name, input, result): result is "ok" (default), "error"
+    (failed call) or None (no result recorded)."""
     f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
-    for name, inp in calls:
+    for n, call in enumerate(calls):
+        name, inp, result = (call + ("ok",))[:3]
+        use_id = f"toolu_{n}"
         f.write(json.dumps({"type": "assistant", "message": {"content": [
-            {"type": "tool_use", "name": name, "input": inp}]}}) + "\n")
+            {"type": "tool_use", "id": use_id, "name": name, "input": inp}]}}) + "\n")
+        if result:
+            f.write(json.dumps({"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": use_id, "content": "docs",
+                 "is_error": result == "error"}]}}) + "\n")
     f.close()
     return f.name
 
@@ -79,6 +87,24 @@ cases = [
      [("mcp__ccffa570-6f0e-44ac-a2df-d30e2cd29738__resolve-library-id", {"libraryName": "vitest"})], 2),
     ("non-mcp tool named query-docs ignored", "Write", {"file_path": "/x/vitest.config.ts", "content": "x"},
      [("fake__query-docs", {"libraryId": "/vitest-dev/vitest", "query": "projects"})], 2),
+    # US-029: only successful calls with a Context7-style libraryId count.
+    ("other server's query-docs without libraryId", "Write", {"file_path": "/x/vitest.config.ts", "content": "x"},
+     [("mcp__otherdocs__query-docs", {"topic": "vitest projects"})], 2),
+    ("libraryId not in Context7 format", "Write", {"file_path": "/x/vitest.config.ts", "content": "x"},
+     [("mcp__otherdocs__query-docs", {"libraryId": "vitest", "query": "vitest projects"})], 2),
+    ("libraryId that is a URL", "Write", {"file_path": "/x/vitest.config.ts", "content": "x"},
+     [("mcp__otherdocs__query-docs", {"libraryId": "https://vitest.dev/config", "query": "vitest"})], 2),
+    ("versioned libraryId accepted", "Bash", {"command": "pnpm add next"},
+     [(Q, {"libraryId": "/vercel/next.js/v16.2.9", "query": "upgrade"})], 0),
+    ("failed query-docs call", "Bash", {"command": "pnpm add next-intl"},
+     [(Q, {"libraryId": "/amannn/next-intl", "query": "setup"}, "error")], 2),
+    ("query-docs call without result", "Bash", {"command": "pnpm add next-intl"},
+     [(Q, {"libraryId": "/amannn/next-intl", "query": "setup"}, None)], 2),
+    ("package only in unrelated input fields", "Bash", {"command": "pnpm add zod"},
+     [(Q, {"libraryId": "/vercel/next.js", "query": "routing", "note": "zod"})], 2),
+    ("redirection is not a package", "Bash", {"command": "pnpm install --frozen-lockfile 2>&1 | tail -3"}, [], 0),
+    ("redirect target is not a package", "Bash", {"command": "pnpm install > install.log"}, [], 0),
+    ("package before a redirection still checked", "Bash", {"command": "pnpm add zod 2>&1"}, [], 2),
 ]
 
 failed = 0

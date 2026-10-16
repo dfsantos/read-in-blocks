@@ -8,8 +8,9 @@ Covered actions:
     drizzle-kit, create-*)
   * Edit/Write/MultiEdit: package.json dependency changes, stack config files, lockfile (forbidden)
 
-A package is "covered" when the session transcript contains a Context7 `query-docs` call whose
-input mentions the package (or one of its aliases). Packages listed in
+A package is "covered" when the session transcript contains a successful Context7 `query-docs`
+call with a Context7-style `libraryId` (/org/project[/version]) whose library id or query mentions
+the package (or one of its aliases). Packages listed in
 .claude/context7-exceptions.json are allowed (approved by the project owner).
 
 Stable versions only: pre-release specs (rc, beta, alpha, canary, next, nightly, dev, x.y.z-suffix) are
@@ -150,9 +151,15 @@ def is_context7_query(tool_name: str) -> bool:
     return name.startswith("mcp__") and name.endswith("__query-docs")
 
 
+# Context7 library ids: /org/project or /org/project/version (e.g. /vercel/next.js/v16.2.9).
+LIBRARY_ID_RE = re.compile(r"^/[\w.-]+/[\w.-]+(?:/[\w.-]+)?$")
+
+
 def consulted_text(transcript_path: str) -> str:
-    """Concatenate lowercase inputs of every Context7 query-docs call in the session."""
-    chunks = []
+    """Concatenate the lowercase library id and query of every Context7 query-docs call in the
+    session that has a Context7-style `libraryId` and a successful result. Calls to other servers'
+    `query-docs` tools, malformed calls and failed calls cover nothing."""
+    uses, succeeded = {}, set()
     try:
         with open(transcript_path, encoding="utf-8") as fh:
             for line in fh:
@@ -164,12 +171,18 @@ def consulted_text(transcript_path: str) -> str:
                 if not isinstance(content, list):
                     continue
                 for part in content:
-                    if (isinstance(part, dict) and part.get("type") == "tool_use"
-                            and is_context7_query(str(part.get("name", "")))):
-                        chunks.append(json.dumps(part.get("input") or {}).lower())
+                    if not isinstance(part, dict):
+                        continue
+                    if part.get("type") == "tool_use" and is_context7_query(str(part.get("name", ""))):
+                        tool_input = part.get("input") or {}
+                        library_id = str(tool_input.get("libraryId", ""))
+                        if part.get("id") and LIBRARY_ID_RE.match(library_id):
+                            uses[part["id"]] = f"{library_id} {tool_input.get('query', '')}".lower()
+                    elif part.get("type") == "tool_result" and not part.get("is_error"):
+                        succeeded.add(part.get("tool_use_id"))
     except Exception:
         return ""
-    return "\n".join(chunks)
+    return "\n".join(text for use_id, text in uses.items() if use_id in succeeded)
 
 
 def terms_for(pkg: str) -> list:
@@ -213,6 +226,8 @@ def packages_from_bash(command: str, project: str) -> list:
     pkgs = []
     segments = re.split(r"(?:&&|\|\||;|\||\n|\$\()", command)
     for seg in segments:
+        # Drop redirections (`2>&1`, `> log`, `</dev/null`) so their targets are not read as packages.
+        seg = re.sub(r"\d*(?:>>?|<|&>)&?\s*\S*", " ", seg)
         words = seg.strip().split()
         while words and (re.match(r"^\w+=\S*$", words[0]) or words[0] in ("sudo", "time", "env")):
             words = words[1:]
