@@ -151,33 +151,33 @@ _Patches fechados na implementação: ver "Versões fechadas na implementação"
 **Critérios de aceite**
 
 *Papéis de banco (`src/db/bootstrap/roles.sql`)*
-- [ ] Papéis `app` e `migrator` pré-existentes são verificados: o script garante `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS` (altera quando o dono pode, aborta quando não pode) e **aborta** se algum dos dois for membro de qualquer papel (`pg_auth_members.member`).
-- [ ] `tests/integration/db-roles.test.ts` verifica `rolsuper`, `rolcreaterole`, `rolcreatedb`, `rolreplication` e `rolbypassrls` falsos e nenhuma linha em `pg_auth_members` com `app` ou `migrator` como membro.
+- [x] Papéis `app` e `migrator` pré-existentes são verificados: o script garante `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS` (altera quando o dono pode, aborta quando não pode) e **aborta** se algum dos dois for membro de qualquer papel (`pg_auth_members.member`).
+- [x] `tests/integration/db-roles.test.ts` verifica `rolsuper`, `rolcreaterole`, `rolcreatedb`, `rolreplication` e `rolbypassrls` falsos e nenhuma linha em `pg_auth_members` com `app` ou `migrator` como membro.
 - [ ] O responsável reexecuta `scripts/setup-database.sh` (idempotente) nas branches `main` e `preview` do Neon e confirma que passou.
 
 *Privilégios padrão (nova migração custom; `0000`/`0001` não são editadas)*
-- [ ] Migração `drizzle-kit generate --custom` com `ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`.
-- [ ] Teste de integração: função criada pelo `migrator` não é executável por `app`; `app` consegue inserir em tabela `serial`/`identity` criada pelo `migrator` (uso da sequência).
+- [x] Migração `drizzle-kit generate --custom` (`0002`) revogando de `PUBLIC` o `EXECUTE` padrão nas funções do `migrator`: `ALTER DEFAULT PRIVILEGES FOR ROLE migrator REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`. *Global, não `IN SCHEMA public`: o teste mostrou que privilégios padrão por schema só somam aos globais, então o `REVOKE … IN SCHEMA` proposto não tinha efeito.*
+- [x] Teste de integração: função criada pelo `migrator` não é executável por `app`; `app` consegue inserir em tabela `serial`/`identity` criada pelo `migrator` (uso da sequência).
 
 *Migrações concorrentes e ordem do journal*
-- [ ] Migrações do deploy rodam sob `pg_advisory_lock`, para que dois builds de preview na branch `preview` compartilhada não apliquem migrações ao mesmo tempo (script com `migrate()` de `drizzle-orm/node-postgres/migrator`, chamado pelo `vercel.json`), com teste de integração da exclusão mútua.
-- [ ] Verificação no CI: os valores `when` de `src/db/migrations/meta/_journal.json` são estritamente crescentes e as entradas de `origin/main` são prefixo inalterado do journal da branch (pega rebase que reordena ou reescreve migrações).
-- [ ] `docs/architecture/database.md` e `.claude/rules/migrations.md` documentam: `SET lock_timeout` (e `statement_timeout`) em migrações que pegam lock, regra *somente aditiva* com expandir → migrar → contrair entre deploys (código antigo e novo convivem com o schema novo), e o que fazer quando o journal conflita após rebase (regerar a migração).
+- [x] Migrações do deploy rodam sob `pg_advisory_lock`, para que dois builds de preview na branch `preview` compartilhada não apliquem migrações ao mesmo tempo (`src/db/migrate.ts` com `migrate()` de `drizzle-orm/node-postgres/migrator`, chamado por `pnpm db:migrate` no `vercel.json`), com teste de integração da exclusão mútua.
+- [x] Verificação no CI: os valores `when` de `src/db/migrations/meta/_journal.json` são estritamente crescentes e as entradas de `origin/main` são prefixo inalterado do journal da branch (pega rebase que reordena ou reescreve migrações).
+- [x] `docs/architecture/database.md` e `.claude/rules/migrations.md` documentam: `SET lock_timeout` (e `statement_timeout`) em migrações que pegam lock, regra *somente aditiva* com expandir → migrar → contrair entre deploys (código antigo e novo convivem com o schema novo), e o que fazer quando o journal conflita após rebase (regerar a migração).
 
 *Testes de integração*
-- [ ] `tests/integration/db-env.ts` recusa URL cujo host não seja local (`localhost`, `127.0.0.1`, `::1`, ou o serviço `postgres` do CI), com teste unitário.
+- [x] `tests/integration/db-env.ts` recusa URL cujo host não seja `localhost`, `127.0.0.1` ou `::1` (o CI usa `localhost`), sem ecoar a URL, com teste (`tests/integration/db-env.test.ts`).
 
 *Deploy e superfície pública (documentação)*
-- [ ] ADR-0014 registra a Git Fork Protection da Vercel (**confirmada pelo responsável** no painel) e o risco de credencial no build de preview (o build roda código da branch com `MIGRATOR_DATABASE_URL` de preview).
-- [ ] `/api/health` registrado como exceção explícita ao `requireUser()` em [zero-trust.md](../../security/zero-trust.md) (público, só `ok`/`error`, sem dados); rate limit planejado na US-028 (Vercel Firewall).
+- [x] ADR-0014 registra a Git Fork Protection da Vercel (**confirmada pelo responsável** no painel em 2026-10-16) e o risco de credencial no build de preview (o build roda código da branch com `MIGRATOR_DATABASE_URL` de preview).
+- [x] `/api/health` registrado como exceção explícita ao `requireUser()` em [zero-trust.md](../../security/zero-trust.md) (público, só `ok`/`error`, sem dados); rate limit planejado na US-028 (Vercel Firewall).
 
 *Gate do Context7 (`.claude/hooks/require-context7.py`)*
-- [ ] Só conta como consulta uma chamada `mcp__*__query-docs` cujo input tenha `libraryId` no formato Context7 (`/org/projeto`, opcionalmente `/versão`) que cubra o pacote; demais servidores `*__query-docs` não liberam nada. Testes novos em `.claude/hooks/tests`.
-- [ ] A exceção permanente de `next-intl` em `.claude/context7-exceptions.json` é reavaliada (removida se o gate passar a reconhecer o servidor da sessão), com aprovação do responsável.
+- [x] Só conta como consulta uma chamada `mcp__*__query-docs` com `libraryId` no formato Context7 (`/org/projeto`, opcionalmente `/versão`) **e resultado sem erro**, cujo `libraryId` ou pergunta cubra o pacote; demais servidores `*__query-docs` não liberam nada. Testes novos em `.claude/hooks/tests`. Também corrigido: redirecionamentos como `2>&1` eram lidos como nome de pacote.
+- [x] Exceção de `next-intl` em `.claude/context7-exceptions.json`: já tinha sido removida (lista `exceptions` vazia); nada a fazer.
 
 *Opcional (incluído pelo responsável em 2026-10-16)*
-- [ ] `scripts/setup-database.sh` envia ao Postgres verificadores SCRAM-SHA-256 calculados localmente, não a senha em texto.
-- [ ] Vercel CLI fixada como `devDependency` exata (via Context7) em vez de `pnpm dlx vercel@…`.
+- [x] `scripts/setup-database.sh` envia ao Postgres verificadores SCRAM-SHA-256 calculados localmente, não a senha em texto.
+- [ ] ~~Vercel CLI fixada como `devDependency` exata em vez de `pnpm dlx vercel@…`~~ **Não adotado:** `vercel@64.3.1` como `devDependency` trouxe 15 alertas *high* e 1 *critical* ao `pnpm audit --audit-level=high` (quebraria o CI). Mantido `pnpm dlx vercel@64.3.1`, versão exata e fora do lockfile da aplicação; registrado em database.md. Aguarda o aceite do responsável.
 
-**Notas técnicas:** ADR-0011, 0013, 0014. Novas dependências: nenhuma prevista (exceto a Vercel CLI no item opcional). `migrate()` e `pg` já estão na stack; consultar o Context7 antes do primeiro uso. Mudar o `vercel.json` e o workflow do CI exige consulta prévia (hook).
+**Notas técnicas:** ADR-0011, 0013, 0014. Nenhuma dependência nova. `migrate()` e `pg` já estavam na stack; Context7 consultado antes do primeiro uso. O `vercel.json` não mudou (`pnpm db:migrate` passou a executar `src/db/migrate.ts`).
 **Fora desta história:** regras de firewall/rate limit em si (US-028); RLS (US-006); promover o ADR-0014 a *Aceito* (decisão do responsável, pode ocorrer junto).
