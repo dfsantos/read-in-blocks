@@ -75,6 +75,29 @@ jobs:
           -f src/db/bootstrap/roles.sql
       - run: pnpm test:integration
 
+  migration-journal:
+    name: Migration journal
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: the PR base commit must be available for comparison.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pnpm and Node.js
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          runtime: node@24
+          cache: true
+          install: false
+      - run: pnpm install --frozen-lockfile
+      # Strictly increasing `when`, and the base branch's entries and SQL left untouched.
+      # BASE_SHA is empty on push events: then only the internal ordering is checked.
+      - name: Check the migration journal
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: pnpm db:check-journal $BASE_SHA
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-24.04

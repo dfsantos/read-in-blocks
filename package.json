@@ -30,6 +30,7 @@
     "prepare": "husky",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node src/db/migrate.ts",
+    "db:check-journal": "node src/db/journal-check.ts",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down"
   },
