@@ -32,17 +32,29 @@ Boas práticas:
 
 `.claude/hooks/require-context7.py` roda antes de `Bash`, `Edit`, `Write` e `MultiEdit`. Ele:
 
-1. Identifica se a ação é de dependência ou de configuração da stack e quais pacotes envolve.
-2. Lê o transcript da sessão e procura chamadas `query-docs` do Context7 (servidor `Context7` ou registrado com id gerado, `mcp__<id>__query-docs`). Só contam chamadas com `libraryId` no formato do Context7 (`/org/projeto` ou `/org/projeto/versão`) **e** com resultado sem erro; chamadas de outros servidores sem esse formato, malformadas ou que falharam não cobrem nada (US-029).
-3. Considera um pacote coberto se o `libraryId` ou a pergunta (`query`) de alguma dessas chamadas menciona o pacote (ou um alias, ex.: `next` ⇒ `next.js`; `@tiptap/*` ⇒ `tiptap`). Redirecionamentos do shell (`2>&1`, `> arquivo`) não são lidos como pacotes.
-4. Bloqueia (exit 2) e lista os pacotes sem cobertura. A resposta orienta a consulta e a repetição do comando.
+1. Identifica se a ação é de dependência ou de configuração da stack e quais pacotes envolve (ver "O que o parser de Bash reconhece" abaixo).
+2. Lê o transcript da sessão e aceita como consulta somente uma chamada `query-docs` que (US-029, US-030):
+   - venha de um **servidor confiável**: o servidor `Context7` (`mcp__Context7__…`) ou um conector com id gerado listado em `trustedServers` no `.claude/context7-exceptions.json`. Qualquer outro `mcp__*__query-docs` é ignorado, mesmo com `libraryId` bem formado ou com "context7" no nome;
+   - use um `libraryId` no formato do Context7 (`/org/projeto` ou `/org/projeto/versão`) que tenha sido **devolvido antes, na mesma sessão, por um `resolve-library-id` bem-sucedido** de um servidor confiável, ou que já esteja no mapa `LIBRARY_IDS` do hook;
+   - tenha resultado sem erro, **não vazio** e que não comece com resposta de "não encontrado" (`not found`, `No documentation found`, `No library found`, `does not exist` etc., procurados nos primeiros 300 caracteres).
+3. Considera um pacote coberto somente pelo **`libraryId`**: o segmento do projeto é o nome do pacote, comparado sem sufixos de site de documentação (`next.js` ⇒ `next`, `zod_dev` ⇒ `zod`, `tailwindcss.com` ⇒ `tailwindcss`), ou o id está listado para o pacote (ou para o escopo dele) em `LIBRARY_IDS` (ex.: `drizzle-kit` ⇒ `/drizzle-team/drizzle-orm-docs`; `@tiptap/*` ⇒ `/ueberdosis/tiptap`; `@types/x` exige a cobertura de `x`). O texto livre da pergunta (`query`) **não** cobre nada: uma consulta não libera vários pacotes citando-os na pergunta, e a organização sozinha não basta (`/vercel/next.js` não cobre `vercel`).
+4. Bloqueia (exit 2), lista os pacotes sem cobertura e os ids consultados até ali. A resposta orienta a consulta e a repetição do comando.
+
+### O que o parser de Bash reconhece
+
+- Instalação, atualização e remoção (`add`, `install <pkg>`, `update`, `remove`…) em `pnpm`, `npm`, `yarn` e `bun`, inclusive com flags globais antes do subcomando (`pnpm -w add`, `pnpm -C . add`, `pnpm --filter web add`, `npm --prefix . install`, `npm -w web install`, `yarn workspace web add`, `bun --cwd . add`); `dlx`/`x`/`create`, `exec drizzle-kit`, `npx`/`bunx`/`pnpx`, `shadcn` e `drizzle-kit`.
+- O gerenciador por caminho (`/usr/bin/pnpm`, `./node_modules/.bin/pnpm`), via `corepack pnpm`, `npx pnpm` ou `pnpm dlx pnpm`, depois de `VAR=valor`, `env`, `sudo`, `doas`, `time`, `nice`, `nohup`, `timeout`, `stdbuf`, `xargs`, `exec` e `command`.
+- Comandos dentro de `bash -c '…'`/`sh -c "…"` (e `zsh`, `dash`, `ksh`), `eval "…"`, subshells `( … )`, blocos `{ …; }`, `$( … )` e crases. Corpos de heredoc são ignorados, e redirecionamentos (`2>&1`, `> arquivo`) não são lidos como pacotes.
+- **Escrita por Bash em arquivo protegido** (`package.json`, lockfiles e os arquivos de configuração da stack): redirecionamento (`>`, `>>`) para o arquivo, `tee`, `sed -i`/`perl -i`/`awk -i inplace`, `cp`/`ln`/`install`/`rsync` sobre ele (ou para o diretório que o contém), `mv`/`rm`/`touch`, `dd of=…`, `find … -delete/-exec`, `git checkout|restore … package.json` e `git apply`/`git am`/`patch` cujo patch (heredoc ou arquivo) cita o arquivo. Lockfile ⇒ sempre bloqueado; `package.json` ⇒ bloqueado, com orientação de usar o gerenciador ou `Edit`/`Write` (que permitem conferir as dependências); arquivo de configuração ⇒ exige a consulta da biblioteca correspondente, como no `Edit`.
+- **Na dúvida, bloqueia:** qualquer comando que cite um arquivo protegido e não esteja na lista de leitura (`cat`, `grep`, `rg`, `jq`, `head`, `tail`, `ls`, `diff`, `sed` sem `-i`, `git diff|log|show|status|add|commit`, ferramentas que só leem a config como `tsc`, `eslint`, `vitest`, `playwright`, `prettier`, `next`, `drizzle-kit`) é tratado como escrita. Ex.: `node scripts/x.js package.json` e `python3 -m json.tool package.json` são bloqueados; use `jq` ou `cat` para ler.
 
 Limites conhecidos:
 
-- A associação pacote→consulta é heurística (nome e aliases); não prova que a consulta tratou do assunto exato.
+- A análise é estática e heurística: não prova que a consulta tratou do assunto exato, nem que um comando desconhecido não altera arquivos. Scripts que escrevem por conta própria sem citar o arquivo na linha de comando (`node -e`, `python -c`, scripts do `package.json`, `pnpm db:generate`) não são reconhecidos; a regra, a skill e a revisão cobrem.
+- Variáveis e expansões do shell não são resolvidas (`$PM add zod`, `f=package.json; sed -i … $f`).
 - Consulta por subagent não conta. Faça na sessão principal.
-- Comandos indiretos (`pnpm db:generate`, scripts do `package.json`) não são reconhecidos; a regra e a revisão cobrem.
 - Cada sessão nova recomeça sem cobertura.
+- O hook protege o agente, não o repositório: não há verificação equivalente no CI.
 
 ## Exceções
 
@@ -61,7 +73,19 @@ Biblioteca que o Context7 não tem: o agente **informa o usuário** e propõe a 
 }
 ```
 
-Pré-releases aprovadas ficam em `"prereleaseApproved": ["pacote"]`. Só o responsável aprova. Cada exceção é revisada ao fim do marco. Sem aprovação, o agente não altera esse arquivo.
+Pré-releases aprovadas ficam em `"prereleaseApproved": ["pacote"]`.
+
+Servidores do Context7 registrados com id gerado (ex.: o conector do Claude Desktop, `mcp__<uuid>__query-docs`) ficam em `trustedServers`:
+
+```json
+{
+  "trustedServers": [
+    { "server": "<uuid>", "reason": "Conector do Context7 no Claude Desktop", "approvedBy": "<responsável>", "date": "AAAA-MM-DD" }
+  ]
+}
+```
+
+Só o responsável aprova. Cada exceção é revisada ao fim do marco. Sem aprovação, o agente não altera esse arquivo.
 
 ## Scaffolding com as CLIs oficiais
 
@@ -79,6 +103,7 @@ As versões que o projeto adota estão em [stack-versions.md](stack-versions.md)
 
 ## Manutenção
 
-- Pacote novo na stack ⇒ conferir se precisa de alias no hook (`ALIASES` em `require-context7.py`) e atualizar o mapa de arquivos de configuração (`CONFIG_FILES`).
-- Mudou o hook, os aliases ou a lista de escopos ⇒ rodar os testes em `.claude/hooks/tests/` (ver o README da pasta).
+- Pacote novo na stack ⇒ se o id do Context7 que o documenta não tem o nome do pacote como projeto, incluir o pacote (ou o escopo) em `LIBRARY_IDS` em `require-context7.py`, com o id registrado em [stack-versions.md](stack-versions.md); atualizar o mapa de arquivos de configuração (`CONFIG_FILES`) quando houver arquivo de configuração novo.
+- Conector do Context7 com id novo (outra máquina ou reinstalação do app) ⇒ o hook bloqueia; o agente informa o id e o responsável decide incluí-lo em `trustedServers`.
+- Mudou o hook, o `LIBRARY_IDS` ou a lista de escopos ⇒ rodar os testes em `.claude/hooks/tests/` (ver o README da pasta).
 - Mudança nesta política ⇒ ADR substituto.
