@@ -70,8 +70,10 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 | Pacote | Versão | Status | Fonte (Context7) | Evidência / compatibilidade |
 |---|---|---|---|---|
 | `next-intl` | **4.14.7** | ✅ Fixada | `/amannn/next-intl` | Tag v4.14.7. `localePrefix: 'as-needed'` documentado. Com Next <16.3 é preciso habilitar `experimental.rootParams`. |
-| `drizzle-orm / drizzle-kit` | **0.44.7 / 0.31.5 (estáveis)** | ✅ Fixada | `/drizzle-team/drizzle-orm-docs; /drizzle-team/drizzle-orm` | Decisão D-12: estável, sem `@rc`. 0.44.7 é a estável citada pela documentação (alvo de downgrade da 1.0 beta); `drizzle-kit_0.31.5` é a tag indexada. O Context7 não indexa uma estável posterior: reconferir na US-003 e, se houver, pedir sua aprovação. |
-| `@neondatabase/serverless` | **a fechar na US-003** | 🟡 Linha (patch a fechar) | `/neondatabase/serverless` | Context7 não informa versão. Drizzle usa `neon-http` (não interativo) ou `neon-serverless` (WebSocket, transações interativas). |
+| `drizzle-orm / drizzle-kit` | **0.45.4 / 0.31.11 (estáveis)** | ✅ Fixada | `/drizzle-team/drizzle-orm-docs; /drizzle-team/drizzle-orm` | Decisão D-12: estável, sem `@rc`. Na US-003 (2026-10-15) a tag `latest` do npm era 0.45.4 / 0.31.11, mais nova que a 0.44.7 / 0.31.5 citada no Context7; atualização aprovada pelo responsável. |
+| ~~`@neondatabase/serverless`~~ | **não usado** | ⛔ Removido (ADR-0014) | `/neondatabase/serverless` | O modo HTTP não conecta num Postgres comum (local/CI) nem tem transações interativas. Substituído por `pg`. |
+| `pg` / `@types/pg` | **8.23.1 / 8.23.1** | ✅ Fixada | `/brianc/node-postgres` | Driver em todos os ambientes (ADR-0014), via `drizzle-orm/node-postgres`. Patch da tag `latest` do npm (Context7 não indexa versões). |
+| `@vercel/functions` | **3.10.1** | ✅ Fixada | `/websites/vercel` | `attachDatabasePool(pool)` para Fluid compute. Patch da tag `latest` do npm. |
 | `better-auth` | **1.6.23** | ✅ Fixada | `/better-auth/better-auth` | Tag v1.6.23. Provedor Google via `socialProviders.google`; `emailAndPassword` desabilitável; CLI `npx auth generate --adapter drizzle`. |
 | `@better-auth/drizzle-adapter` | **alinhar a 1.6.23 (confirmar)** | 🟡 Linha (patch a fechar) | `/better-auth/better-auth` | Desde a 1.5 os adapters são pacotes separados; a documentação v1.6.23 manda instalar este pacote. |
 
@@ -114,7 +116,7 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 5. **pnpm 12** é a linha corrente (D-13, resolvida); o patch é gravado por `pnpm init` na US-001.
 6. **Better Auth** exige instalar o adapter do Drizzle como pacote separado.
 7. **Next.js 16 removeu `next lint`:** os scripts de lint usam a CLI do ESLint.
-8. **Suporte a Node 24 na Vercel não foi verificado** (fora do Context7); conferir na US-003 antes de fixar `engines`.
+8. **Node 24 na Vercel:** verificado na US-003 (`/websites/vercel`): 24.x é o padrão; `engines.node` fixado em `24.x`.
 
 ### Versões fechadas na implementação (2026-10-16)
 
@@ -143,3 +145,13 @@ Pontos de atenção: (1) `eslint-plugin-react`, `-import` e `-jsx-a11y` (via `es
 - Mudou uma versão ⇒ nova consulta ao Context7, atualização aqui **e** na tabela da história, no mesmo commit (`docs(docs): ...` ou `build(deps): ...`).
 - Atualização de dependência (Dependabot) exige consulta ao Context7 e revisão desta tabela.
 - Pesquisa feita em 2026-10-15; versões envelhecem. A cada marco (M1, M2, ...) reconsultar antes de instalar algo novo.
+
+### Versões fechadas na US-003 (2026-10-15)
+
+| Item | Versão | Observação |
+|---|---|---|
+| `drizzle-orm` / `drizzle-kit` | 0.45.4 / 0.31.11 | tag `latest` do npm; aprovadas pelo responsável |
+| `pg` / `@types/pg` | 8.23.1 / 8.23.1 | tag `latest` do npm |
+| `@vercel/functions` | 3.10.1 | tag `latest` do npm |
+| Postgres (local e CI) | `postgres:17-alpine` (17.11), digest `sha256:b0f9560a…` | imagem oficial fixada por digest em `compose.yaml` e no CI |
+| `esbuild` (via `drizzle-kit`) | — | `allowBuilds: false` em `pnpm-workspace.yaml`; o binário vem das dependências opcionais por plataforma |

@@ -10,12 +10,13 @@ docs/
 │   ├── tech-stack.md              # Stack e arquitetura
 │   ├── conventions.md             # Convenções de código, i18n e dados
 │   ├── git-workflow.md            # Conventional Commits, branches e PRs
-│   └── stack-docs-policy.md       # Mudanças de stack sempre a partir do Context7
+│   ├── stack-docs-policy.md       # Mudanças de stack sempre a partir do Context7
+│   └── database.md                # Banco, papéis, migrações, Neon e Vercel
 ├── security/
 │   └── zero-trust.md              # Política Zero Trust e checklist por história
 ├── adr/                           # Architecture Decision Records
 │   ├── README.md
-│   └── 0001 … 0013
+│   └── 0001 … 0014
 └── plan/
     ├── README.md                  # Processo, Definition of Ready/Done, fluxo de aprovação
     ├── progress.md                # Quadro de acompanhamento (atualizado a cada história)

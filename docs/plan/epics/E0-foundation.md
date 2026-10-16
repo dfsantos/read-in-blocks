@@ -134,7 +134,8 @@ _Patches fechados na implementação: ver "Versões fechadas na implementação"
 
 | Pacote | Versão | Status | Fonte Context7 |
 |---|---|---|---|
-| `drizzle-orm / drizzle-kit` | **0.44.7 / 0.31.5 (estáveis)** | ✅ Fixada | `/drizzle-team/drizzle-orm-docs; /drizzle-team/drizzle-orm` |
-| `@neondatabase/serverless` | **a fechar na US-003** | 🟡 Linha (patch a fechar) | `/neondatabase/serverless` |
+| `drizzle-orm / drizzle-kit` | **0.45.4 / 0.31.11 (estáveis)** | ✅ Fixada | `/drizzle-team/drizzle-orm-docs; /drizzle-team/drizzle-orm` |
+| `pg` / `@types/pg` | **8.23.1 / 8.23.1** | ✅ Fixada (substitui `@neondatabase/serverless`, ADR-0014) | `/brianc/node-postgres` |
+| `@vercel/functions` | **3.10.1** | ✅ Fixada | `/websites/vercel` |
 
 - [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. **Somente versões estáveis:** nada de `rc`, `beta`, `alpha`, `canary`, `next`, `nightly` ou versões com sufixo `-x.y` (o hook bloqueia).
