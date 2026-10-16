@@ -106,3 +106,7 @@ chore(deps): bump drizzle-orm
 - Uma branch por história: `story/US-013-leaf-reading-status`. Quando a plataforma designar uma branch específica ao agente, ela prevalece.
 - Um PR por história, aberto somente quando o responsável pedir. Descrição lista os critérios de aceite atendidos e o checklist de segurança.
 - Histórico sem reescrita em branches compartilhadas.
+
+## Exceção: PRs do Dependabot
+
+O Dependabot escreve o assunto com inicial maiúscula (`build(deps): Bump x from a to b`) e isso não é configurável. O `commitlint.config.mjs` ignora **somente** mensagens no formato `(build|ci)(deps): Bump <pacote> from <a> to <b>`; qualquer outra mensagem ou título de PR passa por todas as regras.

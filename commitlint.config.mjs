@@ -20,8 +20,15 @@ const scopes = [
   "agent",
 ];
 
+// Dependabot always capitalizes its subject ("Bump x from a to b"), which cannot
+// be configured. Only that exact shape is skipped; every other commit and PR
+// title still goes through all rules.
+const isDependabotBump = (message) =>
+  /^(build|ci)\(deps\): Bump \S+ from \S+ to \S+/.test(message);
+
 const config = {
   extends: ["@commitlint/config-conventional"],
+  ignores: [isDependabotBump],
   rules: {
     "scope-empty": [2, "never"],
     "scope-enum": [2, "always", scopes],
