@@ -13,7 +13,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-029](epics/E0-foundation.md) | Endurecimento do banco, das migrações e do gate do Context7 | — | G | US-003 | — | Aprovada | 2026-10-16 |
 | M1 | [US-030](epics/E0-foundation.md) | Endurecimento restante do gate do Context7 | — | M | US-029 | — | Aprovada | 2026-10-16 |
 | M1 | [US-031](epics/E0-foundation.md) | Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes | — | M | US-030 | — | Aprovada | 2026-10-16 |
-| M1 | [US-032](epics/E0-foundation.md) | Falsos positivos do gate do Context7 em comandos de leitura | — | P | US-031 | — | Em desenvolvimento | |
+| M1 | [US-032](epics/E0-foundation.md) | Falsos positivos do gate do Context7 em comandos de leitura | — | P | US-031 | — | Em validação | |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
@@ -43,7 +43,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 33 histórias (1 de aprovação, 31 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-000 a US-003 e US-029 a US-031 aprovadas e mescladas em `main` (a última no PR #19, em 2026-10-17); produção saudável (`/api/health` → `ok`). Nenhuma história em andamento; próxima: `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails). Pendente com o responsável (arquivo protegido): aplicar no hook do `require-context7.py` em `.claude/settings.json` o comando `python3 -I …` e `"onFailure": "block"`.
+- **Próxima ação:** US-000 a US-003 e US-029 a US-031 aprovadas e mescladas em `main` (a última no PR #19, em 2026-10-17); produção saudável (`/api/health` → `ok`). US-032 (falsos positivos do gate) **em validação** desde 2026-10-17 (branch `story/US-032-gate-read-false-positives`): patches do gate aplicados pelo responsável (ADR-0015); a revisão de segurança achou 7 regressões no primeiro patch, corrigidas no segundo (aspas só em comandos simples; fuzz diferencial contra `origin/main` sem regressão); desvio registrado no critério 1. Depois dela, `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails). Pendente com o responsável (arquivo protegido): aplicar no hook do `require-context7.py` em `.claude/settings.json` o comando `python3 -I …` e `"onFailure": "block"`.
 - **Desvio de processo registrado:** US-029, US-030 e US-031 ficaram em validação ao mesmo tempo e foram mescladas num único PR (#19), contra as regras de uma história por vez e de um PR por história.
 
 ## Registro de aprovações
