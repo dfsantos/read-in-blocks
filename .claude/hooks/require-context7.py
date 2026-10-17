@@ -124,7 +124,8 @@ GATE_FILE_RE = re.compile(
 GATE_EXTRA_RE = re.compile(r"(?:^|/)\.(?:mcp|claude)\.json$")  # MCP servers: a fake "Context7" would be trusted
 TRANSCRIPT_RE = re.compile(r"\.claude/projects/\S*\.jsonl\b")
 INTERPRETERS = {"python", "python3", "node", "nodejs", "perl", "ruby", "deno"}
-PYTHON_READ_MODULES = {"unittest", "pytest", "py_compile", "compileall", "json.tool"}
+NODE_FLAGS_WITH_VALUE = {"-r", "--require", "--import", "--loader", "--experimental-loader"}
+PYTHON_READ_MODULES ={"unittest", "pytest", "py_compile", "compileall", "json.tool"}
 NON_REGISTRY_SOURCE_RE = re.compile(r"^(?:github:|gitlab:|bitbucket:|git\+|git:|git@|https?:|ssh:)", re.I)
 TIME_LIMIT_SECONDS = 20
 # Set per hook run: directories the command `cd`s into, and the session transcript's file name.
@@ -489,6 +490,160 @@ QUOTED_WITH_SPACE_RE = re.compile(r"'[^'\n]*\s[^'\n]*'|\"(?:[^\"\\\n]|\\.)*\s(?:
 REDIRECT_TARGET_RE = re.compile(r"(?:(?<![-=>])\d*|&)>>?\|?\s*(['\"]?)([^\s'\";&|<>()]+)\1")
 REDIRECT_RE = re.compile(r"\d*(?:>>?|<|&>)&?\|?\s*\S*")
 SEGMENT_SPLIT_RE = re.compile(r"&&|\|\||;|\|&?|&|\n|\$\(|`|\(|\)|(?<![$\w]){|}")
+# A redirection operator outside quotes; its target is read separately (quoted or up to a separator).
+REDIRECT_OP_RE = re.compile(r"\d*(?:&>>?|>>?|<)&?\|?\s*")
+REDIRECT_WORD_RE = re.compile(r"[^\s;&|<>()`'\"]*")
+COMMENT_RE = re.compile(r"(?m)(^|[\s;&|])#[^\n]*")
+
+
+# --- quote-aware scanning (US-032) ------------------------------------------------------------------
+# Separators, redirections and comments count only outside quotes. Any text whose quotes do not
+# balance falls back to the quote-blind handling, which yields more segments, never fewer.
+
+def quoted_end(text: str, i: int) -> int:
+    """Index just past the quoted string starting at i ('…', "…" or $'…'), or -1 if it does not end."""
+    if text.startswith("$'", i):
+        j = i + 2
+        while j < len(text):
+            if text[j] == "\\":
+                j += 2
+            elif text[j] == "'":
+                return j + 1
+            else:
+                j += 1
+        return -1
+    if text[i] == "'":
+        j = text.find("'", i + 1)
+        return -1 if j < 0 else j + 1
+    j = i + 1
+    while j < len(text):
+        if text[j] == "\\":
+            j += 2
+        elif text[j] == '"':
+            return j + 1
+        elif text.startswith("$(", j) or text[j] == "`":
+            j = substitution_end(text, j)
+            if j < 0:
+                return -1
+        else:
+            j += 1
+    return -1
+
+
+def substitution_end(text: str, i: int) -> int:
+    """Index just past the `$(…)` or `…` (backticks) starting at i, or -1 if it does not end."""
+    if text[i] == "`":
+        j = i + 1
+        while j < len(text):
+            if text[j] == "\\":
+                j += 2
+            elif text[j] == "`":
+                return j + 1
+            else:
+                j += 1
+        return -1
+    depth, j = 1, i + 2
+    while j < len(text):
+        c = text[j]
+        if c == "\\":
+            j += 2
+        elif c in "'\"" or text.startswith("$'", j):
+            j = quoted_end(text, j)
+            if j < 0:
+                return -1
+        else:
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    return j + 1
+            j += 1
+    return -1
+
+
+def substitutions(quoted: str):
+    """Bodies of the `$(…)` and backtick commands inside a double-quoted string, or None if unbalanced."""
+    bodies, j = [], 1
+    while j < len(quoted) - 1:
+        if quoted[j] == "\\":
+            j += 2
+        elif quoted.startswith("$(", j) or quoted[j] == "`":
+            end = substitution_end(quoted, j)
+            if end < 0:
+                return None
+            bodies.append(quoted[j + 2:end - 1] if quoted[j] == "$" else quoted[j + 1:end - 1])
+            j = end
+        else:
+            j += 1
+    return bodies
+
+
+def split_segments(text: str) -> list:
+    """Simple commands of a shell text, without redirections. `$(…)` and backticks inside double quotes
+    are commands too and become segments of their own."""
+    segments, current, i = [], [], 0
+    while i < len(text):
+        c = text[i]
+        if c == "\\":
+            current.append(text[i:i + 2])
+            i += 2
+            continue
+        if c in "'\"" or text.startswith("$'", i):
+            end = quoted_end(text, i)
+            bodies = substitutions(text[i:end]) if end > 0 and c == '"' else []
+            if end < 0 or bodies is None:
+                return SEGMENT_SPLIT_RE.split(REDIRECT_RE.sub(" ", text))
+            for body in bodies:
+                segments += split_segments(body)
+            current.append(text[i:end])
+            i = end
+            continue
+        op = REDIRECT_OP_RE.match(text, i)
+        if op and (i == 0 or not text[i - 1].isalnum() or not text[i].isdigit()):
+            i = op.end()
+            if i < len(text) and (text[i] in "'\"" or text.startswith("$'", i)):
+                end = quoted_end(text, i)
+                if end < 0:
+                    return SEGMENT_SPLIT_RE.split(REDIRECT_RE.sub(" ", text))
+                i = end
+            else:
+                i = REDIRECT_WORD_RE.match(text, i).end()
+            current.append(" ")
+            continue
+        sep = SEGMENT_SPLIT_RE.match(text, i)
+        if sep:
+            segments.append("".join(current))
+            current = []
+            i = sep.end()
+            continue
+        current.append(c)
+        i += 1
+    segments.append("".join(current))
+    return segments
+
+
+def strip_comments(text: str) -> str:
+    """The text without shell comments: a `#` starting a word outside quotes, up to the end of the line."""
+    out, i = [], 0
+    while i < len(text):
+        c = text[i]
+        if c == "\\":
+            out.append(text[i:i + 2])
+            i += 2
+        elif c in "'\"" or text.startswith("$'", i):
+            end = quoted_end(text, i)
+            if end < 0:
+                return COMMENT_RE.sub(r"\1", text)
+            out.append(text[i:end])
+            i = end
+        elif c == "#" and (i == 0 or text[i - 1] in " \t\n;&|("):
+            newline = text.find("\n", i)
+            i = len(text) if newline < 0 else newline
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
 
 
 def protected_kind(token: str):
@@ -660,9 +815,10 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
         return []
     cited = [k for k in (protected_kind(a) for a in args) if k]
     if name in INTERPRETERS and cited:
-        if args and not args[0].startswith("-") and protected_kind(args[0]) \
-                and not any(protected_kind(a) for a in args[1:]):
-            return []  # `python3 .claude/hooks/tests/x.py` runs the script, it does not write it
+        at = interpreter_script(name, args)
+        if at is not None and protected_kind(args[at]) \
+                and not any(protected_kind(a) for n, a in enumerate(args) if n != at):
+            return []  # `python3 -I .claude/hooks/tests/x.py` runs the script, it does not write it
         if name.startswith("python") and "-m" in args[:-1]:
             module_at = args.index("-m") + 1
             positional = [a for a in args[module_at + 1:] if not a.startswith("-")]
@@ -727,6 +883,35 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
     return [k for k in (protected_kind(a) for a in args if not re.search(r"\s", a)) if k]
 
 
+def interpreter_script(name: str, args: list):
+    """Index of the script file an interpreter runs (`python3 -I -B x.py`, `node -r m x.js`), or None when
+    it runs inline code, a module or stdin. Only python and node flags are known; for other interpreters
+    the script must be the first argument."""
+    family = "python" if name.startswith("python") else "node" if name.startswith("node") else ""
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        a = args[i]
+        if not family or a in ("-", "--"):
+            return None
+        if family == "node":
+            if a in ("-e", "-p", "--eval", "--print", "-i", "--interactive"):
+                return None
+            i += 2 if a in NODE_FLAGS_WITH_VALUE else 1
+            continue
+        if a.startswith("--"):
+            i += 2 if a == "--check-hash-based-pycs" else 1
+            continue
+        takes_value = False
+        for n, ch in enumerate(a[1:]):
+            if ch in "cm":  # -c code, -m module (also combined: -Ic)
+                return None
+            if ch in "WX":  # -W arg / -X opt, attached (-Wignore) or separate (-W ignore)
+                takes_value = n == len(a) - 2
+                break
+        i += 2 if takes_value else 1
+    return i if i < len(args) else None
+
+
 def copy_destinations(args: list, project: str) -> list:
     """Protected files that cp/ln/install/rsync would create or overwrite, including copies into a
     directory (`cp x .claude/`, `cp -t .claude/hooks x`)."""
@@ -786,7 +971,7 @@ def patched_files(args: list, raw_command: str, project: str) -> list:
 
 def stdin_shell(text: str, names: set = SHELLS) -> bool:
     """A shell (or interpreter) that reads its script from stdin (`… | sh`, `bash <<EOF`, `python3 - <<<…`)."""
-    for segment in SEGMENT_SPLIT_RE.split(REDIRECT_RE.sub(" ", HERESTRING_RE.sub(" ", text))):
+    for segment in split_segments(HERESTRING_RE.sub(" ", text)):
         words = strip_prefixes(split_words(segment))
         if words and os.path.basename(words[0]) in names:
             args, skip = [], False
@@ -848,13 +1033,12 @@ def analyze_bash(command: str, project: str):
                 if kind:
                     edits.append(kind)
         text = strip_heredocs(raw)
-        text = re.sub(r"(?m)(^|[\s;&|])#[^\n]*", r"\1", text)  # comments
+        text = strip_comments(text)
         for _, target in REDIRECT_TARGET_RE.findall(QUOTED_WITH_SPACE_RE.sub("''", text)):
             kind = protected_kind(target)
             if kind:
                 edits.append(kind)
-        text = REDIRECT_RE.sub(" ", text)
-        for segment in SEGMENT_SPLIT_RE.split(text):
+        for segment in split_segments(text):
             words = split_words(segment)
             if not words:
                 continue
