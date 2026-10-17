@@ -1,5 +1,13 @@
 {
-  "_comment": "Pacotes ausentes do Context7 e pre-releases aprovados pelo responsavel. O agente NAO adiciona entradas sozinho. Ver docs/architecture/stack-docs-policy.md",
+  "_comment": "Pacotes ausentes do Context7, pre-releases e servidores MCP do Context7 aprovados pelo responsavel. O agente NAO adiciona entradas sozinho. Ver docs/architecture/stack-docs-policy.md",
   "exceptions": [],
-  "prereleaseApproved": []
+  "prereleaseApproved": [],
+  "trustedServers": [
+    {
+      "server": "ccffa570-6f0e-44ac-a2df-d30e2cd29738",
+      "reason": "Conector do Context7 no Claude Desktop (id gerado pelo app)",
+      "approvedBy": "responsavel (escopo da US-030)",
+      "date": "2026-10-16"
+    }
+  ]
 }

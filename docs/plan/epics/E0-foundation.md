@@ -139,3 +139,122 @@ _Patches fechados na implementação: ver "Versões fechadas na implementação"
 | `@vercel/functions` | **3.10.1** | ✅ Fixada | `/websites/vercel` |
 
 - [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. **Somente versões estáveis:** nada de `rc`, `beta`, `alpha`, `canary`, `next`, `nightly` ou versões com sufixo `-x.y` (o hook bloqueia).
+
+---
+
+### US-029 — Endurecimento do banco, das migrações e do gate do Context7
+**Como** desenvolvedor, **quero** fechar os pontos abertos pelas revisões de segurança e de migração da US-003, **para** que a base de dados, o deploy e as salvaguardas do agente sigam o Zero Trust antes de existir qualquer dado de usuário.
+**Cobre:** ADR-0011, ADR-0013, ADR-0014 · **Tamanho:** G · **Depende de:** US-003 · **Bloqueios:** —
+
+> O ID é um identificador, não a ordem: esta história entra no marco M1, logo após a US-003 e antes da US-004. Origem: pontos de atenção da aprovação da US-003 em [progress.md](../progress.md).
+
+**Critérios de aceite**
+
+*Papéis de banco (`src/db/bootstrap/roles.sql`)*
+- [x] Papéis `app` e `migrator` pré-existentes são verificados: o script garante `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS` (altera quando o dono pode, aborta quando não pode) e **aborta** se algum dos dois for membro de qualquer papel (`pg_auth_members.member`).
+- [x] `tests/integration/db-roles.test.ts` verifica `rolsuper`, `rolcreaterole`, `rolcreatedb`, `rolreplication` e `rolbypassrls` falsos e nenhuma linha em `pg_auth_members` com `app` ou `migrator` como membro.
+- [ ] O responsável reexecuta `scripts/setup-database.sh` (idempotente) nas branches `main` e `preview` do Neon e confirma que passou.
+
+*Privilégios padrão (nova migração custom; `0000`/`0001` não são editadas)*
+- [x] Migração `drizzle-kit generate --custom` (`0002`) revogando de `PUBLIC` o `EXECUTE` padrão nas funções do `migrator`: `ALTER DEFAULT PRIVILEGES FOR ROLE migrator REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`. *Global, não `IN SCHEMA public`: o teste mostrou que privilégios padrão por schema só somam aos globais, então o `REVOKE … IN SCHEMA` proposto não tinha efeito.*
+- [x] Teste de integração: função criada pelo `migrator` não é executável por `app`; `app` consegue inserir em tabela `serial`/`identity` criada pelo `migrator` (uso da sequência).
+
+*Migrações concorrentes e ordem do journal*
+- [x] Migrações do deploy rodam sob `pg_advisory_lock`, para que dois builds de preview na branch `preview` compartilhada não apliquem migrações ao mesmo tempo (`src/db/migrate.ts` com `migrate()` de `drizzle-orm/node-postgres/migrator`, chamado por `pnpm db:migrate` no `vercel.json`), com teste de integração da exclusão mútua.
+- [x] Verificação no CI: os valores `when` de `src/db/migrations/meta/_journal.json` são estritamente crescentes e as entradas de `origin/main` são prefixo inalterado do journal da branch (pega rebase que reordena ou reescreve migrações).
+- [x] `docs/architecture/database.md` e `.claude/rules/migrations.md` documentam: `SET lock_timeout` (e `statement_timeout`) em migrações que pegam lock, regra *somente aditiva* com expandir → migrar → contrair entre deploys (código antigo e novo convivem com o schema novo), e o que fazer quando o journal conflita após rebase (regerar a migração).
+
+*Testes de integração*
+- [x] `tests/integration/db-env.ts` recusa URL cujo host não seja `localhost`, `127.0.0.1` ou `::1` (o CI usa `localhost`), sem ecoar a URL, com teste (`tests/integration/db-env.test.ts`).
+
+*Deploy e superfície pública (documentação)*
+- [x] ADR-0014 registra a Git Fork Protection da Vercel (**confirmada pelo responsável** no painel em 2026-10-16) e o risco de credencial no build de preview (o build roda código da branch com `MIGRATOR_DATABASE_URL` de preview).
+- [x] `/api/health` registrado como exceção explícita ao `requireUser()` em [zero-trust.md](../../security/zero-trust.md) (público, só `ok`/`error`, sem dados); rate limit planejado na US-028 (Vercel Firewall).
+
+*Gate do Context7 (`.claude/hooks/require-context7.py`)*
+- [x] Só conta como consulta uma chamada `mcp__*__query-docs` com `libraryId` no formato Context7 (`/org/projeto`, opcionalmente `/versão`) **e resultado sem erro**, cujo `libraryId` ou pergunta cubra o pacote; demais servidores `*__query-docs` não liberam nada. Testes novos em `.claude/hooks/tests`. Também corrigido: redirecionamentos como `2>&1` eram lidos como nome de pacote.
+- [x] Exceção de `next-intl` em `.claude/context7-exceptions.json`: já tinha sido removida (lista `exceptions` vazia); nada a fazer.
+
+*Opcional (incluído pelo responsável em 2026-10-16)*
+- [x] `scripts/setup-database.sh` envia ao Postgres verificadores SCRAM-SHA-256 calculados localmente, não a senha em texto.
+- [ ] ~~Vercel CLI fixada como `devDependency` exata em vez de `pnpm dlx vercel@…`~~ **Não adotado:** `vercel@64.3.1` como `devDependency` trouxe 15 alertas *high* e 1 *critical* ao `pnpm audit --audit-level=high` (quebraria o CI). Mantido `pnpm dlx vercel@64.3.1`, versão exata e fora do lockfile da aplicação; registrado em database.md. Aguarda o aceite do responsável.
+
+**Notas técnicas:** ADR-0011, 0013, 0014. Nenhuma dependência nova. `migrate()` e `pg` já estavam na stack; Context7 consultado antes do primeiro uso. O `vercel.json` não mudou (`pnpm db:migrate` passou a executar `src/db/migrate.ts`).
+**Fora desta história:** regras de firewall/rate limit em si (US-028); RLS (US-006); promover o ADR-0014 a *Aceito* (decisão do responsável, pode ocorrer junto).
+
+---
+
+### US-030 — Endurecimento restante do gate do Context7
+**Como** desenvolvedor, **quero** que o hook `require-context7.py` só libere uma mudança de stack quando houver consulta real ao Context7 sobre aquele pacote, **para** que a garantia do ADR-0013 não possa ser satisfeita por acidente ou contornada por variações de comando.
+**Cobre:** ADR-0011, ADR-0013 · **Tamanho:** M · **Depende de:** US-029 · **Bloqueios:** —
+
+> O ID é um identificador, não a ordem: proposta para o marco M1, logo após a US-029 e antes da US-004. Origem: pontos de média/baixa severidade da revisão de segurança da US-029, deixados fora do escopo aprovado. Só mexe em ferramentas do agente (`.claude/`) e na documentação; nenhuma mudança na aplicação, no banco ou na stack.
+
+**Critérios de aceite**
+
+*Cobertura pelo `libraryId`, não pelo texto livre*
+- [x] Um pacote só conta como consultado quando o **`libraryId`** da chamada `query-docs` corresponde a ele: pelo próprio caminho (`/org/projeto`) ou por um mapa explícito pacote → IDs Context7 conhecidos (evolução do `ALIASES`). O texto livre de `query` deixa de cobrir pacotes: uma única consulta citando vários nomes na pergunta não libera nenhum deles.
+- [x] Pacote sem ID mapeado e cujo nome não aparece no caminho do `libraryId` continua bloqueado, com mensagem dizendo qual ID foi consultado e como registrar o mapeamento.
+
+*Consulta "bem-sucedida" de verdade*
+- [x] Um `query-docs` só conta se houver, **na mesma sessão e antes dele**, um `resolve-library-id` bem-sucedido que tenha retornado aquele `libraryId` (ou, se o mapa do item anterior já fixa o ID, o resultado do `query-docs` não for uma resposta de "não encontrado").
+- [x] Resultados com texto de biblioteca/documentação não encontrada (ex.: "No library found", "not found", resultado vazio) não cobrem nada, mesmo sem `is_error`. Os padrões ficam numa lista no hook, com teste.
+
+*Somente o servidor Context7*
+- [x] Só contam ferramentas `mcp__Context7__query-docs`/`resolve-library-id` e as de conectores com ID listado explicitamente (ex.: `mcp__<uuid>__…` do Claude Desktop) numa lista de servidores permitidos versionada em `.claude/` (alteração da lista só com aprovação do responsável, como as demais exceções). Qualquer outro `mcp__*__query-docs` é ignorado, mesmo com `libraryId` bem formado.
+
+*Parser de Bash*
+- [x] Detecta instalação com flags globais antes do subcomando: `pnpm -w add zod`, `pnpm -C . add zod`, `pnpm --filter web add zod`, `npm --prefix . install zod` e equivalentes de `yarn`/`bun`.
+- [x] Detecta o gerenciador por caminho absoluto ou relativo (`/usr/bin/pnpm`, `./node_modules/.bin/pnpm`), via `corepack pnpm …`, `npx pnpm …`/`pnpm dlx pnpm …`, e dentro de `bash -c '…'`/`sh -c "…"`, subshells `( … )`, blocos `{ …; }`, `$( … )` e após `env VAR=… `, `sudo`, `time`, `nice`.
+- [x] Edição de `package.json` ou de arquivo de configuração da stack (`CONFIG_FILES`) feita por Bash é tratada como edição: `sed -i`/`perl -i`, redirecionamento (`>`, `>>`, `tee`) para o arquivo, `cp`/`mv`/`ln` sobre ele, `git checkout|restore -- package.json`, `git apply`/`patch`. Na dúvida (comando que cita o arquivo e não é só leitura), bloquear com mensagem pedindo a consulta ou o uso de `Edit`.
+- [x] Comandos só de leitura que citam esses arquivos (`cat`, `grep`, `jq`, `git diff`, `git log`) continuam liberados.
+
+*Testes e documentação*
+- [x] Um caso em `.claude/hooks/tests/test_require_context7.py` para cada item acima (bloqueio e liberação), e toda a suíte de `.claude/hooks/tests/` passando.
+- [x] [stack-docs-policy.md](../../architecture/stack-docs-policy.md) atualizado: o que conta como consulta (servidor, `resolve` + `query`, `libraryId`), onde fica o mapa pacote → ID e a lista de servidores, e o que o parser cobre e o que **não** cobre (limite assumido de uma análise estática).
+
+**Implementação:** a lista `trustedServers` nasce com o conector do Context7 desta instalação do Claude Desktop (`ccffa570-…`), incluído dentro do escopo autorizado; ids novos dependem do responsável. Pacotes cujo id do Context7 não tem o nome do pacote como projeto ficam em `LIBRARY_IDS` no hook (ids de [stack-versions.md](../../architecture/stack-versions.md)). Por conservadorismo, comandos desconhecidos que citam `package.json` (ex.: `python3 -m json.tool package.json`) são bloqueados. A revisão de segurança da história apontou desvios dentro do escopo, já corrigidos: palavras reservadas do shell, script enviado ao `sh` pela entrada padrão, continuação de linha, falha fechada em erro interno, `npm pkg set`, `Edit` que troca só a versão no `package.json`, apelidos do npm e flags globais desconhecidas, comandos de leitura com flag de escrita e bloqueios indevidos de `git restore --staged`/`git reset`. Os pontos fora do escopo estão em [progress.md](../progress.md).
+**Notas técnicas:** ADR-0011 (verificar explicitamente, menor privilégio) e ADR-0013. Nenhuma dependência nova (Python da biblioteca padrão). O hook continua *fail-closed* para mudança de stack e *fail-open* para comandos que não a tocam. Nenhum ADR novo previsto; se a regra de "consulta" mudar o que o ADR-0013 diz, atualizar o ADR na própria história.
+**Fora desta história:** garantir o conteúdo da consulta (se a pergunta foi pertinente); bloquear scripts arbitrários que editem arquivos por linguagem própria (`node -e`, `python -c`), registrado como limite conhecido na política; verificação no CI (o hook é proteção do agente, não do repositório).
+
+---
+
+### US-031 — Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes
+**Como** responsável pelo projeto, **quero** que o agente não consiga afrouxar o gate do Context7 nem os controles da cadeia de suprimentos sem a minha ação, **para** que as garantias do ADR-0011 e do ADR-0013 não dependam só da disciplina do agente.
+**Cobre:** ADR-0011, ADR-0013, ADR-0015 · **Tamanho:** M · **Depende de:** US-030 · **Bloqueios:** —
+
+> O ID é um identificador, não a ordem: proposta para o marco M1, antes da US-004. Origem: pontos abertos da revisão de segurança da US-030, registrados em [progress.md](../progress.md). Só mexe em ferramentas do agente (`.claude/`) e na documentação.
+
+**Decisão (resolvida em 2026-10-16: opção C, escolhida pelo responsável, que autorizou também a alteração do `.claude/settings.json` pelo agente nesta história)**
+
+Como o gate passa a proteger os próprios arquivos (`.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings.json`, `.claude/rules/stack-docs.md`) sem impedir o responsável de mantê-los:
+- **Opção A — regras `deny` no `.claude/settings.json`** (`Edit`/`Write` nesses caminhos). Mais simples, mas não cobre escrita por Bash. O responsável edita fora do agente ou desliga a regra temporariamente.
+- **Opção B — bloqueio no próprio hook** (`Edit`/`Write`/`MultiEdit` e escrita por Bash, com o mesmo detector de escrita da US-030). A mensagem pede ao responsável que faça a mudança. Uma história que precise alterar o hook (como esta) roda com o hook ativo da `main`, que só protege depois do merge.
+- **Opção C — A + B** (recomendada): `deny` como primeira barreira e o hook para cobrir o Bash.
+- Em qualquer opção, o agente pode **propor** a mudança (diff no PR ou texto para o responsável aplicar), mas não aplicá-la.
+
+**Critérios de aceite**
+
+*Arquivos do gate protegidos (conforme a decisão)*
+- [x] `Edit`/`Write`/`MultiEdit` em `.claude/context7-exceptions.json`, `.claude/hooks/**`, `.claude/settings.json` e `.claude/rules/stack-docs.md` são bloqueados, com mensagem pedindo a ação do responsável.
+- [x] Escrita por Bash nesses arquivos (redirecionamento, `tee`, `sed -i`, `cp`/`mv`/`ln`, `git checkout|restore`, `git apply`/`patch`) também é bloqueada (opções B/C). Leitura (`cat`, `grep`, `jq`, `git diff|log`) continua livre.
+- [x] Escrita por Bash no transcript da sessão (`transcript_path`, `~/.claude/projects/**`) é bloqueada, fechando a forja de consulta registrada como limite na US-030.
+- [x] A política documenta o procedimento do responsável para alterar esses arquivos.
+
+*Configuração do gerenciador de pacotes*
+- [x] `pnpm-workspace.yaml`, `.npmrc`, `.yarnrc`, `.yarnrc.yml` e `bunfig.toml` (raiz e subpastas) entram em `CONFIG_FILES`, editados por ferramenta ou por Bash.
+- [x] Mudança nos controles de cadeia de suprimentos do `pnpm-workspace.yaml` (`allowBuilds`, `minimumReleaseAgeExclude`, `minimumReleaseAge`, `audit.ignore`, `overrides`, `catalog`/`catalogs`, `onlyBuiltDependencies`, `neverBuiltDependencies`) e qualquer `registry`/`@escopo:registry` no `.npmrc` exigem consulta ao Context7 do pnpm (`/pnpm/pnpm`), com cada pacote novo citado coberto como dependência.
+- [x] `registry` diferente de `https://registry.npmjs.org/` em `.npmrc` é bloqueado sempre, com mensagem pedindo aprovação do responsável.
+
+*Pré-releases e aliases*
+- [x] Pré-release com faixa é detectada em comando e em `package.json`: `zod@^4.0.0-beta.1`, `zod@~4.0.0-rc.1`, `>=4.0.0-alpha`, `4.0.0-beta.1 - 4.0.0`.
+- [x] `--tag <pré-release>` (`npm install zod --tag beta`, `pnpm add zod --tag next`) é bloqueado como pré-release.
+- [x] Alias `npm:` (`pnpm add zod@npm:outro@1.0.0`, `"zod": "npm:outro@1"` no `package.json`, `overrides` com `npm:`) exige a cobertura do pacote **real** (`outro`) e, por padrão, é bloqueado com mensagem pedindo aprovação do responsável (o nome declarado engana a revisão).
+
+*Testes e documentação*
+- [x] Casos novos em `.claude/hooks/tests/test_require_context7.py` para cada item (bloqueio e liberação), e toda a suíte de `.claude/hooks/tests/` passando.
+- [x] [stack-docs-policy.md](../../architecture/stack-docs-policy.md) atualizado (arquivos protegidos, procedimento do responsável, configuração do gerenciador, pré-releases e aliases); os limites que deixarem de existir saem da lista.
+
+**Implementação:** além dos critérios, a revisão de segurança levou a proteger `.mcp.json` e `~/.claude.json` (registram servidores MCP), tratar especificações `github:`/git/URL como o alias `npm:`, verificar as chaves do pnpm dentro do `package.json`, bloquear `dangerouslyAllowAllBuilds: true` e falhar fechado após 20 s de análise. Ficam como proposta ao responsável (arquivo protegido): `python3 -I` e `onFailure: "block"` no hook em `.claude/settings.json`.
+**Notas técnicas:** ADR-0011 e ADR-0013. Nenhuma dependência nova (Python da biblioteca padrão). Leitura de YAML sem biblioteca: o hook compara as chaves de nível superior por texto, de forma conservadora (na dúvida, exige a consulta). Se a decisão escolher a opção A ou C, a mudança no `.claude/settings.json` é feita pelo responsável, ou pelo agente com aprovação explícita registrada na história.
+**Fora desta história:** verificação equivalente no CI (o hook protege o agente, não o repositório); conteúdo de scripts executados (`bash script.sh`, `node -e`); globs e expansões do shell.

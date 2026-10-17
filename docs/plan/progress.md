@@ -10,6 +10,9 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-001](epics/E0-foundation.md) | Projeto base com qualidade automatizada | — | M | US-000 | — | Aprovada | 2026-10-16 |
 | M1 | [US-002](epics/E0-foundation.md) | Internacionalização preparada (pt-BR) | — | M | US-001 | — | Aprovada | 2026-10-15 |
 | M1 | [US-003](epics/E0-foundation.md) | Banco de dados e deploy na Vercel | — | G | US-002 | — | Aprovada | 2026-10-16 |
+| M1 | [US-029](epics/E0-foundation.md) | Endurecimento do banco, das migrações e do gate do Context7 | — | G | US-003 | — | Aprovada | 2026-10-16 |
+| M1 | [US-030](epics/E0-foundation.md) | Endurecimento restante do gate do Context7 | — | M | US-029 | — | Aprovada | 2026-10-16 |
+| M1 | [US-031](epics/E0-foundation.md) | Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes | — | M | US-030 | — | Aprovada | 2026-10-16 |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
@@ -38,8 +41,8 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 
 ## Resumo
 
-- 29 histórias (1 de aprovação, 27 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-003 aprovada e publicada (PR #13). Nenhuma história em andamento; próxima: `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
+- 32 histórias (1 de aprovação, 30 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
+- **Próxima ação:** US-029, US-030 e US-031 aprovadas em 2026-10-16 (branch `story/US-031-gate-self-protection`, que contém as três; ainda sem PR). Pendente com o responsável (arquivo protegido): aplicar no hook do `require-context7.py` em `.claude/settings.json` o comando `python3 -I …` e `"onFailure": "block"`. Nenhuma história em andamento; próxima: `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails).
 
 ## Registro de aprovações
 
@@ -49,3 +52,6 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | 2026-10-16 | US-001 | Aprovada pelo responsável, mantendo os pontos de atenção: patches de versão fechados no npm, ESLint 10 com avisos de peers, ignore do GHSA-vfj7-8cjw-p6xm, minimumReleaseAgeExclude e texto literal até a US-002. PR ainda não aberto. |
 | 2026-10-15 | US-002 | Aprovada pelo responsável, mantendo os pontos de atenção: exceção permanente de `next-intl` em `context7-exceptions.json` (hook não reconhece o servidor Context7 da sessão; reavaliar), `allowBuilds` falso para `@swc/core` e `@parcel/watcher`, detector de literais heurístico. PR ainda não aberto. |
 | 2026-10-16 | US-003 | Aprovada pelo responsável (PR #13 mesclado). Produção: `https://read-in-blocks.vercel.app/api/health` → `{"status":"ok"}`; Preview protegido (302 sem login). ADR-0014 aceito. Pontos de atenção: `MIGRATOR_DATABASE_URL` visível no runtime (risco aceito); GHSA-67mh-4wv8-2f99 (moderada, `esbuild` 0.18.20 via `drizzle-kit`, só dev server, fora do runtime); endurecimentos apontados pelas revisões ainda abertos: papéis pré-existentes sem checagem de atributos/filiação no `roles.sql`, Git Fork Protection a confirmar, corrida de migração e ordem do journal na branch `preview` compartilhada, `REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`, testes de integração restritos a host local, gate do Context7 aceitando qualquer `*__query-docs`, rate limit de `/api/health`. |
+| 2026-10-16 | US-029 | Aprovada pelo responsável. Os pontos de média/baixa da revisão de segurança sobre o gate do Context7 viraram a US-030, autorizada na mesma data. Branch `story/US-029-db-hardening` ainda sem PR. |
+| 2026-10-16 | US-030 | Aprovada pelo responsável. Gate do Context7 cobre pacotes só pelo `libraryId`, exige `resolve-library-id` prévio (ou id conhecido) e resposta real, aceita só servidores confiáveis (`trustedServers`) e reconhece variações de comando e escritas por Bash; 172 testes do hook. Pontos abertos para decisão futura: o gate não protege os próprios arquivos (`.claude/context7-exceptions.json`, hook, `settings.json`); `pnpm-workspace.yaml`, `.npmrc`, `.yarnrc*` e `bunfig.toml` fora de `CONFIG_FILES`; pré-release com faixa, `--tag beta` e alias `npm:` não detectados. Branch ainda sem PR. |
+| 2026-10-16 | US-031 | Aprovada pelo responsável, com o ADR-0015 aceito (opção C: `deny` no `.claude/settings.json` + bloqueio no hook). O agente não altera mais os arquivos do gate, `.mcp.json`, `~/.claude.json` nem os transcripts; configuração do gerenciador, pré-releases em faixa, `--tag` e aliases/especificações fora do registro verificados; 283 testes do hook. Pendente com o responsável: `python3 -I` e `onFailure: "block"` no hook. Branch ainda sem PR. |

@@ -37,3 +37,14 @@ Também era preciso decidir o banco dos Preview Deployments, onde aplicar as mig
 - **Risco aceito:** variáveis de ambiente da Vercel ficam disponíveis no build **e** no runtime, então `MIGRATOR_DATABASE_URL` existe também nas funções. Mitigação: o código da aplicação nunca lê essa variável (só `drizzle.config.ts`), e ela só é cadastrada nos ambientes que fazem deploy.
 - Previews simultâneos compartilham o schema da branch `preview`; migrações devem seguir expandir → migrar → contrair. Com um único desenvolvedor e uma história por vez, o conflito é improvável. Se a branch divergir, ela pode ser recriada a partir de `main` (redefinindo as senhas).
 - Cold start do compute do Neon continua podendo adicionar latência na primeira requisição.
+
+## Adendo (US-029, 2026-10-16) — endurecimento
+
+Refinamentos que não mudam a decisão, vindos das revisões de segurança e de migração da US-003:
+
+- **Papéis:** `roles.sql` não confia em papéis pré-existentes: remove atributos elevados (`SUPERUSER`, `CREATEDB`, `CREATEROLE`, `REPLICATION`, `BYPASSRLS`) e aborta se `app` ou `migrator` pertencer a algum papel. A migração `0002` revoga de `PUBLIC` o `EXECUTE` padrão nas funções do `migrator` (global, pois um `REVOKE … IN SCHEMA` não remove o padrão global).
+- **Aplicação das migrações (item 4):** o build continua rodando `pnpm db:migrate`, mas agora por `src/db/migrate.ts` (`migrate()` de `drizzle-orm/node-postgres/migrator`) sob `pg_advisory_lock`, com `lock_timeout` de 10 s para as instruções, em vez de `drizzle-kit migrate`. Motivo: builds de Preview simultâneos compartilham a branch `preview`. O CI verifica que o `when` do journal é estritamente crescente e que as entradas de `main` não mudaram. Regras de migração segura (somente aditiva por deploy, `lock_timeout`) em [database.md](../architecture/database.md#regras-para-migrações-seguras).
+- **Leitura de `MIGRATOR_DATABASE_URL`:** além do `drizzle.config.ts`, só `src/db/migrate.ts` (executado no build) lê a variável; o código servido pela aplicação continua sem lê-la.
+- **Risco do build de Preview:** o build executa o código da branch do PR com `MIGRATOR_DATABASE_URL` de Preview (DDL na branch `preview`). Quem consegue abrir um PR que dispara o build consegue usar essa credencial. Mitigações: **Git Fork Protection** da Vercel ativa (confirmada pelo responsável em 2026-10-16), de modo que PRs de forks só fazem build com aprovação; a credencial é só de Preview, sem acesso à branch `main`; repositório com um único colaborador. Revisar se o repositório ganhar colaboradores.
+- **Superfície pública:** `/api/health` é exceção explícita ao `requireUser()`, registrada em [zero-trust.md](../security/zero-trust.md); rate limit planejado na US-028.
+- **Senhas:** `scripts/setup-database.sh` envia ao Postgres só verificadores SCRAM-SHA-256 calculados localmente.
