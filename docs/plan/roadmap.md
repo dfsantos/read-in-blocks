@@ -21,7 +21,7 @@ A ordem busca **entregar valor ponta a ponta o mais cedo possível** (um leitor 
 ## Caminho crítico
 
 ```
-US-000 → US-001 → US-002 → US-003 → US-029 → US-004 → US-005 → US-006
+US-000 → US-001 → US-002 → US-003 → US-029 → US-030 → US-031 → US-004 → US-005 → US-006
    → US-007 → US-010 → US-011 → US-013 → US-014 → US-016
                                    └→ US-018 → US-019 → US-020
 ```
