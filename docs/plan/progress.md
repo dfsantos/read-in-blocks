@@ -13,7 +13,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-029](epics/E0-foundation.md) | Endurecimento do banco, das migrações e do gate do Context7 | — | G | US-003 | — | Aprovada | 2026-10-16 |
 | M1 | [US-030](epics/E0-foundation.md) | Endurecimento restante do gate do Context7 | — | M | US-029 | — | Aprovada | 2026-10-16 |
 | M1 | [US-031](epics/E0-foundation.md) | Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes | — | M | US-030 | — | Aprovada | 2026-10-16 |
-| M1 | [US-032](epics/E0-foundation.md) | Falsos positivos do gate do Context7 em comandos de leitura | — | P | US-031 | — | Pendente | |
+| M1 | [US-032](epics/E0-foundation.md) | Falsos positivos do gate do Context7 em comandos de leitura | — | P | US-031 | — | Em desenvolvimento | |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
