@@ -176,7 +176,7 @@ _Patches fechados na implementação: ver "Versões fechadas na implementação"
 - [x] Exceção de `next-intl` em `.claude/context7-exceptions.json`: já tinha sido removida (lista `exceptions` vazia); nada a fazer.
 
 *Opcional (incluído pelo responsável em 2026-10-16)*
-- [x] `scripts/setup-database.sh` envia ao Postgres verificadores SCRAM-SHA-256 calculados localmente, não a senha em texto.
+- [x] `scripts/setup-database.sh` envia ao Postgres verificadores SCRAM-SHA-256 calculados localmente, não a senha em texto. **Revertido em 2026-10-18:** o Neon recusa senha com hash (`Neon only supports being given plaintext passwords`) e o script deixou de rodar; a senha volta a ir em texto, só pelo stdin do `psql` e sobre TLS (ver [database.md](../../architecture/database.md)).
 - [x] ~~Vercel CLI fixada como `devDependency` exata em vez de `pnpm dlx vercel@…`~~ **Não adotado:** `vercel@64.3.1` como `devDependency` trouxe 15 alertas *high* e 1 *critical* ao `pnpm audit --audit-level=high` (quebraria o CI). Mantido `pnpm dlx vercel@64.3.1`, versão exata e fora do lockfile da aplicação; registrado em database.md. Aceito pelo responsável.
 
 **Notas técnicas:** ADR-0011, 0013, 0014. Nenhuma dependência nova. `migrate()` e `pg` já estavam na stack; Context7 consultado antes do primeiro uso. O `vercel.json` não mudou (`pnpm db:migrate` passou a executar `src/db/migrate.ts`).
