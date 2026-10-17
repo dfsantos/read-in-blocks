@@ -2,7 +2,7 @@
 
 Aplicativo web de acompanhamento de leitura que usa a estrutura hierárquica do livro (partes, capítulos e tópicos) como unidade de progresso, com anotações ancoradas em cada capítulo.
 
-> **Estado atual:** planejamento aprovado (US-000); projeto base em desenvolvimento (US-001). Acompanhe em [`docs/plan/progress.md`](docs/plan/progress.md).
+> **Estado atual:** marco M1 concluído (US-000 a US-003 e US-029 a US-031): app em pt-BR com Postgres (Neon), migrações, CI e deploy na Vercel. Próxima: US-004 (entrar com Google). Acompanhe em [`docs/plan/progress.md`](docs/plan/progress.md).
 
 ## Desenvolvimento local
 
