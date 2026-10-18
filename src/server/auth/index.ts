@@ -1,9 +1,9 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
-import { eq } from "drizzle-orm";
 
 import { getDb, type Database } from "../../db/client";
 import * as authSchema from "../../db/auth-schema";
+import { findSignInCandidate } from "../repositories/sign-in";
 import { parseAuthEnv } from "./env";
 import { createAuthOptions } from "./options";
 
@@ -17,18 +17,10 @@ export function createAuth<Plugins extends BetterAuthPlugin[] = []>(
   return betterAuth({
     ...createAuthOptions({
       env: parseAuthEnv(source),
+      // Better Auth's own data layer: it reads and writes only its tables (user, session,
+      // account, verification). Every other query lives in src/server/repositories.
       database: drizzleAdapter(db, { provider: "pg", schema: authSchema }),
-      findSignInCandidate: async (userId) => {
-        const [row] = await db
-          .select({
-            email: authSchema.user.email,
-            emailVerified: authSchema.user.emailVerified,
-          })
-          .from(authSchema.user)
-          .where(eq(authSchema.user.id, userId))
-          .limit(1);
-        return row;
-      },
+      findSignInCandidate: (userId) => findSignInCandidate(db, userId),
     }),
     plugins: plugins ?? ([] as unknown as Plugins),
   });
