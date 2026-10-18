@@ -25,9 +25,11 @@ export type AuthOptionsInput = {
 
 function denied(reason: string, userId?: string): never {
   logAuthEvent({ event: "auth.login_denied", reason, userId });
+  // The message is the code too: when user creation is refused, the OAuth callback redirects with
+  // the message (spaces as `_`) instead of the code, so both paths yield the same `?error=`.
   throw APIError.from("FORBIDDEN", {
     code: ACCOUNT_NOT_ALLOWED,
-    message: "Sign-in is not allowed for this account",
+    message: ACCOUNT_NOT_ALLOWED,
   });
 }
 

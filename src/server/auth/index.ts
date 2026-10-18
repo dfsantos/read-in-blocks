@@ -2,16 +2,21 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
 import { eq } from "drizzle-orm";
 
-import { getDb } from "../../db/client";
+import { getDb, type Database } from "../../db/client";
 import * as authSchema from "../../db/auth-schema";
 import { parseAuthEnv } from "./env";
-import { createAuthOptions } from "./options";
+import { createAuthOptions, type AuthOptionsInput } from "./options";
 
-function createAuth() {
-  const db = getDb();
+// The app's auth instance for a database and an environment; tests build it the same way.
+export function createAuth(
+  db: Database,
+  source: Record<string, string | undefined>,
+  plugins?: AuthOptionsInput["plugins"],
+) {
   return betterAuth(
     createAuthOptions({
-      env: parseAuthEnv(process.env),
+      env: parseAuthEnv(source),
+      plugins,
       database: drizzleAdapter(db, { provider: "pg", schema: authSchema }),
       findSignInCandidate: async (userId) => {
         const [row] = await db
@@ -33,7 +38,7 @@ let auth: ReturnType<typeof createAuth> | undefined;
 // Built on first use, like the database client, so `next build` and tests that never touch auth
 // need neither the database nor the auth variables. Invalid configuration fails here, closed.
 export function getAuth() {
-  auth ??= createAuth();
+  auth ??= createAuth(getDb(), process.env);
   return auth;
 }
 
