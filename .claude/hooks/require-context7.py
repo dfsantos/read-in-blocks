@@ -67,6 +67,7 @@ LIBRARY_IDS = {
     "vercel": ["/vercel/vercel", "/websites/vercel"],
     "@vercel": ["/websites/vercel"],
     "@better-auth": ["/better-auth/better-auth"],
+    "auth": ["/better-auth/better-auth"],  # Better Auth CLI (renamed from @better-auth/cli)
     "next-intl": ["/amannn/next-intl"],
     "zod": ["/colinhacks/zod", "/websites/zod_dev"],
     "@hookform": ["/react-hook-form/resolvers"],

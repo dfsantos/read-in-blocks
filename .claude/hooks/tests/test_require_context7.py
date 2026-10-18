@@ -454,6 +454,11 @@ cases = [
     ("cd into hook tests and run", "Bash", {"command": "cd .claude/hooks/tests && python3 test_require_context7.py"}, [], 0),
     ("normalize only the project", "Bash", {"command": "pnpm add reactjs"},
      [(Q, {"libraryId": "/facebook/react", "query": "x"})], 2),
+    # US-004: the Better Auth CLI is the `auth` package, documented under /better-auth/better-auth
+    ("better auth cli covered by better-auth docs", "Bash",
+     {"command": "pnpm dlx auth@1.6.23 generate --adapter drizzle --dialect postgresql --output src/db/auth-schema.ts --yes"},
+     [(Q, {"libraryId": "/better-auth/better-auth/v1.6.23", "query": "generate"})], 0),
+    ("better auth cli not covered by other docs", "Bash", {"command": "pnpm dlx auth@1.6.23 generate"}, NEXT, 2),
     # US-032: separators inside quotes do not split the command; interpreter flags before a script
     ("grep pattern with parens and pipe", "Bash", {"command": "grep -E \"^(import|from) \" .claude/hooks/*.py"}, [], 0),
     ("cd then grep with quoted pipe", "Bash",
