@@ -50,6 +50,16 @@ const authEnvSchema = z
     },
   );
 
+// Better Auth falls back to these for its base URL (and so for trusted origins and redirect checks)
+// when BETTER_AUTH_URL is absent. Only BETTER_AUTH_URL, validated above, may set it.
+const UNVALIDATED_BASE_URL_VARIABLES = [
+  "NEXT_PUBLIC_BETTER_AUTH_URL",
+  "PUBLIC_BETTER_AUTH_URL",
+  "NUXT_PUBLIC_BETTER_AUTH_URL",
+  "NUXT_PUBLIC_AUTH_URL",
+  "BASE_URL",
+] as const;
+
 const allowlistSchema = z.array(
   z.email({ error: "AUTH_ALLOWED_EMAILS has an invalid e-mail" }),
 );
@@ -72,6 +82,16 @@ export function parseAuthEnv(
     );
   }
   const env = parsed.data;
+
+  const stray = UNVALIDATED_BASE_URL_VARIABLES.filter((name) => {
+    const value = source[name]?.trim();
+    return value !== undefined && value !== "" && value !== "/";
+  });
+  if (stray.length > 0) {
+    throw new Error(
+      `invalid auth configuration: unset ${stray.join(", ")}; the base URL comes only from BETTER_AUTH_URL`,
+    );
+  }
 
   const entries = (env.AUTH_ALLOWED_EMAILS ?? "")
     .split(",")

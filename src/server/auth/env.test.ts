@@ -55,6 +55,16 @@ describe("parseAuthEnv", () => {
     ).toThrow(/http\(s\) URL/);
   });
 
+  it("rejects other base URL variables that Better Auth would use without validation", () => {
+    expect(() =>
+      parseAuthEnv({ NEXT_PUBLIC_BETTER_AUTH_URL: "https://evil.example" }),
+    ).toThrow(/unset NEXT_PUBLIC_BETTER_AUTH_URL/);
+    expect(() => parseAuthEnv({ BASE_URL: "https://evil.example" })).toThrow(
+      /unset BASE_URL/,
+    );
+    expect(() => parseAuthEnv({ BASE_URL: "/" })).not.toThrow();
+  });
+
   it("rejects an invalid allowlist entry instead of skipping it", () => {
     expect(() =>
       parseAuthEnv({ AUTH_ALLOWED_EMAILS: "reader@example.com, not-an-email" }),
