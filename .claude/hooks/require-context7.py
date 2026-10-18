@@ -124,7 +124,8 @@ GATE_FILE_RE = re.compile(
 GATE_EXTRA_RE = re.compile(r"(?:^|/)\.(?:mcp|claude)\.json$")  # MCP servers: a fake "Context7" would be trusted
 TRANSCRIPT_RE = re.compile(r"\.claude/projects/\S*\.jsonl\b")
 INTERPRETERS = {"python", "python3", "node", "nodejs", "perl", "ruby", "deno"}
-PYTHON_READ_MODULES = {"unittest", "pytest", "py_compile", "compileall", "json.tool"}
+PYTHON_PLAIN_FLAGS = set("bBdEiIOPqsSuvx")  # python options that take no value and run no other code
+PYTHON_READ_MODULES ={"unittest", "pytest", "py_compile", "compileall", "json.tool"}
 NON_REGISTRY_SOURCE_RE = re.compile(r"^(?:github:|gitlab:|bitbucket:|git\+|git:|git@|https?:|ssh:)", re.I)
 TIME_LIMIT_SECONDS = 20
 # Set per hook run: directories the command `cd`s into, and the session transcript's file name.
@@ -488,7 +489,77 @@ QUOTED_RE = re.compile(r"\$?'([^']*)'|\"((?:[^\"\\]|\\.)*)\"")
 QUOTED_WITH_SPACE_RE = re.compile(r"'[^'\n]*\s[^'\n]*'|\"(?:[^\"\\\n]|\\.)*\s(?:[^\"\\\n]|\\.)*\"")
 REDIRECT_TARGET_RE = re.compile(r"(?:(?<![-=>])\d*|&)>>?\|?\s*(['\"]?)([^\s'\";&|<>()]+)\1")
 REDIRECT_RE = re.compile(r"\d*(?:>>?|<|&>)&?\|?\s*\S*")
+# The same, with the target stopping at a separator (`2>&1;cp …` keeps the `cp`).
+REDIRECT_TO_SEPARATOR_RE = re.compile(r"\d*(?:>>?|<|&>)&?\|?\s*[^\s;&|()]*")
 SEGMENT_SPLIT_RE = re.compile(r"&&|\|\||;|\|&?|&|\n|\$\(|`|\(|\)|(?<![$\w]){|}")
+COMMENT_RE = re.compile(r"(?m)(^|[\s;&|])#[^\n]*")
+
+
+# --- quote-aware splitting (US-032) -----------------------------------------------------------------
+# Only "plain" commands are split with quotes in mind: no `$`, backtick, backslash, `#` or `<<` anywhere
+# and balanced quotes. There, '…' and "…" are fully literal, so separators and redirections inside them
+# are text, exactly as in the shell. Any other command gets the quote-blind handling of earlier versions,
+# plus its text with comments kept: a superset of what the hook checked before US-032. The mode is
+# decided once per command, on its original text, so stripping comments can never switch it.
+NOT_PLAIN_RE = re.compile(r"[$`\\#]|<<")
+REDIRECT_OP_RE = re.compile(r"\d*(?:&>>?|>>?|<)&?\|?\s*")
+REDIRECT_WORD_RE = re.compile(r"[^\s;&|<>()'\"]*")
+
+
+def plain_segments(text: str):
+    """Simple commands of a plain shell text, without redirections; None when the text is not plain."""
+    if NOT_PLAIN_RE.search(text):
+        return None
+    segments, current, i = [], [], 0
+    while i < len(text):
+        c = text[i]
+        if c in "'\"":
+            end = text.find(c, i + 1)
+            if end < 0:
+                return None
+            current.append(text[i:end + 1])
+            i = end + 1
+            continue
+        op = REDIRECT_OP_RE.match(text, i)
+        if op and (i == 0 or not text[i - 1].isalnum() or not text[i].isdigit()):
+            i = op.end()
+            if i < len(text) and text[i] in "'\"":
+                end = text.find(text[i], i + 1)
+                if end < 0:
+                    return None
+                i = end + 1
+            else:
+                i = REDIRECT_WORD_RE.match(text, i).end()
+            current.append(" ")
+            continue
+        sep = SEGMENT_SPLIT_RE.match(text, i)
+        if sep:
+            segments.append("".join(current))
+            current = []
+            i = sep.end()
+            continue
+        current.append(c)
+        i += 1
+    segments.append("".join(current))
+    return segments
+
+
+def blind_segments(text: str) -> list:
+    """Quote-blind split, as before US-032, plus the split with redirection targets ending at a separator."""
+    return (SEGMENT_SPLIT_RE.split(REDIRECT_RE.sub(" ", text))
+            + SEGMENT_SPLIT_RE.split(REDIRECT_TO_SEPARATOR_RE.sub(" ", text)))
+
+
+def split_segments(text: str) -> list:
+    """Simple commands of a shell text, without redirections (quote-aware only when the text is plain)."""
+    segments = plain_segments(text)
+    return blind_segments(text) if segments is None else segments
+
+
+def without_comments(text: str) -> list:
+    """Versions of a non-plain text to analyze: comments stripped quote-blind (as before US-032) and,
+    when it has a `#`, the text as is (a `#` inside quotes is not a comment: `echo "x #" ; cp …`)."""
+    return [COMMENT_RE.sub(r"\1", text)] + ([text] if "#" in text else [])
 
 
 def protected_kind(token: str):
@@ -660,9 +731,10 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
         return []
     cited = [k for k in (protected_kind(a) for a in args) if k]
     if name in INTERPRETERS and cited:
-        if args and not args[0].startswith("-") and protected_kind(args[0]) \
-                and not any(protected_kind(a) for a in args[1:]):
-            return []  # `python3 .claude/hooks/tests/x.py` runs the script, it does not write it
+        at = interpreter_script(name, args)
+        if at is not None and protected_kind(args[at]) \
+                and not any(protected_kind(a) for n, a in enumerate(args) if n != at):
+            return []  # `python3 -I .claude/hooks/tests/x.py` runs the script, it does not write it
         if name.startswith("python") and "-m" in args[:-1]:
             module_at = args.index("-m") + 1
             positional = [a for a in args[module_at + 1:] if not a.startswith("-")]
@@ -727,6 +799,26 @@ def edited_files(words: list, raw_command: str, project: str) -> list:
     return [k for k in (protected_kind(a) for a in args if not re.search(r"\s", a)) if k]
 
 
+def interpreter_script(name: str, args: list):
+    """Index of the script file an interpreter runs, or None when it may run other code (inline, a module,
+    stdin) that could write the files it names. Python flags are read from an allowlist (`python3 -I -B
+    x.py`, `-W ignore`); any other flag, and any flag of another interpreter, means None."""
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        a = args[i]
+        if not name.startswith("python") or a.startswith("--") or a == "-":
+            return None
+        takes_value = False
+        for n, ch in enumerate(a[1:]):
+            if ch in "WX":  # -W arg / -X opt, attached (-Wignore) or separate (-W ignore)
+                takes_value = n == len(a) - 2
+                break
+            if ch not in PYTHON_PLAIN_FLAGS:  # -c code, -m module, anything unknown
+                return None
+        i += 2 if takes_value else 1
+    return i if i < len(args) else None
+
+
 def copy_destinations(args: list, project: str) -> list:
     """Protected files that cp/ln/install/rsync would create or overwrite, including copies into a
     directory (`cp x .claude/`, `cp -t .claude/hooks x`)."""
@@ -786,7 +878,7 @@ def patched_files(args: list, raw_command: str, project: str) -> list:
 
 def stdin_shell(text: str, names: set = SHELLS) -> bool:
     """A shell (or interpreter) that reads its script from stdin (`… | sh`, `bash <<EOF`, `python3 - <<<…`)."""
-    for segment in SEGMENT_SPLIT_RE.split(REDIRECT_RE.sub(" ", HERESTRING_RE.sub(" ", text))):
+    for segment in split_segments(HERESTRING_RE.sub(" ", text)):
         words = strip_prefixes(split_words(segment))
         if words and os.path.basename(words[0]) in names:
             args, skip = [], False
@@ -848,19 +940,23 @@ def analyze_bash(command: str, project: str):
                 if kind:
                     edits.append(kind)
         text = strip_heredocs(raw)
-        text = re.sub(r"(?m)(^|[\s;&|])#[^\n]*", r"\1", text)  # comments
-        for _, target in REDIRECT_TARGET_RE.findall(QUOTED_WITH_SPACE_RE.sub("''", text)):
-            kind = protected_kind(target)
-            if kind:
-                edits.append(kind)
-        text = REDIRECT_RE.sub(" ", text)
-        for segment in SEGMENT_SPLIT_RE.split(text):
-            words = split_words(segment)
-            if not words:
-                continue
-            all_words += words
-            pkgs += analyze_words(words, project)
-            edits += edited_files(words, raw, project)
+        plain = plain_segments(text)
+        variants = [(text, plain, False)] if plain is not None else [
+            (t, blind_segments(t), n > 0) for n, t in enumerate(without_comments(text))]
+        for text, segments, kept_comments in variants:
+            for _, target in REDIRECT_TARGET_RE.findall(QUOTED_WITH_SPACE_RE.sub("''", text)):
+                kind = protected_kind(target)
+                if kind:
+                    edits.append(kind)
+            for segment in segments:
+                words = split_words(segment)
+                if kept_comments:  # `pnpm add x # pin it`: the comment words are not arguments
+                    words = words[:next((n for n, w in enumerate(words) if w.startswith("#")), len(words))]
+                if not words:
+                    continue
+                all_words += words
+                pkgs += analyze_words(words, project)
+                edits += edited_files(words, raw, project)
     return list(dict.fromkeys(p for p in pkgs if p)), list(dict.fromkeys(edits)), all_words
 
 

@@ -258,3 +258,27 @@ Como o gate passa a proteger os próprios arquivos (`.claude/context7-exceptions
 **Implementação:** além dos critérios, a revisão de segurança levou a proteger `.mcp.json` e `~/.claude.json` (registram servidores MCP), tratar especificações `github:`/git/URL como o alias `npm:`, verificar as chaves do pnpm dentro do `package.json`, bloquear `dangerouslyAllowAllBuilds: true` e falhar fechado após 20 s de análise. Ficam como proposta ao responsável (arquivo protegido): `python3 -I` e `onFailure: "block"` no hook em `.claude/settings.json`.
 **Notas técnicas:** ADR-0011 e ADR-0013. Nenhuma dependência nova (Python da biblioteca padrão). Leitura de YAML sem biblioteca: o hook compara as chaves de nível superior por texto, de forma conservadora (na dúvida, exige a consulta). Se a decisão escolher a opção A ou C, a mudança no `.claude/settings.json` é feita pelo responsável, ou pelo agente com aprovação explícita registrada na história.
 **Fora desta história:** verificação equivalente no CI (o hook protege o agente, não o repositório); conteúdo de scripts executados (`bash script.sh`, `node -e`); globs e expansões do shell.
+
+---
+
+### US-032 — Falsos positivos do gate do Context7 em comandos de leitura
+**Como** responsável pelo projeto, **quero** que o gate do Context7 só bloqueie comandos que realmente escrevem nos próprios arquivos, **para** que leituras e execuções de teste do hook não travem o agente nem estimulem contornos.
+**Cobre:** ADR-0013, ADR-0015 · **Tamanho:** P · **Depende de:** US-031 · **Bloqueios:** —
+
+> Origem: falsos positivos observados em 2026-10-17, depois da US-031. Com o hook em `python3 -I` e `onFailure: "block"` (proposta do ADR-0015), a detecção precisa ser precisa. Só mexe em ferramentas do agente (`.claude/`) e na documentação.
+
+**Causas encontradas**
+- A divisão do comando em segmentos ignora aspas: `(`, `)`, `{`, `}`, `|` e `;` **dentro** de strings (`grep -E "^(import|from) " hooks/*.py`) criam segmentos falsos, e um "comando desconhecido" que cita arquivo protegido é tratado como escrita.
+- A isenção "`python3 <script>` executa o script, não o escreve" só vale quando o script é o primeiro argumento; `python3 -I <script>` (e outras flags do interpretador) cai no bloqueio.
+
+**Critérios de aceite**
+- [x] Separadores de comando (`&&`, `||`, `;`, `|`, `&`, quebra de linha, `(`, `)`, `{`, `}`) dentro de aspas simples ou duplas não dividem o comando; `$(…)` e crases dentro de aspas duplas continuam sendo analisados como comandos. *Desvio: vale só para comandos "simples" (sem `$`, crase, `\`, `#` ou `<<`, aspas balanceadas). Três revisões de segurança acharam divergências com o bash quando o scanner modelava expansões (`case`/comentários em `"$(…)"`, aspas em `"${…}"`, heredocs não reconhecidos); nos demais comandos vale a análise anterior, acrescida do texto com comentários e de redirecionamentos que terminam no separador. Fuzz diferencial contra `origin/main` (90 mil comandos) sem regressão.*
+- [x] Liberados: `grep -E "^(import|from) " .claude/hooks/*.py`, `cd .claude && grep -h -E "^(import|from) " hooks/*.py | sort -u`, `echo '{"a":1}' | python3 -I .claude/hooks/require-context7.py`, `python3 -I -B .claude/hooks/tests/test_require_context7.py` e `python3 -W ignore .claude/hooks/tests/…`.
+- [x] Continuam bloqueados (sem regressão): escrita por redirecionamento, `tee`, `sed -i`, `cp`/`mv`/`ln`, `git checkout|restore`, `git apply`/`patch` nos arquivos do gate, `echo "$(cp x .claude/settings.json)"`, ``echo "`rm .claude/hooks/x`"``, `python3 -I -c "open('.claude/settings.json','w')"` e código de interpretador por heredoc ou pipe que cite arquivo do gate.
+- [x] Código de interpretador que só **cite** um arquivo do gate (ex.: heredoc em Python que edita outro arquivo e menciona `.claude/settings.json` no texto) continua bloqueado por decisão de segurança, porque o hook não segue variáveis; a política indica a alternativa (`Edit`/`Write` no arquivo de destino).
+- [x] Casos novos (liberação e bloqueio) em `.claude/hooks/tests/test_require_context7.py`, com toda a suíte de `.claude/hooks/tests/` passando.
+- [x] [stack-docs-policy.md](../../architecture/stack-docs-policy.md) atualizado nos limites conhecidos.
+
+**Procedimento (ADR-0015):** os arquivos do gate são protegidos contra o agente. O agente prepara e testa a mudança numa cópia fora de `.claude/` e entrega um patch; o responsável aplica (`git apply`) no próprio terminal; o agente então roda a suíte e faz os commits.
+**Notas técnicas:** Python da biblioteca padrão; nenhuma dependência nova.
+**Fora desta história:** seguir variáveis e fluxo de dados em código de interpretador; globs e expansões do shell; verificação no CI.
