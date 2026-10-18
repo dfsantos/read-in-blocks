@@ -10,8 +10,9 @@ Login com Google pelo Better Auth ([ADR-0005](../adr/0005-authentication-better-
 4. Antes de gravar, os *database hooks* (`src/server/auth/options.ts`) aplicam a allowlist:
    - **`user.create.before`**: no primeiro login, e-mail fora da lista ou não verificado pelo Google (`email_verified`) é recusado, e **nada é gravado**.
    - **`session.create.before`**: em todo login, novo ou não, a regra é conferida de novo. Tirar um e-mail da lista impede o próximo login.
+   - **`account.create/update.before`**: os tokens do Google (`access`, `refresh`, `id_token`) são descartados antes de gravar, porque o app só usa o Google para entrar. Como segunda camada, `encryptOAuthTokens` cifraria o que ainda chegasse ao banco.
 5. A recusa redireciona para `/login?error=account_not_allowed`, com uma mensagem genérica. A página só traduz três casos (recusado, cancelado no Google, falha), nunca mostra o valor da URL e não informa o motivo.
-6. A sessão fica em cookie `httpOnly`, `SameSite=Lax`, e `Secure` com prefixo `__Secure-` sempre que a URL base é `https`. Dura 12 h, é prorrogada no máximo uma vez por hora enquanto em uso e não tem *cookie cache*: toda requisição confere a sessão no banco, então revogar (apagar a linha de `session`) vale na hora.
+6. A sessão fica em cookie `httpOnly`, `SameSite=Lax`, e `Secure` com prefixo `__Secure-` sempre que a URL base é `https`. Dura **12 h fixas a partir do login e nunca é prorrogada** (`disableSessionRefresh`). Como a allowlist só é conferida ao criar a sessão, isso limita a 12 h o acesso de um e-mail retirado da lista ou de um cookie roubado: depois disso é preciso entrar de novo, e o novo login confere a regra. Não há *cookie cache*: toda requisição confere a sessão no banco, então apagar a linha de `session` revoga na hora.
 7. Eventos registrados em JSON: `auth.login` (com `userId`) e `auth.login_denied` (com motivo e, se houver, `userId`). Nunca e-mail, nome ou token.
 
 Código: `src/server/auth/` (`options.ts` é a configuração única, `env.ts` valida as variáveis com Zod, `allowlist.ts` decide quem entra) e `src/db/auth-schema.ts`, gerado pelo CLI.
@@ -27,6 +28,8 @@ Código: `src/server/auth/` (`options.ts` é a configuração única, `env.ts` v
 
 - Configuração inválida (segredo curto, só uma das credenciais do Google, e-mail inválido na lista) **falha ao iniciar** a autenticação, sem mostrar o valor.
 - Allowlist vazia ou ausente bloqueia todo mundo.
+- `NEXT_PUBLIC_BETTER_AUTH_URL`, `PUBLIC_BETTER_AUTH_URL`, `NUXT_PUBLIC_BETTER_AUTH_URL`, `NUXT_PUBLIC_AUTH_URL` e `BASE_URL` são **recusadas** se definidas: o Better Auth as usaria como URL base sem passar pela validação. A URL base vem só de `BETTER_AUTH_URL`; sem ela (Preview), dos cabeçalhos da Vercel.
+- **Para tirar alguém na hora:** remover o e-mail de `AUTH_ALLOWED_EMAILS`, refazer o deploy e apagar as sessões do usuário (`DELETE FROM session WHERE user_id = …`, com o papel `app`). Sem apagar, a sessão aberta vale até completar 12 h.
 - Na Vercel, cadastrar cada variável como *Sensitive*, digitando o valor no prompt da CLI, sem passá-lo como argumento: `pnpm dlx vercel@64.3.1 env add BETTER_AUTH_SECRET production --sensitive`.
 - Trocar o `BETTER_AUTH_SECRET` invalida todas as sessões abertas. Se isso um dia for um problema, use a opção `secrets` do Better Auth (rotação com chaves versionadas).
 
@@ -45,6 +48,12 @@ Código: `src/server/auth/` (`options.ts` é a configuração única, `env.ts` v
 2. Acrescentar a entrada em `socialProviders` de `src/server/auth/options.ts` e as duas variáveis em `env.ts`, `.env.example` e na Vercel.
 3. Conferir se o provedor informa e-mail verificado; a allowlist exige `emailVerified`.
 4. Acrescentar o botão na página de login, com texto no catálogo, e casos nos testes de integração (`tests/integration/auth.test.ts`).
+
+## Limites conhecidos
+
+- **Rate limit:** o embutido do Better Auth guarda contadores na memória de cada instância serverless, então não protege de fato na Vercel. O limite real fica para a US-028 (Vercel Firewall).
+- **Datas sem fuso:** as tabelas geradas pelo CLI usam `timestamp` sem fuso. O Better Auth grava instantes em UTC e o driver converte, então o risco prático é baixo. Mudar para `timestamptz` exige migração própria e regenerar o schema com o tipo aceito pelo CLI; fica registrado como exceção à convenção.
+- **Tabela `"user"`:** nome reservado no Postgres. O SQL gerado sempre usa aspas, e qualquer SQL manual também precisa delas.
 
 ## Testes
 
