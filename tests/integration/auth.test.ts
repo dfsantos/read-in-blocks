@@ -59,7 +59,7 @@ function cookieHeader(response: Response): string {
 }
 
 async function signIn(
-  auth: ReturnType<typeof createAuth>,
+  auth: { handler: (request: Request) => Promise<Response> },
   as: Profile,
   state?: string,
 ) {
@@ -263,6 +263,32 @@ describe("Google sign-in with the e-mail allowlist", () => {
       "account_not_allowed",
     );
     expect(await usersWith(ALLOWED)).toHaveLength(0);
+  });
+
+  it("uses Secure, __Secure- prefixed cookies when the base URL is https", async () => {
+    const auth = createAuth(db, {
+      ...baseEnv,
+      BETTER_AUTH_URL: "https://read-in-blocks.example",
+    });
+
+    const start = await auth.handler(
+      new Request("https://read-in-blocks.example/api/auth/sign-in/social", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://read-in-blocks.example",
+        },
+        body: JSON.stringify({ provider: "google", callbackURL: "/" }),
+      }),
+    );
+
+    const cookies = start.headers.getSetCookie();
+    expect(cookies.length).toBeGreaterThan(0);
+    for (const cookie of cookies) {
+      expect(cookie).toMatch(/^__Secure-/);
+      expect(cookie).toMatch(/;\s*Secure/i);
+      expect(cookie).toMatch(/;\s*HttpOnly/i);
+    }
   });
 
   it("rejects a callback whose state does not match the sign-in", async () => {

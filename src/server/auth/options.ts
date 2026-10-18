@@ -20,7 +20,6 @@ export type AuthOptionsInput = {
   // Loads the e-mail and its verification for an existing user (the session hook re-checks the
   // allowlist on every sign-in, so removing an e-mail revokes access at the next login).
   findSignInCandidate: (userId: string) => Promise<SignInCandidate | undefined>;
-  plugins?: BetterAuthOptions["plugins"];
 };
 
 function denied(reason: string, userId?: string): never {
@@ -37,14 +36,12 @@ export function createAuthOptions({
   env,
   database,
   findSignInCandidate,
-  plugins,
 }: AuthOptionsInput) {
   return {
     appName: "Read in Blocks",
     baseURL: env.baseURL,
     secret: env.secret,
     database,
-    plugins,
     // Google only (ADR-0005); no e-mail/password sign-in or sign-up.
     emailAndPassword: { enabled: false },
     socialProviders: env.google
@@ -62,8 +59,9 @@ export function createAuthOptions({
       updateAge: HOUR,
       cookieCache: { enabled: false },
     },
+    // Secure (`__Secure-` prefix) whenever the base URL is https, Better Auth's default: always in
+    // production and Preview, never on http://localhost.
     advanced: {
-      useSecureCookies: process.env.NODE_ENV === "production",
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
     },
     databaseHooks: {

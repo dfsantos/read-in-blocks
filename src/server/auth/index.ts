@@ -1,22 +1,22 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { eq } from "drizzle-orm";
 
 import { getDb, type Database } from "../../db/client";
 import * as authSchema from "../../db/auth-schema";
 import { parseAuthEnv } from "./env";
-import { createAuthOptions, type AuthOptionsInput } from "./options";
+import { createAuthOptions } from "./options";
 
-// The app's auth instance for a database and an environment; tests build it the same way.
-export function createAuth(
+// The app's auth instance for a database and an environment; tests build it the same way. The app
+// passes no plugins; E2E helpers add Better Auth's test plugin (typed, so `$context.test` is available there).
+export function createAuth<Plugins extends BetterAuthPlugin[] = []>(
   db: Database,
   source: Record<string, string | undefined>,
-  plugins?: AuthOptionsInput["plugins"],
+  plugins?: Plugins,
 ) {
-  return betterAuth(
-    createAuthOptions({
+  return betterAuth({
+    ...createAuthOptions({
       env: parseAuthEnv(source),
-      plugins,
       database: drizzleAdapter(db, { provider: "pg", schema: authSchema }),
       findSignInCandidate: async (userId) => {
         const [row] = await db
@@ -30,7 +30,8 @@ export function createAuth(
         return row;
       },
     }),
-  );
+    plugins: plugins ?? ([] as unknown as Plugins),
+  });
 }
 
 let auth: ReturnType<typeof createAuth> | undefined;
