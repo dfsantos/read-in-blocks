@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq, like } from "drizzle-orm";
 import { Pool } from "pg";
@@ -33,10 +35,11 @@ const db = drizzle({ client: pool, schema });
 
 const baseEnv = {
   NODE_ENV: "test",
-  BETTER_AUTH_SECRET: "integration-test-secret-0123456789abcdef",
+  // Generated per run: no secret-like literal in the repository (secret scanning).
+  BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
   BETTER_AUTH_URL: ORIGIN,
   GOOGLE_CLIENT_ID: "test-client-id",
-  GOOGLE_CLIENT_SECRET: "test-client-secret",
+  GOOGLE_CLIENT_SECRET: randomBytes(16).toString("hex"),
   AUTH_ALLOWED_EMAILS: ALLOWED,
 };
 

@@ -1,0 +1,6 @@
+# Findings reviewed and ignored by fingerprint (commit:file:rule-id:line). Each entry needs a reason.
+# Only exact historical findings: new commits are always scanned in full.
+
+# US-004: throwaway BETTER_AUTH_SECRET literal in an integration test (never used outside the local
+# test database). Replaced by a per-run random value in a later commit; the commit stays in history.
+edd9ebdfad0eb1d9dfb067704cd5b8158aac80cd:tests/integration/auth.test.ts:generic-api-key:36
