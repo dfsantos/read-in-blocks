@@ -101,6 +101,31 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        # postgres:17-alpine (17.11), same digest as compose.yaml.
+        image: postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+        env:
+          # Throwaway credentials for this job's container only.
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: read_in_blocks_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      # The app under test (`next start`) and the E2E session helpers use the same database and
+      # secret. Google credentials are placeholders: the tests never reach Google (US-004).
+      DATABASE_URL: postgres://app:app_ci@localhost:5432/read_in_blocks_e2e
+      MIGRATOR_DATABASE_URL: postgres://migrator:migrator_ci@localhost:5432/read_in_blocks_e2e
+      BETTER_AUTH_URL: http://localhost:3000
+      GOOGLE_CLIENT_ID: e2e-placeholder-client-id
+      GOOGLE_CLIENT_SECRET: e2e-placeholder-client-secret
+      AUTH_ALLOWED_EMAILS: nobody@example.test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -112,6 +137,19 @@ jobs:
           cache: true
           install: false
       - run: pnpm install --frozen-lockfile
+      - name: Generate a throwaway auth secret
+        run: |
+          secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$secret"
+          echo "BETTER_AUTH_SECRET=$secret" >> "$GITHUB_ENV"
+      - name: Create database roles
+        env:
+          PGPASSWORD: postgres
+        run: >-
+          psql -h localhost -U postgres -d read_in_blocks_e2e -v ON_ERROR_STOP=1
+          -v app_password=app_ci -v migrator_password=migrator_ci
+          -f src/db/bootstrap/roles.sql
+      - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
 
