@@ -181,6 +181,20 @@ describe("Google sign-in with the e-mail allowlist", () => {
     const users = await usersWith(ALLOWED);
     expect(users).toHaveLength(1);
     expect(await sessionsOf(users[0]!.id)).toHaveLength(2);
+
+    // Google's tokens are never stored (sign-in only), on the first or the next sign-in.
+    const accounts = await db
+      .select()
+      .from(schema.account)
+      .where(eq(schema.account.userId, users[0]!.id));
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0]).toMatchObject({
+      providerId: "google",
+      accountId: "google-reader",
+      accessToken: null,
+      refreshToken: null,
+      idToken: null,
+    });
   });
 
   it("refuses an e-mail outside the allowlist without creating any row", async () => {
@@ -221,6 +235,43 @@ describe("Google sign-in with the e-mail allowlist", () => {
       "account_not_allowed",
     );
     expect(await usersWith(ALLOWED)).toHaveLength(0);
+  });
+
+  it("never extends a session, so it ends 12 hours after the sign-in", async () => {
+    await cleanUp();
+    const auth = createAuth(db, baseEnv);
+    const { callback } = await signIn(auth, {
+      sub: "google-reader",
+      email: ALLOWED,
+      email_verified: true,
+    });
+    const cookie = cookieHeader(callback);
+    const [user] = await usersWith(ALLOWED);
+    const getSession = () =>
+      auth.handler(
+        new Request(`${ORIGIN}/api/auth/get-session`, {
+          headers: { cookie, origin: ORIGIN },
+        }),
+      );
+
+    // Two hours into the session: a refreshing setup would push the expiry 12 hours forward.
+    const twoHoursIn = new Date(Date.now() + 10 * 60 * 60 * 1000);
+    await db
+      .update(schema.session)
+      .set({ expiresAt: twoHoursIn })
+      .where(eq(schema.session.userId, user!.id));
+    expect(await (await getSession()).json()).toMatchObject({
+      user: { email: ALLOWED },
+    });
+    const [kept] = await sessionsOf(user!.id);
+    expect(kept!.expiresAt.getTime()).toBe(twoHoursIn.getTime());
+
+    // Past its expiry the same cookie no longer works.
+    await db
+      .update(schema.session)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.session.userId, user!.id));
+    expect(await (await getSession()).json()).toBeNull();
   });
 
   it("refuses a returning user whose e-mail was removed from the allowlist", async () => {

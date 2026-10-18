@@ -17,8 +17,8 @@ export const ACCOUNT_NOT_ALLOWED = "account_not_allowed";
 export type AuthOptionsInput = {
   env: AuthEnv;
   database: BetterAuthOptions["database"];
-  // Loads the e-mail and its verification for an existing user (the session hook re-checks the
-  // allowlist on every sign-in, so removing an e-mail revokes access at the next login).
+  // Loads the e-mail and its verification for an existing user: the session hook re-checks the
+  // allowlist on every sign-in, so a removed e-mail cannot start a new session.
   findSignInCandidate: (userId: string) => Promise<SignInCandidate | undefined>;
 };
 
@@ -30,6 +30,17 @@ function denied(reason: string, userId?: string): never {
     code: ACCOUNT_NOT_ALLOWED,
     message: ACCOUNT_NOT_ALLOWED,
   });
+}
+
+function withoutTokens<T extends object>(account: T): T {
+  return {
+    ...account,
+    accessToken: null,
+    refreshToken: null,
+    idToken: null,
+    accessTokenExpiresAt: null,
+    refreshTokenExpiresAt: null,
+  };
 }
 
 export function createAuthOptions({
@@ -52,19 +63,34 @@ export function createAuthOptions({
           },
         }
       : {},
-    // Short sessions, extended at most once an hour while in use, and always checked against the
-    // database: no cookie cache, so a revoked session stops working on the next request.
+    // Fixed 12-hour sessions, never extended: the allowlist is only checked when a session is
+    // created, so every session ends at most 12 hours after its sign-in and the next sign-in checks
+    // the allowlist again (an e-mail removed from it, or a stolen cookie, lasts 12 hours at most).
+    // No cookie cache: every request reads the session from the database, so deleting the row
+    // revokes it at once.
     session: {
       expiresIn: 12 * HOUR,
-      updateAge: HOUR,
+      disableSessionRefresh: true,
       cookieCache: { enabled: false },
     },
+    // Google's access/refresh/id tokens are stored encrypted with the auth secret, not in clear.
+    account: { encryptOAuthTokens: true },
     // Secure (`__Secure-` prefix) whenever the base URL is https, Better Auth's default: always in
     // production and Preview, never on http://localhost.
     advanced: {
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
     },
     databaseHooks: {
+      // Google is used only to sign in; the app never calls Google APIs. Its tokens are dropped
+      // before they reach the database (the id_token would keep the e-mail and name in clear).
+      account: {
+        create: {
+          before: async (account) => ({ data: withoutTokens(account) }),
+        },
+        update: {
+          before: async (account) => ({ data: withoutTokens(account) }),
+        },
+      },
       user: {
         create: {
           // First sign-in: refuse before any row is written.
