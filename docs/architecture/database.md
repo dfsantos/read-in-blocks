@@ -83,9 +83,11 @@ Faz os passos 3 a 5 de uma vez e pode ser repetido para **rotacionar** todas as 
 ```
 
 - Pede `vercel login`/`vercel link` se necessário e as connection strings do `neondb_owner` das branches `main` e `preview` (entrada oculta).
-- Gera as senhas de `app` e `migrator` localmente (`openssl rand`), aplica `roles.sql` e `ALTER ROLE … PASSWORD` em cada branch enviando só o **verificador SCRAM-SHA-256** calculado localmente (a senha em texto não chega ao Neon nem aos logs dele), testa as conexões e grava `DATABASE_URL` e `MIGRATOR_DATABASE_URL` como *Sensitive* em Production e Preview, conferindo cada gravação.
+- Gera as senhas de `app` e `migrator` localmente (`openssl rand`), aplica `roles.sql` e `ALTER ROLE … PASSWORD` em cada branch, testa as conexões e grava `DATABASE_URL` e `MIGRATOR_DATABASE_URL` como *Sensitive* em Production e Preview, conferindo cada gravação.
 - Remove as variáveis da integração Neon listadas acima.
-- Nenhuma senha é exibida nem passada como argumento de linha de comando.
+- Nenhuma senha é exibida nem passada como argumento de linha de comando: chegam ao `psql` só pelo stdin (`\set`), sobre TLS `verify-full`.
+- **Rotacionar derruba a produção até um novo deploy.** Cada deploy da Vercel guarda as variáveis do momento em que foi criado, então o deploy no ar continua com a senha antiga, que deixa de valer. Logo depois do script, refaça o deploy de Produção e o de Preview (`vercel redeploy <URL do deploy atual>`) e confira `/api/health` nos dois. Em 2026-10-18 a produção ficou fora do ar (503) por isso até ser republicada.
+- **A senha vai em texto ao Neon.** O Neon só aceita senha em texto e a guarda com hash ("Hashed passwords are not supported", [Manage roles](https://neon.com/docs/manage/roles)); um verificador SCRAM calculado localmente é recusado pelo plano de controle (`Neon only supports being given plaintext passwords`). Por isso o envio de verificadores SCRAM, adotado na US-029, foi revertido em 2026-10-18.
 - Requer `psql` (libpq 16+), `openssl`, `python3` e `pnpm`; usa `pnpm dlx vercel@64.3.1` (versão exata). A CLI não vira `devDependency`: na US-029 ela trouxe 15 alertas *high* e 1 *critical* para o `pnpm audit` (quebrando o job de auditoria), e o `dlx` a mantém fora do lockfile da aplicação.
 
 Os passos 3 a 5 abaixo descrevem o mesmo processo manualmente.

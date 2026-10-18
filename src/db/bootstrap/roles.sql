@@ -1,7 +1,7 @@
 -- Creates the least-privilege database roles (ADR-0014, docs/architecture/database.md).
 -- Run once per database as its owner, with psql, before the first migration. On Neon use
--- scripts/setup-database.sh: it passes SCRAM verifiers (not plaintext) through stdin `\set`, so no
--- secret lands in process arguments or shell history. Local/CI containers pass throwaway values
+-- scripts/setup-database.sh: it passes the passwords through stdin `\set` (Neon accepts only plaintext
+-- and stores them hashed), so no secret lands in process arguments or shell history. Local/CI containers pass throwaway values
 -- with `-v app_password=... -v migrator_password=...`.
 --
 -- Idempotent: existing roles keep their passwords (rotate with ALTER ROLE ... PASSWORD).

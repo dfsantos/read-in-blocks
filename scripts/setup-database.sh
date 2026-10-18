@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Sets up the database roles in Neon and the database variables in Vercel (ADR-0014,
-# docs/architecture/database.md). Safe to re-run: it also rotates all four passwords.
+# docs/architecture/database.md). Safe to re-run: it also rotates all four passwords, which takes
+# Production down until it is redeployed (deployments keep the variables they were built with).
 #
 # Secrets never leave this machine except to Neon and Vercel: owner URLs are read with
 # hidden prompts, role passwords are generated locally, and none of them is printed or
@@ -59,23 +60,8 @@ read_owner_url() {
   printf '%s' "$url"
 }
 
+# 192 random bits as hex: above Neon's 60-bit entropy minimum and safe inside a URL without encoding.
 new_password() { openssl rand -hex 24; }
-
-# Reads a password from stdin and prints its SCRAM-SHA-256 verifier (RFC 7677, the format Postgres
-# stores), so the plaintext password is never sent to the server or written to its logs.
-scram_verifier() {
-  python3 -I -c '
-import base64, hashlib, hmac, os, sys
-password = sys.stdin.read().encode()
-salt, iterations = os.urandom(16), 4096
-salted = hashlib.pbkdf2_hmac("sha256", password, salt, iterations)
-client_key = hmac.new(salted, b"Client Key", hashlib.sha256).digest()
-stored_key = hashlib.sha256(client_key).digest()
-server_key = hmac.new(salted, b"Server Key", hashlib.sha256).digest()
-b64 = lambda raw: base64.b64encode(raw).decode()
-print(f"SCRAM-SHA-256${iterations}:{b64(salt)}${b64(stored_key)}:{b64(server_key)}")
-'
-}
 
 # Creates the roles (if missing), applies the grants and sets fresh passwords on one branch.
 # Writes the resulting app and migrator URLs to the globals APP_URL and MIGRATOR_URL.
@@ -91,14 +77,11 @@ configure_branch() {
     read -r owner_pw
   } <<<"$fields"
 
-  local app_verifier migrator_verifier
-  app_verifier="$(printf '%s' "$app_pw" | scram_verifier)" || fail "could not hash the app password"
-  migrator_verifier="$(printf '%s' "$migrator_pw" | scram_verifier)" || fail "could not hash the migrator password"
-
-  # roles.sql and ALTER ROLE receive SCRAM verifiers; Postgres stores them as they are. Quoted so
-  # psql does not read the ":" inside a verifier as a variable reference.
+  # Neon only accepts plaintext passwords ("Hashed passwords are not supported", docs/manage/roles;
+  # a SCRAM verifier is rejected by its control plane) and stores them hashed. The passwords reach
+  # psql only through stdin `\set`, never process arguments or shell history, over TLS verify-full.
   {
-    printf "\\\\set app_password '%s'\n\\\\set migrator_password '%s'\n" "$app_verifier" "$migrator_verifier"
+    printf "\\\\set app_password '%s'\n\\\\set migrator_password '%s'\n" "$app_pw" "$migrator_pw"
     cat src/db/bootstrap/roles.sql
     printf "ALTER ROLE app PASSWORD :'app_password';\n"
     printf "ALTER ROLE migrator PASSWORD :'migrator_password';\n"
@@ -183,4 +166,6 @@ set_vercel_env MIGRATOR_DATABASE_URL preview "$PREVIEW_MIGRATOR_URL"
 unset PROD_APP_URL PROD_MIGRATOR_URL PREVIEW_APP_URL PREVIEW_MIGRATOR_URL
 
 step "Done"
-printf '  Redeploy the Preview (existing deployments keep their old variables) and open /api/health.\n'
+printf '  The old passwords stopped working: Production is DOWN until it is redeployed, because existing\n'
+printf '  deployments keep the variables they were built with. Redeploy Production now, then the Preview,\n'
+printf '  and open /api/health on both (vercel redeploy <current deployment URL>).\n'
