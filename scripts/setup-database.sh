@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Sets up the database roles in Neon and the database variables in Vercel (ADR-0014,
-# docs/architecture/database.md). Safe to re-run: it also rotates all four passwords.
+# docs/architecture/database.md). Safe to re-run: it also rotates all four passwords, which takes
+# Production down until it is redeployed (deployments keep the variables they were built with).
 #
 # Secrets never leave this machine except to Neon and Vercel: owner URLs are read with
 # hidden prompts, role passwords are generated locally, and none of them is printed or
@@ -165,4 +166,6 @@ set_vercel_env MIGRATOR_DATABASE_URL preview "$PREVIEW_MIGRATOR_URL"
 unset PROD_APP_URL PROD_MIGRATOR_URL PREVIEW_APP_URL PREVIEW_MIGRATOR_URL
 
 step "Done"
-printf '  Redeploy the Preview (existing deployments keep their old variables) and open /api/health.\n'
+printf '  The old passwords stopped working: Production is DOWN until it is redeployed, because existing\n'
+printf '  deployments keep the variables they were built with. Redeploy Production now, then the Preview,\n'
+printf '  and open /api/health on both (vercel redeploy <current deployment URL>).\n'
