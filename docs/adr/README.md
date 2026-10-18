@@ -23,6 +23,7 @@ Todos os ADRs abaixo foram **Aceitos** em 2026-10-15, com a aprovação da US-00
 | [0013](0013-context7-docs-first.md) | Documentação via Context7 antes de mudar a stack | Aceito |
 | [0014](0014-database-driver-roles-and-deploy-migrations.md) | Driver `pg`, papéis de banco, banco de preview e migrações no deploy | Aceito |
 | [0015](0015-context7-gate-self-protection.md) | Autoproteção do gate do Context7 e da configuração do gerenciador de pacotes | Aceito |
+| [0016](0016-no-google-sign-in-on-preview.md) | Sem login com Google nos Preview Deployments | Proposto |
 
 ## Template
 

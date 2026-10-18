@@ -10,7 +10,7 @@ Cada escolha abaixo tem um ADR com contexto, alternativas e consequências. Nenh
 |---|---|---|
 | 1 | Hospedagem na Vercel | Next.js na Vercel; banco via Vercel Marketplace; Preview Deployments por PR ([ADR-0001](../adr/0001-framework-nextjs-on-vercel.md)) |
 | 2 | UI com shadcn | shadcn/ui + Tailwind CSS ([ADR-0002](../adr/0002-ui-shadcn-tailwind.md)) |
-| 3 | Login social, só Google por ora | Better Auth com provedor Google; outros provedores entram por configuração ([ADR-0005](../adr/0005-authentication-better-auth-google.md)) |
+| 3 | Login social, só Google por ora | Better Auth com provedor Google; outros provedores entram por configuração; login só em local e produção, não no Preview ([ADR-0005](../adr/0005-authentication-better-auth-google.md), [ADR-0016](../adr/0016-no-google-sign-in-on-preview.md); guia em [authentication.md](authentication.md)) |
 | 4 | Código em inglês | Convenção obrigatória ([conventions.md](conventions.md)) |
 | 5 | Aplicação em português, pronta para i18n | `next-intl`, `pt-BR` como único locale ativo, zero texto fixo em componentes ([ADR-0006](../adr/0006-internationalization-next-intl.md)) |
 

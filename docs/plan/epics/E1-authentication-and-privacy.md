@@ -9,15 +9,15 @@ Cobre RF-010 e a regra crítica de privacidade (PRD §6.1). Persona: **Leitor**.
 **Cobre:** exigência 3 · RF-010 (base) · **Tamanho:** G · **Depende de:** US-003
 
 **Critérios de aceite**
-- [ ] Tela de login (shadcn) com botão “Entrar com Google”, todos os textos em pt-BR via i18n.
-- [ ] Fluxo OAuth completo em local e produção (Preview: abordagem documentada, ver ADR-0005).
-- [ ] Primeiro login cria o usuário; logins seguintes reutilizam o mesmo registro.
-- [ ] Sessão em cookie httpOnly; segredos apenas em variáveis de ambiente.
-- [ ] Nenhum outro método de login disponível (sem e-mail/senha); adicionar provedor futuro é só configuração (documentado).
-- [ ] **Zero Trust:** acesso negado por padrão — apenas e-mails na allowlist (D-10, aprovada) conseguem entrar; `email_verified` exigido; `state` e PKCE no OAuth; conta fora da lista recebe mensagem genérica e nada é criado no banco.
-- [ ] Sessão curta com rotação e revogação no servidor; eventos de login/falha registrados (sem dados sensíveis).
-- [ ] Erros de OAuth (acesso negado, falha) mostram mensagem amigável.
-- [ ] Teste E2E do login usando sessão de teste semeada (não o Google real).
+- [x] Tela de login (shadcn) com botão “Entrar com Google”, todos os textos em pt-BR via i18n.
+- [ ] Fluxo OAuth completo em local e produção (Preview: abordagem documentada, ver ADR-0005). *Fluxo coberto contra o banco com o endpoint de token do Google simulado (`tests/integration/auth.test.ts`); o teste com o Google real, em local e produção, é da validação do responsável. Preview: sem login com Google (ADR-0016, proposto).*
+- [x] Primeiro login cria o usuário; logins seguintes reutilizam o mesmo registro.
+- [x] Sessão em cookie httpOnly; segredos apenas em variáveis de ambiente.
+- [x] Nenhum outro método de login disponível (sem e-mail/senha); adicionar provedor futuro é só configuração (documentado).
+- [x] **Zero Trust:** acesso negado por padrão — apenas e-mails na allowlist (D-10, aprovada) conseguem entrar; `email_verified` exigido; `state` e PKCE no OAuth; conta fora da lista recebe mensagem genérica e nada é criado no banco.
+- [x] Sessão curta com rotação e revogação no servidor; eventos de login/falha registrados (sem dados sensíveis). *Sessão de 12 h fixas a partir do login, nunca prorrogada (a allowlist é conferida a cada login); cada login cria sessão nova; revogação imediata apagando a linha de `session` (sem cookie cache). Desvio de "rotação": o Better Auth não troca o token durante a sessão; a prorrogação foi desligada porque mantinha indefinidamente quem saiu da allowlist (revisão de segurança).*
+- [x] Erros de OAuth (acesso negado, falha) mostram mensagem amigável.
+- [x] Teste E2E do login usando sessão de teste semeada (não o Google real).
 
 **Pré-requisitos do responsável (D-04):** projeto no Google Cloud Console com cliente OAuth (redirect URIs de local, preview e produção) e lista de e-mails autorizados (D-10) em variável de ambiente.
 
@@ -28,9 +28,9 @@ Cobre RF-010 e a regra crítica de privacidade (PRD §6.1). Persona: **Leitor**.
 | Pacote | Versão | Status | Fonte Context7 |
 |---|---|---|---|
 | `better-auth` | **1.6.23** | ✅ Fixada | `/better-auth/better-auth` |
-| `@better-auth/drizzle-adapter` | **alinhar a 1.6.23 (confirmar)** | 🟡 Linha (patch a fechar) | `/better-auth/better-auth` |
+| `@better-auth/drizzle-adapter` | **1.6.23** | ✅ Fixada (mesmo grupo de release do `better-auth`, confirmado no Context7 em 2026-10-18) | `/better-auth/better-auth` |
 
-- [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. **Somente versões estáveis:** nada de `rc`, `beta`, `alpha`, `canary`, `next`, `nightly` ou versões com sufixo `-x.y` (o hook bloqueia).
+- [x] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. **Somente versões estáveis:** nada de `rc`, `beta`, `alpha`, `canary`, `next`, `nightly` ou versões com sufixo `-x.y` (o hook bloqueia).
 
 ---
 

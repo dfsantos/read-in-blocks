@@ -13,5 +13,18 @@
       "number": "Número: {value}",
       "percent": "Progresso: {value}"
     }
+  },
+  "login": {
+    "metadataTitle": "Entrar — Read in Blocks",
+    "title": "Entrar",
+    "description": "Use sua conta Google para acessar seus livros.",
+    "google": "Entrar com Google",
+    "redirecting": "Redirecionando…",
+    "unavailable": "O login não está disponível neste ambiente.",
+    "errors": {
+      "notAllowed": "Não foi possível entrar com essa conta.",
+      "cancelled": "O login foi cancelado. Tente de novo quando quiser.",
+      "failed": "Não foi possível concluir o login. Tente de novo em instantes."
+    }
   }
 }

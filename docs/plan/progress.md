@@ -14,7 +14,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-030](epics/E0-foundation.md) | Endurecimento restante do gate do Context7 | — | M | US-029 | — | Aprovada | 2026-10-16 |
 | M1 | [US-031](epics/E0-foundation.md) | Proteção do próprio gate do Context7 e da configuração do gerenciador de pacotes | — | M | US-030 | — | Aprovada | 2026-10-16 |
 | M1 | [US-032](epics/E0-foundation.md) | Falsos positivos do gate do Context7 em comandos de leitura | — | P | US-031 | — | Aprovada | 2026-10-17 |
-| M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Pendente | |
+| M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Em validação | |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Pendente | |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
 | M2 | [US-028](epics/E1-authentication-and-privacy.md) | Cabeçalhos de segurança e proteção de requisições | RF-010 | M | US-005 | — | Pendente | |
@@ -43,7 +43,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 33 histórias (1 de aprovação, 31 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-000 a US-003 e US-029 a US-031 aprovadas e mescladas em `main` (a última no PR #19, em 2026-10-17); produção saudável (`/api/health` → `ok`). US-032 (falsos positivos do gate) aprovada em 2026-10-17, ainda não mesclada (branch `story/US-032-gate-read-false-positives`). Próxima: `/start-story US-004` (pré-requisito D-04: cliente OAuth do Google e allowlist de e-mails). Pendente com o responsável (arquivo protegido): aplicar no hook do `require-context7.py` em `.claude/settings.json` o comando `python3 -I …` e `"onFailure": "block"`.
+- **Próxima ação:** US-000 a US-003 e US-029 a US-031 aprovadas e mescladas em `main` (a última no PR #19, em 2026-10-17); produção saudável (`/api/health` → `ok`). US-032 (falsos positivos do gate) aprovada e mesclada (PR #21); correção do `setup-database.sh` para o Neon mesclada (PR #22). US-004 (Entrar com Google) **em validação** desde 2026-10-18 (branch `story/US-004-google-login`); D-04 concluído pelo responsável. Para aprovar: testar o login real com o Google em local e, após o merge, em produção; aceitar ou não o ADR-0016 (sem login no Preview). Desvios: sessão de 12 h fixas, sem prorrogação; tokens do Google não são guardados; Zod adiantado da US-007. Pendente com o responsável (arquivo protegido): aplicar no hook do `require-context7.py` em `.claude/settings.json` o comando `python3 -I …` e `"onFailure": "block"`.
 - **Desvio de processo registrado:** US-029, US-030 e US-031 ficaram em validação ao mesmo tempo e foram mescladas num único PR (#19), contra as regras de uma história por vez e de um PR por história.
 
 ## Registro de aprovações

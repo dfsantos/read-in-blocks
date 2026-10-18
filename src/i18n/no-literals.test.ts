@@ -25,8 +25,11 @@ export function findUiLiterals(source: string): string[] {
 
   return withoutComments.split("\n").flatMap((line, index) => {
     const accented = /[À-ÿ]/.test(line);
-    // Text between JSX tags, e.g. <h1>Title</h1> or <p>Some words</p>.
-    const jsxText = />\s*[A-Za-zÀ-ÿ][^<>{}]*[A-Za-zÀ-ÿ.!?:]\s*</.test(line);
+    // Text between JSX tags, e.g. <h1>Title</h1> or <p>Some words</p>. The `>` of an arrow
+    // (`=> Promise<T>`) does not close a tag.
+    const jsxText = /(?<!=)>\s*[A-Za-zÀ-ÿ][^<>{}]*[A-Za-zÀ-ÿ.!?:]\s*</.test(
+      line,
+    );
     // Literal values of text-bearing attributes, e.g. aria-label="Close".
     const textAttr =
       /\b(?:aria-label|placeholder|title|alt)=["'][^"']*[A-Za-z]/.test(line);
@@ -44,6 +47,10 @@ describe("UI literals", () => {
     expect(findUiLiterals("<h1>{t('title')}</h1>")).toHaveLength(0);
     expect(findUiLiterals("<a aria-label={t('close')} />")).toHaveLength(0);
     expect(findUiLiterals("// Comentário: ação")).toHaveLength(0);
+    expect(
+      findUiLiterals("find: (id: string) => Promise<User | undefined>;"),
+    ).toHaveLength(0);
+    expect(findUiLiterals("{ok && <p>Read more</p>}")).toHaveLength(1);
   });
 
   it("finds no UI text in src/ outside messages/", () => {

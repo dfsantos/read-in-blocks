@@ -75,7 +75,7 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 | `pg` / `@types/pg` | **8.23.1 / 8.23.1** | ✅ Fixada | `/brianc/node-postgres` | Driver em todos os ambientes (ADR-0014), via `drizzle-orm/node-postgres`. Patch da tag `latest` do npm (Context7 não indexa versões). |
 | `@vercel/functions` | **3.10.1** | ✅ Fixada | `/websites/vercel` | `attachDatabasePool(pool)` para Fluid compute. Patch da tag `latest` do npm. |
 | `better-auth` | **1.6.23** | ✅ Fixada | `/better-auth/better-auth` | Tag v1.6.23. Provedor Google via `socialProviders.google`; `emailAndPassword` desabilitável; CLI `npx auth generate --adapter drizzle`. |
-| `@better-auth/drizzle-adapter` | **alinhar a 1.6.23 (confirmar)** | 🟡 Linha (patch a fechar) | `/better-auth/better-auth` | Desde a 1.5 os adapters são pacotes separados; a documentação v1.6.23 manda instalar este pacote. |
+| `@better-auth/drizzle-adapter` | **1.6.23** | ✅ Fixada (US-004) | `/better-auth/better-auth` | Desde a 1.5 os adapters são pacotes separados. Mesmo grupo de release (`fixed` do changesets) que `better-auth`, `@better-auth/core` e o CLI `auth`, sempre na mesma versão. Peer `vitest ^2–^4` do `better-auth` não atendido pelo `vitest` 5 do projeto (só aviso; não afeta o runtime). |
 
 ## Formulários e editor
 
