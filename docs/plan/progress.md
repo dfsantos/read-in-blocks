@@ -17,7 +17,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Aprovada | 2026-10-19 |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Aprovada | 2026-10-19 |
 | M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Aprovada | 2026-10-19 |
-| M2 | [US-033](epics/E1-authentication-and-privacy.md) | RLS do Postgres nas tabelas de conteúdo | RF-010 | M | US-006 | — | Pendente | |
+| M2 | [US-033](epics/E1-authentication-and-privacy.md) | RLS do Postgres nas tabelas de conteúdo | RF-010 | M | US-006 | — | Em desenvolvimento | |
 | M2 | [US-028](epics/E1-authentication-and-privacy.md) | Cabeçalhos de segurança e proteção de requisições | RF-010 | M | US-005 | — | Pendente | |
 | M3 | [US-007](epics/E2-library-and-book-structure.md) | Cadastrar um livro | RF-001 | M | US-006, US-033 | — | Pendente | |
 | M3 | [US-008](epics/E2-library-and-book-structure.md) | Biblioteca pessoal | RF-009 | P | US-007 | — | Pendente | |
