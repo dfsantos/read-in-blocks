@@ -1,4 +1,6 @@
 // @vitest-environment node
+// Next 16.4 still names it unstable_doesMiddlewareMatch (the docs call it unstable_doesProxyMatch).
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest, NextResponse } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,7 +9,7 @@ vi.mock("next-intl/middleware", () => ({
   default: () => () => NextResponse.next(),
 }));
 
-import proxy from "./proxy";
+import proxy, { config } from "./proxy";
 
 const ORIGIN = "http://localhost:3000";
 
@@ -107,5 +109,32 @@ describe("proxy security headers (US-028)", () => {
     expect(
       proxy(request("/login")).headers.get("content-security-policy"),
     ).not.toContain("upgrade-insecure-requests");
+  });
+});
+
+describe("proxy matcher (US-028)", () => {
+  const runs = (url: string) =>
+    unstable_doesMiddlewareMatch({ config, nextConfig: {}, url });
+
+  it.each([
+    "/",
+    "/login",
+    "/books/42",
+    "/books/v1.2/notes",
+    "/apiary",
+    "/a.b/c",
+  ])("runs on the page %s, so it gets the CSP and no-store", (url) => {
+    expect(runs(url)).toBe(true);
+  });
+
+  it.each([
+    "/api/health",
+    "/api/auth/get-session",
+    "/_next/static/chunk.js",
+    "/_vercel/insights/script.js",
+    "/favicon.ico",
+    "/images/cover.png",
+  ])("skips %s (API routes, internals and files)", (url) => {
+    expect(runs(url)).toBe(false);
   });
 });

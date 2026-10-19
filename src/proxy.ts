@@ -48,6 +48,7 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Skip API routes, Next.js internals and files with an extension.
-  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
+  // Skip API routes, Next.js internals and files with an extension (a dot in the last segment, not
+  // anywhere in the path), so a page such as /books/v1.2/notes or /apiary still gets the CSP.
+  matcher: ["/((?!api/|api$|_next/|_vercel/|[^?]*\\.[A-Za-z0-9]+$).*)"],
 };
