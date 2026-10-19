@@ -1,5 +1,6 @@
 import { toNextJsHandler } from "better-auth/next-js";
 
+import { PRIVATE_NO_STORE } from "@/lib/security-headers";
 import { getAuth } from "@/server/auth";
 import { guardWrite } from "@/server/request-guard";
 
@@ -9,12 +10,27 @@ import { guardWrite } from "@/server/request-guard";
 // Rate limited by the Vercel Firewall and by Better Auth itself (US-028).
 export const dynamic = "force-dynamic";
 
+// Every auth response is about one reader (the session, cookies): never stored by a browser,
+// proxy or CDN (US-028). A copy, since a handler's Response headers may be immutable.
+function privateResponse(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", PRIVATE_NO_STORE);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export async function GET(request: Request) {
-  return toNextJsHandler(getAuth()).GET(request);
+  return privateResponse(await toNextJsHandler(getAuth()).GET(request));
 }
 
 // Writes are refused before Better Auth reads the body when they come from another origin or carry
 // a body larger than any auth request needs (US-028).
 export async function POST(request: Request) {
-  return guardWrite(request) ?? toNextJsHandler(getAuth()).POST(request);
+  return (
+    guardWrite(request) ??
+    privateResponse(await toNextJsHandler(getAuth()).POST(request))
+  );
 }

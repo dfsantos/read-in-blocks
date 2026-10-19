@@ -102,6 +102,7 @@ test("API responses carry the headers and a CSP that allows nothing", async ({
     expect(headers["content-security-policy"], path).toBe(
       "default-src 'none'; frame-ancestors 'none'",
     );
+    expect(headers["cache-control"], path).toMatch(/no-store/);
   }
 });
 

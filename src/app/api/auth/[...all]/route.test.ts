@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Better Auth must never see a refused write: the guard answers first.
 const handler = vi.fn(async () => new Response("ok"));
@@ -8,7 +8,7 @@ vi.mock("better-auth/next-js", () => ({
 }));
 vi.mock("@/server/auth", () => ({ getAuth: () => ({}) }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const ORIGIN = "http://localhost:3000";
 
@@ -19,7 +19,9 @@ function post(headers: Record<string, string>) {
   });
 }
 
-describe("POST /api/auth/* (US-028)", () => {
+describe("/api/auth/* (US-028)", () => {
+  beforeEach(() => handler.mockClear());
+
   it("refuses another origin and oversized bodies without calling Better Auth", async () => {
     const crossSite = await POST(
       post({ origin: "https://evil.example", "content-length": "10" }),
@@ -40,5 +42,13 @@ describe("POST /api/auth/* (US-028)", () => {
 
     expect(await response.text()).toBe("ok");
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("marks every Better Auth response private and never stored", async () => {
+    const read = await GET(new Request(`${ORIGIN}/api/auth/get-session`));
+    const write = await POST(post({ origin: ORIGIN, "content-length": "10" }));
+
+    expect(read.headers.get("cache-control")).toBe("private, no-store");
+    expect(write.headers.get("cache-control")).toBe("private, no-store");
   });
 });
