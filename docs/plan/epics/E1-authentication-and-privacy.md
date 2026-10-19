@@ -10,7 +10,7 @@ Cobre RF-010 e a regra crítica de privacidade (PRD §6.1). Persona: **Leitor**.
 
 **Critérios de aceite**
 - [x] Tela de login (shadcn) com botão “Entrar com Google”, todos os textos em pt-BR via i18n.
-- [ ] Fluxo OAuth completo em local e produção (Preview: abordagem documentada, ver ADR-0005). *Fluxo coberto contra o banco com o endpoint de token do Google simulado (`tests/integration/auth.test.ts`); o teste com o Google real, em local e produção, é da validação do responsável. Preview: sem login com Google (ADR-0016, aceito em 2026-10-19).*
+- [x] Fluxo OAuth completo em local e produção (Preview: abordagem documentada, ver ADR-0005). *Fluxo coberto contra o banco com o endpoint de token do Google simulado (`tests/integration/auth.test.ts`); login com o Google real validado em produção pelo responsável em 2026-10-19. Preview: sem login com Google (ADR-0016, aceito em 2026-10-19).*
 - [x] Primeiro login cria o usuário; logins seguintes reutilizam o mesmo registro.
 - [x] Sessão em cookie httpOnly; segredos apenas em variáveis de ambiente.
 - [x] Nenhum outro método de login disponível (sem e-mail/senha); adicionar provedor futuro é só configuração (documentado).
