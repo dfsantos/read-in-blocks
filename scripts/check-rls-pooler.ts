@@ -20,23 +20,33 @@ const PARALLEL = 5;
 const SAMPLES = 100;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
+// Errors this script writes itself: their messages never carry the URL, so they can be printed.
+class UsageError extends Error {}
+
 function connectionString(): { url: string; target: "pooler" | "local" } {
   const url = process.env.RLS_CHECK_DATABASE_URL;
-  if (!url) throw new Error("RLS_CHECK_DATABASE_URL is not set");
+  if (!url) throw new UsageError("RLS_CHECK_DATABASE_URL is not set");
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error("RLS_CHECK_DATABASE_URL is not a valid URL");
+    throw new UsageError("RLS_CHECK_DATABASE_URL is not a valid URL");
   }
   // pg reads ?host= / ?hostaddr= before the URL host, so they could point elsewhere.
   if (parsed.searchParams.has("host") || parsed.searchParams.has("hostaddr")) {
-    throw new Error("RLS_CHECK_DATABASE_URL must not override the host");
+    throw new UsageError("RLS_CHECK_DATABASE_URL must not override the host");
   }
   if (LOCAL_HOSTS.has(parsed.hostname)) return { url, target: "local" };
   if (!parsed.hostname.split(".")[0].endsWith("-pooler")) {
-    throw new Error(
+    throw new UsageError(
       "RLS_CHECK_DATABASE_URL must be the pooled (-pooler) host: the check is about the pooler",
+    );
+  }
+  // Never send the credentials in plaintext, whatever the server would accept. verify-full, as in
+  // the rest of the project: pg's next major gives require and verify-ca libpq's weaker meaning.
+  if (parsed.searchParams.get("sslmode") !== "verify-full") {
+    throw new UsageError(
+      "RLS_CHECK_DATABASE_URL must use sslmode=verify-full (replace sslmode=require from the Neon console)",
     );
   }
   return { url, target: "pooler" };
@@ -198,6 +208,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: Error & { code?: string }) => {
-  console.error("check failed", { code: error.code ?? error.message });
+  // Driver messages may carry connection details: only codes, or this script's own messages.
+  console.error("check failed", {
+    code:
+      error instanceof UsageError ? error.message : (error.code ?? error.name),
+  });
   process.exitCode = 1;
 });
