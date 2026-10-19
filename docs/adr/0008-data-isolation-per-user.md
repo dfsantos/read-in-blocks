@@ -30,7 +30,7 @@ Defesa em camadas:
 
 ## Adendo (US-006, 2026-10-19) — resultado do spike de RLS
 
-Itens 1, 3, 4 e 5 implementados como fundação: `ownedBy` e o repositório de exemplo (`sessions`), a regra de lint que restringe o acesso ao banco a `src/server/repositories` e `src/db`, `foundOrNotFound` para o 404 e o utilitário de dois leitores. Guia: [data-access.md](../architecture/data-access.md).
+Itens 1, 3, 4 e 5 implementados como fundação: `ownedBy` e o repositório de exemplo (`sessions`), que obtém o próprio cliente; as regras de lint que restringem o acesso ao banco (e à instância do Better Auth, cujo adaptador não tem escopo de dono) a `src/server/repositories`, `src/db` e `src/server/auth`; `foundOrNotFound` para o 404; e o utilitário de dois leitores. Guia: [data-access.md](../architecture/data-access.md).
 
 **Spike do item 6** (`tests/integration/rls-spike.test.ts`, Postgres 17 local, papel `app`, `pg` `Pool` com uma única conexão para simular a reutilização do pool):
 
@@ -43,6 +43,8 @@ Itens 1, 3, 4 e 5 implementados como fundação: `ownedBy` e o repositório de e
 | `set_config(..., false)` (de sessão) | **Vaza** para a próxima requisição na mesma conexão. Proibido. |
 | Pooler do Neon (PgBouncer em modo transação) | Pela documentação do Neon (Context7, `/websites/neon`), `SET`/`RESET` de sessão não são suportados, mas o que é local à transação funciona; o padrão acima é o compatível. Não testado contra o Neon (os testes de integração só rodam em host local). |
 | Limite | RLS protege contra um filtro de dono esquecido, não contra um servidor comprometido: o `app` define o dono que quiser. O `userId` continua vindo só do `requireUser()`. |
+
+**Cuidados se adotado:** views criadas pelo `migrator` ignoram o RLS para o `app`, a menos que usem `security_invoker = true`, e funções `SECURITY DEFINER` também; ambas ficam proibidas nas tabelas de conteúdo sem revisão. A falha fechada depende de `owner_id` ser `text`, como o `user.id` do Better Auth: com uma coluna `uuid`, a política precisaria de `nullif(current_setting('app.user_id', true), '')::uuid`, para que o valor vazio não vire erro de conversão.
 
 **Custos:** cada operação de repositório passa a rodar numa transação com um `set_config` (mais três idas ao banco: `BEGIN`, `set_config`, `COMMIT`), o que pesa com a latência até o Neon; políticas em todas as tabelas de conteúdo; o `migrator` (dono das tabelas) ignora RLS, a menos que se use `FORCE ROW LEVEL SECURITY`; as tabelas do Better Auth ficam fora, porque o adaptador dele não define o dono.
 
