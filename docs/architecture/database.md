@@ -91,7 +91,7 @@ CREATE POLICY "owner_only" ON "book" AS PERMISSIVE FOR ALL TO "app"
 **RLS no pooler do Neon.** Os testes de integração só rodam em host local; para provar o comportamento no pooler do Neon, rode `scripts/check-rls-pooler.ts` contra a connection string **pooled** (`-pooler`) da branch `preview` (pode ser a do `neondb_owner`, copiada do console do Neon; o script não cria nem lê tabela):
 
 ```bash
-read -rs RLS_CHECK_DATABASE_URL && export RLS_CHECK_DATABASE_URL && node scripts/check-rls-pooler.ts; unset RLS_CHECK_DATABASE_URL
+printf 'Pooled URL: ' && read -rs RLS_CHECK_DATABASE_URL && echo && export RLS_CHECK_DATABASE_URL && node scripts/check-rls-pooler.ts; unset RLS_CHECK_DATABASE_URL
 ```
 
 Ele roda 1000 transações em 5 conexões paralelas, cada uma define um dono, confere que ele vale dentro da transação e que não aparece na consulta seguinte (1 em cada 10 termina em `ROLLBACK`), e mede a latência de `select 1` sozinho e embrulhado como no `withOwner`. Recusa host que não seja `-pooler` (ou local, para a medição de referência) e nunca imprime a URL. Resultado registrado no adendo da US-033 do ADR-0008.

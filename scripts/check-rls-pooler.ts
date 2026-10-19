@@ -8,7 +8,7 @@ import { Pool, type PoolClient } from "pg";
 // mode, that the owner withOwner sets in one transaction never reaches the next one, and measures
 // what withOwner costs per operation. It creates nothing and reads no table.
 //
-//   read -rs RLS_CHECK_DATABASE_URL && export RLS_CHECK_DATABASE_URL
+//   printf 'Pooled URL: ' && read -rs RLS_CHECK_DATABASE_URL && echo && export RLS_CHECK_DATABASE_URL
 //   node scripts/check-rls-pooler.ts
 //
 // RLS_CHECK_DATABASE_URL: a pooled (-pooler) connection string of the Preview branch, or a local
@@ -151,13 +151,27 @@ async function cost(pool: Pool) {
 
 async function main(): Promise<void> {
   const { url, target } = connectionString();
-  const pool = new Pool({ connectionString: url, max: PARALLEL });
+  // Fail instead of hanging when the host is unreachable or a query stalls (Neon may be waking up
+  // a suspended compute, hence the generous connect timeout).
+  const pool = new Pool({
+    connectionString: url,
+    max: PARALLEL,
+    connectionTimeoutMillis: 20_000,
+    query_timeout: 15_000,
+  });
   // Log only the error code: messages may carry connection details.
   pool.on("error", (error: Error & { code?: string }) => {
     console.error("pool error", { code: error.code });
   });
   try {
+    console.log(`connecting (${target})…`);
+    const probe = await pool.connect();
+    probe.release();
+    console.log(
+      `leak check: ${ROUNDS * PARALLEL} transactions on ${PARALLEL} connections…`,
+    );
     const leak = await leakCheck(pool);
+    console.log(`latency: ${SAMPLES} samples…`);
     const latency = await cost(pool);
     console.log(
       JSON.stringify(
