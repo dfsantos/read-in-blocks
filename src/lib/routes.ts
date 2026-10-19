@@ -27,17 +27,27 @@ export function isPublicPath(pathname: string): boolean {
   return withoutLocale(pathname) === LOGIN_PATH;
 }
 
+// A path that stays on this site wherever a browser resolves it: one leading `/`, never `//` or a
+// backslash (both read as another host), no control characters.
+function isSameSitePath(path: string): boolean {
+  return (
+    path.startsWith("/") &&
+    !path.startsWith("//") &&
+    !/[\\\u0000-\u001f\u007f]/.test(path)
+  );
+}
+
 // The `?next=` value made safe to redirect to: an absolute path on this site, or undefined.
 // Refuses other origins (`//host`, `\\host`, `https:`), control characters, the login page itself
-// (no loop) and API routes, so the value can never become an open redirect.
+// (no loop) and API routes, so the value can never become an open redirect. The checks run again
+// on the normalized path: dot segments can turn `/..//host` into `//host`. Percent-encoding in the
+// path is refused (it could hide `.`, `/` or `api`; Better Auth refuses it in `callbackURL` too),
+// and the `#hash` is dropped (Better Auth refuses it as well).
 export function safeNextPath(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length > MAX_NEXT_LENGTH) {
     return undefined;
   }
-  if (!value.startsWith("/") || /[\\\u0000-\u001f\u007f]/.test(value)) {
-    return undefined;
-  }
-  if (value.startsWith("//")) return undefined;
+  if (!isSameSitePath(value)) return undefined;
 
   let url: URL;
   try {
@@ -46,12 +56,15 @@ export function safeNextPath(value: unknown): string | undefined {
     return undefined;
   }
   if (url.origin !== PLACEHOLDER_ORIGIN) return undefined;
+  if (!isSameSitePath(url.pathname) || url.pathname.includes("%")) {
+    return undefined;
+  }
 
   const pathname = withoutLocale(url.pathname);
   if (isPublicPath(pathname)) return undefined;
   if (pathname === "/api" || pathname.startsWith("/api/")) return undefined;
 
-  return `${url.pathname}${url.search}${url.hash}`;
+  return `${url.pathname}${url.search}`;
 }
 
 // The login URL for an anonymous visitor of `pathname` + `search`, remembering the destination.

@@ -100,7 +100,10 @@ test.describe("signed-in reader", () => {
   }) => {
     await signIn(context);
     await page.goto("/login?next=%2F%2Fevil.example%2F");
+    await expect(page).toHaveURL("/");
 
+    // Dot segments that normalize to `//evil.example` (security review of US-005).
+    await page.goto("/login?next=%2F..%2F%2Fevil.example");
     await expect(page).toHaveURL("/");
   });
 

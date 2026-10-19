@@ -15,10 +15,10 @@ describe("isPublicPath", () => {
 });
 
 describe("safeNextPath", () => {
-  it("keeps paths on this site, with query and hash", () => {
+  it("keeps paths on this site, with the query", () => {
     expect(safeNextPath("/")).toBe("/");
     expect(safeNextPath("/books/1")).toBe("/books/1");
-    expect(safeNextPath("/books?tab=notes#n1")).toBe("/books?tab=notes#n1");
+    expect(safeNextPath("/books?tab=notes")).toBe("/books?tab=notes");
     expect(safeNextPath("/pt-BR/books")).toBe("/pt-BR/books");
   });
 
@@ -38,6 +38,15 @@ describe("safeNextPath", () => {
     ["API root", "/api"],
     ["empty", ""],
     ["too long", `/${"a".repeat(2048)}`],
+    // Dot segments that normalize to `//host` (security review of US-005).
+    ["dot-dot then double slash", "/..//evil.example"],
+    ["encoded dot-dot then double slash", "/%2e%2e//evil.example"],
+    ["dot then double slash", "/.//evil.example"],
+    ["segment, dot-dot, double slash", "/a/..//evil.example"],
+    ["locale, dot-dot, double slash", "/pt-BR/..//evil.example"],
+    ["encoded slash", "/%2f%2fevil.example"],
+    ["encoded backslash", "/%5cevil.example"],
+    ["encoded API route", "/%61pi/auth/get-session"],
   ])("refuses %s", (_, value) => {
     expect(safeNextPath(value)).toBeUndefined();
   });
@@ -46,6 +55,10 @@ describe("safeNextPath", () => {
     expect(safeNextPath(undefined)).toBeUndefined();
     expect(safeNextPath(["/books", "/other"])).toBeUndefined();
     expect(safeNextPath(42)).toBeUndefined();
+  });
+
+  it("drops the hash, which Better Auth refuses in callbackURL", () => {
+    expect(safeNextPath("/books?tab=notes#n1")).toBe("/books?tab=notes");
   });
 
   it("normalizes dot segments without leaving the site", () => {
