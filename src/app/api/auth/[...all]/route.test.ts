@@ -51,4 +51,26 @@ describe("/api/auth/* (US-028)", () => {
     expect(read.headers.get("cache-control")).toBe("private, no-store");
     expect(write.headers.get("cache-control")).toBe("private, no-store");
   });
+
+  it.each([
+    ["GET", "/api/auth/random-path"],
+    ["GET", "/api/auth/sign-in/social"],
+    ["GET", "/api/auth/get-session/"],
+    ["POST", "/api/auth/sign-out"],
+    ["POST", "/api/auth/get-session"],
+    ["POST", `/api/auth/${"x".repeat(4000)}`],
+  ])(
+    "answers %s %s with 404 without calling Better Auth",
+    async (method, path) => {
+      const request = new Request(`${ORIGIN}${path}`, {
+        method,
+        headers: { origin: ORIGIN, "content-length": "0" },
+      });
+      const response = await (method === "GET" ? GET : POST)(request);
+
+      expect(response.status).toBe(404);
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(handler).not.toHaveBeenCalled();
+    },
+  );
 });
