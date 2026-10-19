@@ -40,6 +40,26 @@ const DB_REEXPORT = {
     "Never re-export database modules: callers would bypass the repositories.",
 };
 
+// withOwner chooses the RLS owner and hands over a transaction on the whole schema (US-033): it
+// belongs to the repositories, which take the owner from requireUser().
+const WITH_OWNER_PATH = "(^|/)with-owner(\\.[cm]?[jt]sx?)?$";
+
+const WITH_OWNER = {
+  regex: WITH_OWNER_PATH,
+  message:
+    "withOwner is reachable only from src/server/repositories (ADR-0008, US-033).",
+};
+
+const WITH_OWNER_REEXPORT_ALL = {
+  selector: `ExportAllDeclaration[source.value=/${WITH_OWNER_PATH.replaceAll("/", "\\/")}/]`,
+  message: "Never re-export withOwner: callers could choose the RLS owner.",
+};
+
+const WITH_OWNER_REEXPORT = {
+  selector: `ExportNamedDeclaration[source.value=/${WITH_OWNER_PATH.replaceAll("/", "\\/")}/]`,
+  message: "Never re-export withOwner: callers could choose the RLS owner.",
+};
+
 const AUTH_CONTEXT = {
   selector: "MemberExpression[property.name='$context']",
   message:
@@ -57,7 +77,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [DB_MODULES, DB_DRIVERS, AUTH_INSTANCE] },
+        { patterns: [DB_MODULES, DB_DRIVERS, AUTH_INSTANCE, WITH_OWNER] },
       ],
       "no-restricted-syntax": [
         "error",
@@ -76,7 +96,26 @@ const eslintConfig = defineConfig([
     files: ["src/server/repositories/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [AUTH_INSTANCE] }],
+      "no-restricted-syntax": [
+        "error",
+        DB_REEXPORT_ALL,
+        DB_REEXPORT,
+        AUTH_CONTEXT,
+        WITH_OWNER_REEXPORT_ALL,
+        WITH_OWNER_REEXPORT,
+      ],
     },
+  },
+  // A query left running after withOwner returns would run outside its transaction (US-033).
+  {
+    files: ["src/server/repositories/**/*.{ts,mts,cts}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: { "@typescript-eslint/no-floating-promises": "error" },
   },
   // Code that drives Better Auth (route, sign-out action, session guard) may use its instance,
   // but not the database.
@@ -89,7 +128,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [DB_MODULES, DB_DRIVERS] },
+        { patterns: [DB_MODULES, DB_DRIVERS, WITH_OWNER] },
       ],
       "no-restricted-syntax": ["error", DB_REEXPORT_ALL, DB_REEXPORT],
     },
@@ -105,7 +144,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [DB_DRIVERS, AUTH_INSTANCE] },
+        { patterns: [DB_DRIVERS, AUTH_INSTANCE, WITH_OWNER] },
       ],
     },
   },

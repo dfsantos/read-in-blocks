@@ -9,7 +9,7 @@ import { getDb, type Database } from "@/db/client";
 // The owner is set for this transaction only (set_config's third argument). Neon's pooler runs in
 // transaction mode, so a session-level setting would survive on the pooled connection and hand the
 // next request someone else's rows. Nothing else in the code may set app.user_id (architecture test
-// in owner-guc.test.ts), and only repositories may import this module.
+// in owner-setting.test.ts), and only repositories may import this module.
 
 export type OwnerTransaction = Parameters<
   Parameters<Database["transaction"]>[0]

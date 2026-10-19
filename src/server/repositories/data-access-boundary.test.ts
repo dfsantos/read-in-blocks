@@ -8,6 +8,7 @@ import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
 
 import { getDb } from "@/db/client";
+import { withOwner } from "@/server/repositories/with-owner";
 
 // Architecture test for the data-access boundary (US-006, ADR-0008): the lint rules in
 // eslint.config.mjs must refuse database access outside src/db and src/server/repositories,
@@ -19,6 +20,8 @@ const SOURCE = /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/;
 
 async function boundaryErrors(code: string, filePath: string) {
   const [result] = await eslint.lintText(code, { filePath });
+  // A parse error (e.g. typed linting on a path outside the project) would hide every rule.
+  expect(result.messages.filter((message) => message.fatal)).toEqual([]);
   return result.messages
     .filter(
       (message) =>
@@ -57,6 +60,9 @@ const forbiddenImports = [
   'import postgres from "postgres";',
   'import { neon } from "@neondatabase/serverless";',
   'import { sql } from "@vercel/postgres";',
+  // withOwner chooses the RLS owner (US-033): repositories only.
+  'import { withOwner } from "@/server/repositories/with-owner";',
+  'import { withOwner } from "../repositories/with-owner.js";',
 ];
 
 const authInstanceUses = [
@@ -83,7 +89,7 @@ describe("data-access boundary", () => {
     );
   });
 
-  it.each(["src/server/repositories/books.ts", "src/db/health.ts"])(
+  it.each(["src/server/repositories/sessions.ts", "src/db/health.ts"])(
     "allows the data layer to import the database (%s)",
     async (filePath) => {
       const imports = forbiddenImports.filter(
@@ -101,16 +107,49 @@ describe("data-access boundary", () => {
           'export * from "@/db/schema";',
           'export * as tables from "../../db/auth-schema";',
         ].join("\n"),
-        "src/server/repositories/books.ts",
+        "src/server/repositories/sessions.ts",
       ),
     ).toEqual([1, 2, 3]);
+  });
+
+  it("refuses repositories that re-export withOwner", async () => {
+    expect(
+      await boundaryErrors(
+        [
+          'export { withOwner } from "./with-owner";',
+          'export * from "./with-owner.ts";',
+        ].join("\n"),
+        "src/server/repositories/sessions.ts",
+      ),
+    ).toEqual([1, 2]);
+  });
+
+  // A query left running after withOwner returns would run outside its transaction (US-033).
+  it("refuses floating promises in repositories", async () => {
+    const [result] = await eslint.lintText(
+      [
+        "async function query(): Promise<void> {}",
+        "export async function run(): Promise<void> {",
+        "  query();",
+        "}",
+      ].join("\n"),
+      { filePath: "src/server/repositories/sessions.ts" },
+    );
+    expect(
+      result.messages
+        .filter(
+          (message) =>
+            message.ruleId === "@typescript-eslint/no-floating-promises",
+        )
+        .map((message) => message.line),
+    ).toEqual([3]);
   });
 
   it("refuses the auth instance in repositories", async () => {
     expect(
       await boundaryErrors(
         authInstanceUses.join("\n"),
-        "src/server/repositories/books.ts",
+        "src/server/repositories/sessions.ts",
       ),
     ).toEqual([1, 2, 3, 4]);
   });
@@ -127,6 +166,12 @@ describe("data-access boundary", () => {
       ).toEqual([]);
       expect(
         await boundaryErrors('import { getDb } from "@/db/client";', filePath),
+      ).toEqual([1]);
+      expect(
+        await boundaryErrors(
+          'import { withOwner } from "@/server/repositories/with-owner";',
+          filePath,
+        ),
       ).toEqual([1]);
     },
   );
@@ -152,6 +197,12 @@ describe("data-access boundary", () => {
     ).toEqual([]);
     expect(
       await boundaryErrors('import { Pool } from "pg";', filePath),
+    ).toEqual([1]);
+    expect(
+      await boundaryErrors(
+        'import { withOwner } from "@/server/repositories/with-owner";',
+        filePath,
+      ),
     ).toEqual([1]);
     expect(
       await boundaryErrors(
@@ -197,7 +248,7 @@ describe("data-access boundary", () => {
       const allowed = /^(db|server\/repositories)\//;
       const offenders = files.filter((file) => {
         if (allowed.test(relativeToSrc(file))) return false;
-        return /\b(?:import|require)\s*\(\s*(?:\/\*[\s\S]*?\*\/\s*)*["'`][^"'`]*(?:(?:^|\/)db(?:\/|["'`])|drizzle-orm|\bpg\b|\bpostgres\b|@neondatabase|@vercel\/postgres)/.test(
+        return /\b(?:import|require)\s*\(\s*(?:\/\*[\s\S]*?\*\/\s*)*["'`][^"'`]*(?:(?:^|\/)db(?:\/|["'`])|with-owner|drizzle-orm|\bpg\b|\bpostgres\b|@neondatabase|@vercel\/postgres)/.test(
           readFileSync(file, "utf-8"),
         );
       });
@@ -223,7 +274,7 @@ describe("data-access boundary", () => {
 
   // Lint sees `export { getDb }` only with a source; a repository could still import the client
   // and export it under any name. Check what the repositories actually export.
-  it("repositories export no client, database or table", async () => {
+  it("repositories export no client, database, table or withOwner", async () => {
     const repositories = sourceFiles(path.join(srcDir, "server/repositories"))
       .filter((file) => !/\.test\.[cm]?[jt]sx?$/.test(file))
       .map((file) => relativeToSrc(file).replace(SOURCE, ""));
@@ -235,6 +286,8 @@ describe("data-access boundary", () => {
       for (const [name, value] of Object.entries(exports)) {
         if (
           value === getDb ||
+          (value === withOwner &&
+            repository !== "server/repositories/with-owner") ||
           is(value, PgDatabase) ||
           is(value, PgTable) ||
           (typeof value === "object" &&

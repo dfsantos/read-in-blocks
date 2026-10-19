@@ -32,18 +32,26 @@ function files(dir: string): string[] {
 // What a file does with app.user_id that it must not (its controls are the last tests below).
 function ownerSettingViolations(file: string, source: string): string[] {
   const problems: string[] = [];
-  // Whole-line comments (//, /* */ blocks, SQL --) explain the hazards; they do not run.
-  const text = source
-    .split("\n")
-    .filter((line) => !/^\s*(?:\/\/|\/?\*|--)/.test(line))
-    .join("\n");
+  // Comments explain the hazards; they do not run. Strip the comment tokens only, so code after a
+  // closing */ stays. A // right after ':' (a URL) is kept; SQL -- comments only in .sql files.
+  let text = source
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  if (file.endsWith(".sql")) text = text.replace(/--.*$/gm, "");
   // set_config of app.user_id (or of a name computed at runtime, which could be it) that is not
   // local to the transaction: false, a variable, or no third argument. Other settings, such as the
   // migration runner's lock_timeout, are not the owner.
   let ownerSetConfigs = 0;
   for (const match of text.matchAll(/set_config\s*\(([^;]*?)\)/gi)) {
-    const literalName = /^\s*(['"])([^'"]*)\1/.exec(match[1]);
-    if (literalName && literalName[2] !== "app.user_id") continue;
+    // Setting names are case-insensitive; a literal followed by || is a computed name.
+    const literalName = /^\s*(['"])([^'"]*)\1\s*(\|\|)?/.exec(match[1]);
+    if (
+      literalName &&
+      !literalName[3] &&
+      literalName[2].toLowerCase() !== "app.user_id"
+    ) {
+      continue;
+    }
     ownerSetConfigs += 1;
     if (!/,\s*true\s*$/i.test(match[1])) {
       problems.push(`${file}: set_config not local to the transaction`);
@@ -64,15 +72,15 @@ function ownerSettingViolations(file: string, source: string): string[] {
     problems.push(`${file}: switches the database role`);
   }
   // Only the owner setters may set it; migrations and the policy helper may only read it.
-  const mentions = text.match(/app\.user_id/g)?.length ?? 0;
+  const mentions = text.match(/app\.user_id/gi)?.length ?? 0;
   const reads =
-    text.match(/current_setting\s*\(\s*'app\.user_id'/g)?.length ?? 0;
+    text.match(/current_setting\s*\(\s*'app\.user_id'/gi)?.length ?? 0;
   if (!OWNER_SETTERS.has(file) && (mentions > reads || ownerSetConfigs > 0)) {
     problems.push(`${file}: sets the owner outside withOwner`);
   }
   if (
     !file.startsWith("src/server/repositories/") &&
-    /["'][^"']*\/with-owner["']/.test(text)
+    /["'`][^"'`]*\/with-owner(?:\.[cm]?[jt]sx?)?["'`]/.test(text)
   ) {
     problems.push(`${file}: imports withOwner outside the repositories`);
   }
@@ -92,6 +100,17 @@ describe("RLS owner setting", () => {
     expect(problems).toEqual([]);
   });
 
+  // Test files are not scanned (they hold the controls below), so application code must not load
+  // them.
+  it("application code does not import test files", () => {
+    const offenders = [...files("src"), ...files("scripts")].filter((file) =>
+      /\b(?:from|import|require)\s*\(?\s*["'`][^"'`]*\.test(?:\.[cm]?[jt]sx?)?["'`]/.test(
+        readFileSync(path.join(root, file), "utf-8"),
+      ),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it("withOwner sets the owner with set_config(..., true)", () => {
     expect(readFileSync(path.join(root, WITH_OWNER), "utf-8")).toMatch(
       /set_config\('app\.user_id', \$\{userId\}, true\)/,
@@ -103,6 +122,12 @@ describe("RLS owner setting", () => {
     ["sql`select set_config('app.user_id', ${id}, false)`", "not local"],
     ["sql`select set_config('app.user_id', ${id})`", "not local"],
     ["sql`select set_config(${name}, ${id}, ${local})`", "not local"],
+    ["sql`select set_config('App.User_Id', ${id}, false)`", "not local"],
+    ["sql`select set_config('app.' || 'user_id', ${id}, false)`", "not local"],
+    [
+      "/* note */ sql`select set_config('app.user_id', ${id}, false)`",
+      "not local",
+    ],
     ["sql`set app.user_id = ${id}`", "session-level"],
     ["sql`SET SESSION app.user_id TO 'x'`", "session-level"],
     ['sql`set "app.user_id" = 1`', "session-level"],
@@ -115,6 +140,14 @@ describe("RLS owner setting", () => {
       'import { withOwner } from "@/server/repositories/with-owner";',
       "imports withOwner outside",
     ],
+    [
+      'import { withOwner } from "@/server/repositories/with-owner.js";',
+      "imports withOwner outside",
+    ],
+    [
+      "const { withOwner } = await import(`@/server/repositories/with-owner`);",
+      "imports withOwner outside",
+    ],
   ])("refuses %s outside withOwner", (code, problem) => {
     expect(
       ownerSettingViolations("src/server/actions/books.ts", code).join("\n"),
@@ -124,7 +157,7 @@ describe("RLS owner setting", () => {
   it.each([
     [
       "src/db/migrations/0004_create_book.sql",
-      `CREATE POLICY "owner_only" ON "book" AS PERMISSIVE FOR ALL TO "app" USING (owner_id = current_setting('app.user_id', true)) WITH CHECK (owner_id = current_setting('app.user_id', true));`,
+      `CREATE POLICY "owner_only" ON "book" AS PERMISSIVE FOR ALL TO "app" USING (owner_id = nullif(current_setting('app.user_id', true), '')) WITH CHECK (owner_id = nullif(current_setting('app.user_id', true), ''));`,
     ],
     [
       "src/server/repositories/books.ts",
