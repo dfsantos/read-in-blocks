@@ -16,7 +16,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 | M1 | [US-032](epics/E0-foundation.md) | Falsos positivos do gate do Context7 em comandos de leitura | — | P | US-031 | — | Aprovada | 2026-10-17 |
 | M2 | [US-004](epics/E1-authentication-and-privacy.md) | Entrar com Google | RF-010 | G | US-003 | — | Aprovada | 2026-10-19 |
 | M2 | [US-005](epics/E1-authentication-and-privacy.md) | Sessão, sair e rotas protegidas | RF-010 | M | US-004 | — | Aprovada | 2026-10-19 |
-| M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Pendente | |
+| M2 | [US-006](epics/E1-authentication-and-privacy.md) | Fundação do isolamento de dados | RF-010 | M | US-005 | — | Em desenvolvimento | |
 | M2 | [US-028](epics/E1-authentication-and-privacy.md) | Cabeçalhos de segurança e proteção de requisições | RF-010 | M | US-005 | — | Pendente | |
 | M3 | [US-007](epics/E2-library-and-book-structure.md) | Cadastrar um livro | RF-001 | M | US-006 | — | Pendente | |
 | M3 | [US-008](epics/E2-library-and-book-structure.md) | Biblioteca pessoal | RF-009 | P | US-007 | — | Pendente | |
@@ -43,7 +43,7 @@ Só uma história fica em *Em desenvolvimento* ou *Em validação* por vez.
 ## Resumo
 
 - 33 histórias (1 de aprovação, 31 de entrega, 1 de lançamento); 4 delas Desejáveis opcionais (US-017, US-022, US-023, US-024).
-- **Próxima ação:** US-000 a US-003 e US-029 a US-031 aprovadas e mescladas em `main` (a última no PR #19, em 2026-10-17); produção saudável (`/api/health` → `ok`). US-032 (falsos positivos do gate) aprovada e mesclada (PR #21); correção do `setup-database.sh` para o Neon mesclada (PR #22). US-004 (Entrar com Google) aprovada em 2026-10-19 e mesclada (PR #23); ADR-0016 aceito. US-005 (sessão, sair e rotas protegidas) aprovada em 2026-10-19 e mesclada (PR #25). Pendente com o responsável (arquivo protegido): aplicar no hook do `require-context7.py` em `.claude/settings.json` o comando `python3 -I …` e `"onFailure": "block"`.
+- **Próxima ação:** US-000 a US-003 e US-029 a US-031 aprovadas e mescladas em `main` (a última no PR #19, em 2026-10-17); produção saudável (`/api/health` → `ok`). US-032 (falsos positivos do gate) aprovada e mesclada (PR #21); correção do `setup-database.sh` para o Neon mesclada (PR #22). US-004 (Entrar com Google) aprovada em 2026-10-19 e mesclada (PR #23); ADR-0016 aceito. US-005 (sessão, sair e rotas protegidas) aprovada em 2026-10-19 e mesclada (PR #25). US-006 (fundação do isolamento de dados) **em desenvolvimento** desde 2026-10-19 (branch `story/US-006-data-isolation-foundation`). Pendente com o responsável (arquivo protegido): aplicar no hook do `require-context7.py` em `.claude/settings.json` o comando `python3 -I …` e `"onFailure": "block"`.
 - **Desvio de processo registrado:** US-029, US-030 e US-031 ficaram em validação ao mesmo tempo e foram mescladas num único PR (#19), contra as regras de uma história por vez e de um PR por história.
 
 ## Registro de aprovações
