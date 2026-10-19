@@ -55,3 +55,57 @@ describe("proxy", () => {
     expect(response.headers.get("location")).toContain("/login");
   });
 });
+
+describe("proxy security headers (US-028)", () => {
+  const cases = [
+    ["a redirect to login", request("/books/1")],
+    ["the login page", request("/login")],
+    [
+      "a page with a session",
+      request("/books/1", "better-auth.session_token=x"),
+    ],
+  ] as const;
+
+  it.each(cases)("sets a nonce CSP and no-store on %s", (_, incoming) => {
+    const response = proxy(incoming);
+    const csp = response.headers.get("content-security-policy") ?? "";
+
+    expect(csp).toMatch(
+      /script-src 'self' 'nonce-[A-Za-z0-9+/]{22}==' 'strict-dynamic'/,
+    );
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("hands the same nonce to the page through the request headers", () => {
+    const incoming = request("/login");
+    const response = proxy(incoming);
+    const nonce = incoming.headers.get("x-nonce");
+
+    expect(nonce).toBeTruthy();
+    expect(incoming.headers.get("content-security-policy")).toBe(
+      response.headers.get("content-security-policy"),
+    );
+    expect(response.headers.get("content-security-policy")).toContain(
+      `'nonce-${nonce}'`,
+    );
+  });
+
+  it("uses a new nonce on every request", () => {
+    const csp = () =>
+      proxy(request("/login")).headers.get("content-security-policy");
+
+    expect(csp()).not.toBe(csp());
+  });
+
+  it("upgrades insecure requests only on https", () => {
+    const secure = proxy(new NextRequest("https://example.test/login"));
+
+    expect(secure.headers.get("content-security-policy")).toContain(
+      "upgrade-insecure-requests",
+    );
+    expect(
+      proxy(request("/login")).headers.get("content-security-policy"),
+    ).not.toContain("upgrade-insecure-requests");
+  });
+});
