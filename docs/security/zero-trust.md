@@ -43,7 +43,7 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 
 ### 3. Assumir violação
 
-1. **Raio de impacto pequeno:** `owner_id` em toda tabela de conteúdo; RLS do Postgres como segunda barreira: spike da US-006 viável (por transação, com `set_config(..., true)`); adotado (D-14) na US-033, antes da primeira tabela de conteúdo ([ADR-0008, adendo](../adr/0008-data-isolation-per-user.md)).
+1. **Raio de impacto pequeno:** `owner_id` em toda tabela de conteúdo; RLS do Postgres como segunda barreira (US-033): toda tabela de conteúdo tem RLS e a política de dono (`ownerPolicy()`), e os repositórios definem o dono por transação com `withOwner` ([ADR-0008, adendos](../adr/0008-data-isolation-per-user.md); [database.md](../architecture/database.md#rls-nas-tabelas-de-conteúdo)).
 2. **Sessões:** curtas, com rotação e revogação no servidor; logout invalida a sessão.
 3. **Logs/auditoria:** registrar eventos de segurança (login, falha, exclusão, negação de acesso) com `userId` e carimbo de tempo, **nunca** conteúdo de livros/anotações, tokens ou e-mails em claro além do necessário.
 4. **Rate limiting** em login e ações de escrita (Vercel Firewall/WAF); limites de tamanho de payload.
@@ -61,7 +61,7 @@ Marcar no PR; “N/A” precisa de justificativa de uma linha.
 - [ ] Conteúdo de usuário renderizado sem HTML bruto; sanitização aplicada quando houver HTML.
 - [ ] Respostas de erro não revelam existência de recursos de terceiros nem detalhes internos.
 - [ ] Novas dependências justificadas (necessidade, manutenção, licença) e com lockfile atualizado.
-- [ ] Mudanças de schema: coluna `owner_id` presente e coberta pelos testes de isolamento.
+- [ ] Mudanças de schema: coluna `owner_id` presente e coberta pelos testes de isolamento; tabela de conteúdo com RLS e `ownerPolicy()` (teste de catálogo `tests/integration/rls-catalog.test.ts`).
 - [ ] `.env.example` atualizado, sem valores reais.
 
 ## Revisão

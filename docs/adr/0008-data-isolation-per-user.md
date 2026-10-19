@@ -32,7 +32,7 @@ Defesa em camadas:
 
 Itens 1, 3, 4 e 5 implementados como fundação: `ownedBy` e o repositório de exemplo (`sessions`), que obtém o próprio cliente; as regras de lint que restringem o acesso ao banco (e à instância do Better Auth, cujo adaptador não tem escopo de dono) a `src/server/repositories`, `src/db` e `src/server/auth`; `foundOrNotFound` para o 404; e o utilitário de dois leitores. Guia: [data-access.md](../architecture/data-access.md).
 
-**Spike do item 6** (`tests/integration/rls-spike.test.ts`, Postgres 17 local, papel `app`, `pg` `Pool` com uma única conexão para simular a reutilização do pool):
+**Spike do item 6** (`tests/integration/rls-spike.test.ts`, substituído na US-033 por `rls.test.ts`; Postgres 17 local, papel `app`, `pg` `Pool` com uma única conexão para simular a reutilização do pool):
 
 | Pergunta | Resultado |
 |---|---|
@@ -49,3 +49,21 @@ Itens 1, 3, 4 e 5 implementados como fundação: `ownedBy` e o repositório de e
 **Custos:** cada operação de repositório passa a rodar numa transação com um `set_config` (mais três idas ao banco: `BEGIN`, `set_config`, `COMMIT`), o que pesa com a latência até o Neon; políticas em todas as tabelas de conteúdo; o `migrator` (dono das tabelas) ignora RLS, a menos que se use `FORCE ROW LEVEL SECURITY`; as tabelas do Better Auth ficam fora, porque o adaptador dele não define o dono.
 
 **Recomendação:** viável e compatível com a stack; adotar nas tabelas de conteúdo (`book`, `book_node`, `note`) como **história própria**, com um helper `withOwner(userId, fn)` em `src/server/repositories` que todo repositório use, e as políticas criadas por migração. **Decisão (D-14, 2026-10-19):** adotar, na **US-033**, antes da US-007, de modo que `book` já nasça com RLS. Até lá, o isolamento continua garantido pelos itens 1 a 5.
+
+## Adendo (US-033, 2026-10-19) — RLS adotado
+
+Item 6 implementado como segunda barreira, junto com os itens 1 a 5 (nada deles foi removido):
+
+- **Helper:** `withOwner(userId, fn, db)` em `src/server/repositories/with-owner.ts`: transação + `set_config('app.user_id', userId, true)`; recusa `userId` vazio. Todo repositório de tabela de conteúdo roda por ele **e** filtra com `ownedBy`. Só repositórios o importam e nenhum outro código define `app.user_id` (`owner-setting.test.ts`).
+- **Convenção de migração:** `ownerPolicy()` em `src/db/rls.ts`, declarado no `pgTable`; o drizzle-kit gera `ENABLE ROW LEVEL SECURITY` e a política `owner_only` (`FOR ALL TO app`, `USING` e `WITH CHECK` em `owner_id = current_setting('app.user_id', true)`). Guia: [database.md](../architecture/database.md#rls-nas-tabelas-de-conteúdo).
+- **Catálogo:** `tests/integration/rls-catalog.test.ts` falha se uma tabela com `owner_id` estiver sem RLS, sem a política do `app` ou com outra política permissiva que o alcance, e se houver view sem `security_invoker`, view materializada ou função `SECURITY DEFINER` fora dos schemas do sistema (mais restrito que "alcança tabela de conteúdo", de propósito).
+- **Comportamento** (`tests/integration/rls.test.ts`, tabela de prova criada pelo SQL que o drizzle-kit gera para a convenção): só as linhas do dono numa consulta sem filtro; sem `withOwner`, nada e `insert` recusado; o dono não sobrevive a `COMMIT`, a erro da aplicação nem a erro de consulta na mesma conexão do pool; mudar o dono e criar linha para outro leitor são recusados.
+
+**Pooler do Neon e custo** (`scripts/check-rls-pooler.ts`: 1000 transações em 5 conexões, latência de `select 1` sozinho e embrulhado como no `withOwner`, 100 amostras após aquecimento):
+
+| Ambiente | Dono vazou para a transação seguinte? | `select 1` (mediana / p95) | Com `withOwner` (mediana / p95) | Custo a mais (mediana) |
+|---|---|---|---|---|
+| Local (Postgres 17 em contêiner, conexão direta) | Não (0 de 1000) | 0,08 / 0,12 ms | 0,31 / 0,60 ms | +0,23 ms |
+| Preview (branch `preview`, host `-pooler`) | *a medir pelo responsável* | — | — | — |
+
+O custo a mais vem das três idas ao banco (`BEGIN`, `set_config`, `COMMIT`); contra o Neon, cada uma custa uma volta de rede da função até o banco. Consultas de uma mesma operação devem ficar dentro de um único `withOwner`.
