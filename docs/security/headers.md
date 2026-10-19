@@ -13,6 +13,7 @@ História: US-028. Política: [zero-trust.md](zero-trust.md) (itens 1.2, 2.6 e 3
 | Sem `X-Powered-By` | `poweredByHeader: false` em `next.config.ts` | Todas as respostas |
 | Origem e tamanho do corpo nas Server Actions | Next.js (checagem de `Origin` × `Host`; `serverActions.bodySizeLimit: "100kb"`) | Toda Server Action |
 | Origem e tamanho do corpo nos Route Handlers de escrita | `guardWrite()` em `src/server/request-guard.ts` | `POST /api/auth/*` e todo handler de escrita futuro |
+| Lista de endpoints do Better Auth | `ENDPOINTS` em `src/app/api/auth/[...all]/route.ts` | `/api/auth/*`: o resto é 404 antes do Better Auth |
 | Rate limit | Regra do Vercel Firewall + `rateLimit` do Better Auth no banco | `/api/auth/*` e `/api/health` |
 
 ## Content Security Policy
@@ -23,7 +24,7 @@ A cada requisição de página, o proxy gera um nonce de 128 bits e monta a pol�
 default-src 'self';
 script-src 'self' 'nonce-<nonce>' 'strict-dynamic';
 style-src 'self' 'nonce-<nonce>';
-img-src 'self' blob: data: https://*.googleusercontent.com;
+img-src 'self' blob: data: https://lh3.googleusercontent.com;
 font-src 'self';
 connect-src 'self';
 object-src 'none';
@@ -40,7 +41,7 @@ upgrade-insecure-requests        (só em https)
 - `'strict-dynamic'` deixa os scripts com nonce carregarem os próprios *chunks*; nenhum outro script roda.
 - Sem `'unsafe-eval'` e sem `'unsafe-inline'`. A exceção é o `next dev`, que precisa de `eval` e injeta estilos sem nonce. O build de produção (`next start`, Preview, produção) nunca recebe as duas.
 - **Toda página precisa ser renderizada dinamicamente**, porque o nonce só existe por requisição. Hoje todas são (leem a sessão). Página estática ou ISR não recebe o nonce e fica sem JavaScript.
-- Fotos de perfil do Google (`*.googleusercontent.com`) são a única origem externa. Foto de outra origem não carrega e o menu mostra as iniciais.
+- Fotos de perfil do Google (`lh3.googleusercontent.com`) são a única origem externa. Só esse host: o resto de `googleusercontent.com` serve conteúdo de terceiros, o que daria a um XSS um canal de saída. Foto de outra origem não carrega e o menu mostra as iniciais.
 
 ### Como liberar uma nova origem
 
@@ -68,6 +69,12 @@ O Next.js não protege Route Handlers. Todo handler que muda estado começa com 
 
 O `POST /api/auth/*` usa o guarda antes do Better Auth, que ainda confere a origem por conta própria.
 
+**Provedor com `form_post`:** um callback OAuth com `response_mode=form_post` chega como POST de outro site e seria recusado pelo `guardWrite()`. O Google usa GET, então nada quebra hoje; um provedor novo assim exige exceção específica para o callback dele.
+
+### Endpoints do Better Auth
+
+O handler de `/api/auth/*` só repassa ao Better Auth os endpoints que o app usa: `GET get-session`, `callback/google`, `error` e `ok`, e `POST sign-in/social`. Qualquer outro caminho recebe 404 sem corpo. Motivo (achado da revisão de segurança): o rate limiter do Better Auth grava uma linha em `rate_limit` por caminho **antes** de saber se a rota existe, então caminhos inventados deixariam um cliente encher a tabela (e uma chave enorme estouraria o índice com erro 500). A saída é uma Server Action que chama a API direto, sem HTTP. Usar outro endpoint do Better Auth no navegador exige incluí-lo em `ENDPOINTS`.
+
 ## Rate limit
 
 Duas camadas, porque nenhuma basta sozinha:
@@ -86,7 +93,8 @@ As Server Actions de escrita ainda não têm limite próprio: as que existem nã
 
 ## Limites conhecidos
 
-- **IP na tabela `rate_limit`:** a chave guarda IP e caminho, um dado pessoal. As linhas não expiram sozinhas (o Better Auth reaproveita a linha da mesma chave). Limpeza periódica fica para a auditoria da US-026.
+- **IP na tabela `rate_limit`:** a chave guarda IP e caminho, um dado pessoal. O Better Auth 1.6.23 apaga as linhas mais antigas que a maior janela (60 s) sempre que alguma chave reinicia a janela, então com tráfego a retenção é de minutos; sem tráfego, as últimas linhas ficam até a próxima requisição. A política de retenção é conferida na auditoria da US-026.
+- **IP não resolvido:** se o `x-forwarded-for` vier vazio ou com mais de um valor, o Better Auth conta todos os clientes num único balde (`no-trusted-ip`), e 10 tentativas por minuto do mundo inteiro bloqueariam o login de todos. Na Vercel o cabeçalho tem um único valor; conferir no Preview que a chave gravada traz o IP real e ficar atento ao aviso "could not determine a client IP" nos logs.
 - **IPv6 por /64:** o Better Auth conta IPv6 por sub-rede /64, o que é o comportamento desejado contra quem troca de endereço dentro da mesma rede.
 - **Página 404 de rota inexistente:** a página padrão do Next (`/_not-found`) é estática e não recebe nonce; como não tem interação, o efeito esperado é só o aviso de CSP no console (não verificado no E2E). Um `notFound()` dentro de página dinâmica (o caso de recurso alheio, `foundOrNotFound`) é renderizado na própria requisição e recebe o nonce.
 - **HSTS sem `preload`:** o domínio é um subdomínio de `vercel.app`; `preload` só faz sentido com domínio próprio (US-027).
