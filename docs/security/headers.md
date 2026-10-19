@@ -72,7 +72,7 @@ O `POST /api/auth/*` usa o guarda antes do Better Auth, que ainda confere a orig
 
 Duas camadas, porque nenhuma basta sozinha:
 
-1. **Vercel Firewall** (fora do repositório, aplicada pelo responsável): uma regra de rate limit por IP para os caminhos que começam com `/api/auth/` **ou** são iguais a `/api/health`, com ação `deny` acima do limite. No plano Hobby cabe uma única regra de rate limit por projeto, com janela de 10 s a 10 min. Para conferir:
+1. **Vercel Firewall** (fora do repositório, aplicada pelo responsável): uma regra de rate limit por IP para os caminhos que começam com `/api/auth/` **ou** são iguais a `/api/health`, respondendo 429 acima do limite (100 requisições por minuto, janela fixa). No plano Hobby cabe uma única regra de rate limit por projeto, com janela de 10 s a 10 min. Para conferir:
 
    ```bash
    pnpm dlx vercel@64.3.1 firewall rules list
