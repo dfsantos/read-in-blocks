@@ -76,25 +76,29 @@ O `pnpm db:generate` gera então, na migração:
 ```sql
 ALTER TABLE "book" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "owner_only" ON "book" AS PERMISSIVE FOR ALL TO "app"
-  USING (owner_id = current_setting('app.user_id', true))
-  WITH CHECK (owner_id = current_setting('app.user_id', true));
+  USING (owner_id = nullif(current_setting('app.user_id', true), ''))
+  WITH CHECK (owner_id = nullif(current_setting('app.user_id', true), ''));
 ```
 
 - O papel `app` entra no schema como `pgRole("app").existing()`: o drizzle-kit não o cria nem o remove (ele vem do `roles.sql`).
-- Sem dono definido, `current_setting(..., true)` é `NULL` ou `''` e não casa com nenhum `owner_id`: nenhuma linha (falha fechada). Isso depende de `owner_id` ser `text`. Com `uuid`, a expressão seria `owner_id = nullif(current_setting('app.user_id', true), '')::uuid`, para que o vazio não vire erro de conversão; exige revisão.
+- Sem dono definido, `current_setting(..., true)` é `NULL`, ou `''` numa conexão do pool que já passou por um `withOwner`; o `nullif` transforma `''` em `NULL`, que não casa com nenhum `owner_id`: nenhuma linha, e nenhuma linha gravada com dono vazio (falha fechada). `owner_id` é `text`, como o `user.id` do Better Auth; com `uuid`, a expressão seria `owner_id = nullif(current_setting('app.user_id', true), '')::uuid` e exige revisão.
 - `WITH CHECK` recusa criar linha para outro dono e mudar o `owner_id` de uma linha para outro leitor.
 - O `migrator`, dono das tabelas, ignora o RLS (sem `FORCE ROW LEVEL SECURITY`); por isso **não** use, sobre dados de conteúdo, view sem `security_invoker = true`, view materializada nem função `SECURITY DEFINER`: elas rodam como o dono.
-- O teste `tests/integration/rls-catalog.test.ts` lê o catálogo do banco migrado e falha se alguma tabela com `owner_id` estiver sem RLS, sem a política de dono do `app` ou com outra política permissiva que alcance o `app`, ou se existir view sem `security_invoker`, view materializada ou função `SECURITY DEFINER` fora dos schemas do sistema.
+- O teste `tests/integration/rls-catalog.test.ts` lê o catálogo do banco migrado e **nega por padrão**: toda tabela que o `app` alcança precisa ter `owner_id` e a política de dono (RLS ligado, nenhuma outra política permissiva que alcance o `app`) ou estar na lista `NOT_CONTENT` do teste (hoje `app_meta` e as tabelas do Better Auth). Tabela nova falha até ser classificada. Ele também falha com view sem `security_invoker`, view materializada, regra (`CREATE RULE`), função `SECURITY DEFINER`, tabela cujo dono seja o `app`, `TRUNCATE`/`REFERENCES`/`TRIGGER` concedidos ao `app` ou `app` com `BYPASSRLS`.
+
+- **Tabela que já existe:** ligar o RLS (`ownerPolicy()`) numa tabela já usada **não** é aditivo: o código anterior, que ainda não usa `withOwner`, passa a ver nada e a ter as escritas recusadas durante o deploy e na branch `preview` compartilhada. Siga expandir → contrair: primeiro um deploy em que todos os repositórios daquela tabela já rodam por `withOwner`; a migração com `ownerPolicy()` só em deploy posterior, com `owner_id` já `NOT NULL` e preenchido (linha sem dono fica invisível ao `app`). Tabelas novas (US-007 em diante) nascem com a política e não têm esse problema.
+- **Referências entre tabelas:** o RLS só olha o `owner_id` da própria linha, e a checagem de FK roda como dono da tabela, ignorando o RLS. Um nó com `owner_id = A` poderia apontar para o livro de B. Por isso, FKs entre tabelas de conteúdo são compostas e incluem o dono: `(owner_id, book_id)` referencia `UNIQUE (owner_id, id)` do livro (idem para `parent_id` e anotações).
+- **Mudar `ownerPolicy()`** altera a política de todas as tabelas de conteúdo na próxima migração gerada, e as expressões esperadas em `rls-catalog.test.ts` mudam junto (o teste compara o texto que o Postgres 17 guarda).
 
 **Dono por transação.** Em runtime, o dono é definido só por `withOwner(userId, fn)` (`src/server/repositories/with-owner.ts`), que abre uma transação e roda `set_config('app.user_id', userId, true)`: o valor some no `COMMIT` ou no `ROLLBACK`. Configuração de sessão (`set_config(..., false)`, `SET` sem `LOCAL`) ficaria na conexão do pool e entregaria as linhas de um leitor ao próximo; o pooler do Neon (PgBouncer em modo transação) também não a suporta. O teste `src/server/repositories/owner-setting.test.ts` impede essas formas no código. Uso nos repositórios: [data-access.md](data-access.md#rls-do-postgres).
 
-**RLS no pooler do Neon.** Os testes de integração só rodam em host local; para provar o comportamento no pooler do Neon, rode `scripts/check-rls-pooler.ts` contra a connection string **pooled** (`-pooler`) da branch `preview` (pode ser a do `neondb_owner`, copiada do console do Neon; o script não cria nem lê tabela):
+**RLS no pooler do Neon.** Os testes de integração só rodam em host local; para provar o comportamento no pooler do Neon, rode `scripts/check-rls-pooler.ts` contra a connection string **pooled** (`-pooler`) da branch `preview`, com `sslmode=verify-full` (troque o `sslmode=require` que o console do Neon mostra). Prefira a do papel `app` (menor privilégio); se só tiver a do `neondb_owner`, o resultado é o mesmo, porque o script não cria nem lê tabela:
 
 ```bash
 printf 'Pooled URL: ' && read -rs RLS_CHECK_DATABASE_URL && echo && export RLS_CHECK_DATABASE_URL && node scripts/check-rls-pooler.ts; unset RLS_CHECK_DATABASE_URL
 ```
 
-Ele roda 1000 transações em 5 conexões paralelas, cada uma define um dono, confere que ele vale dentro da transação e que não aparece na consulta seguinte (1 em cada 10 termina em `ROLLBACK`), e mede a latência de `select 1` sozinho e embrulhado como no `withOwner`. Recusa host que não seja `-pooler` (ou local, para a medição de referência) e nunca imprime a URL. Resultado registrado no adendo da US-033 do ADR-0008.
+Ele roda 1000 transações em 5 conexões paralelas, cada uma define um dono, confere que ele vale dentro da transação e que não aparece na consulta seguinte (1 em cada 10 termina em `ROLLBACK`), e mede a latência de `select 1` sozinho e embrulhado como no `withOwner`. Recusa host que não seja `-pooler` (ou local, para a medição de referência) e conexão sem `sslmode=verify-full`, e nunca imprime a URL nem mensagens do driver (só o código do erro). Resultado registrado no adendo da US-033 do ADR-0008.
 
 ## Configuração na Vercel e no Neon (responsável, D-04)
 

@@ -117,7 +117,8 @@ export async function findBook(userId: string, bookId: string, db: Database = ge
 
 - Use sempre o `tx` recebido, nunca o `db`, dentro do `withOwner`: consulta fora da transação não tem dono e não vê nada (falha fechada).
 - `withOwner` lança erro com `userId` vazio, como `ownedBy`.
-- Só repositórios importam `withOwner`, e só ele define `app.user_id` (teste `owner-setting.test.ts`).
+- Só repositórios importam `withOwner` (regra `no-restricted-imports` em `eslint.config.mjs`, que também proíbe reexportá-lo; o teste de fronteira confere que nenhum repositório o exporta e pega `import()` dinâmico), e só ele define `app.user_id` (teste `owner-setting.test.ts`). Com ele, quem chama escolheria o dono do RLS e receberia uma transação sobre o schema inteiro.
+- Nos repositórios, `@typescript-eslint/no-floating-promises` é erro: uma consulta sem `await` continuaria depois do `COMMIT`, fora da transação do dono.
 - Limite: o RLS pega um filtro esquecido, não um servidor comprometido. O `app` define o dono que quiser; o `userId` continua vindo só do `requireUser()`.
 - As tabelas do Better Auth ficam fora (o adaptador dele não define o dono); o acesso a elas já é restrito a `src/server/auth` e ao repositório de sessões.
 
