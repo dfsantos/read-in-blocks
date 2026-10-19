@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { E2E_ALLOWLIST } from "./tests/e2e/identity";
+
 const port = 3000;
 
 export default defineConfig({
@@ -19,5 +21,8 @@ export default defineConfig({
     url: `http://localhost:${port}`,
     timeout: 180_000,
     reuseExistingServer: !process.env.CI,
+    // The server under test allows only the seeded E2E accounts (US-005: requireUser() re-checks the
+    // allowlist on every request). Overrides AUTH_ALLOWED_EMAILS from the job or .env.local.
+    env: { AUTH_ALLOWED_EMAILS: E2E_ALLOWLIST },
   },
 });
