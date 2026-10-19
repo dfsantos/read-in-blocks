@@ -95,4 +95,4 @@ Bloqueante em toda história que toca dados (também no [template de PR](../../.
 
 ## RLS do Postgres
 
-Avaliado no spike da US-006 (`tests/integration/rls-spike.test.ts`): viável com o driver e o pooler atuais, desde que o dono seja definido **por transação**. Resultado e recomendação no [adendo do ADR-0008](../adr/0008-data-isolation-per-user.md#adendo-us-006-2026-10-19--resultado-do-spike-de-rls); adoção pendente da decisão D-14 ([open-decisions.md](../plan/open-decisions.md)).
+Avaliado no spike da US-006 (`tests/integration/rls-spike.test.ts`): viável com o driver e o pooler atuais, desde que o dono seja definido **por transação**. Resultado no [adendo do ADR-0008](../adr/0008-data-isolation-per-user.md#adendo-us-006-2026-10-19--resultado-do-spike-de-rls). Adotado pela D-14: a US-033 cria o helper `withOwner` e a convenção de políticas, antes da US-007.

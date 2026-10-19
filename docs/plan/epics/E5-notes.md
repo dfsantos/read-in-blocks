@@ -13,7 +13,7 @@ Cobre RF-005, RF-006, RF-007 e RF-009 (retomada). Persona: **Leitor**.
 - [ ] Criar, editar e excluir anotações (texto simples nesta história) com confirmação na exclusão.
 - [ ] Anotações listadas por nó em ordem cronológica, com data de criação/edição.
 - [ ] Indicador de “possui anotações” (contagem) no sumário.
-- [ ] Migração `note` incluída; `owner_id`, `book_id` e `node_id` presentes; excluir um nó/livro remove suas anotações.
+- [ ] Migração `note` incluída, com RLS e política de dono (US-033); `owner_id`, `book_id` e `node_id` presentes; excluir um nó/livro remove suas anotações.
 - [ ] Testes de isolamento para todas as operações.
 
 **Notas técnicas:** ADR-0007 (modelo de anotação), ADR-0008.

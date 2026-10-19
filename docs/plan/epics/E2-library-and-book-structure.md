@@ -6,13 +6,13 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 
 ### US-007 — Cadastrar um livro
 **Como** leitor, **quero** cadastrar um livro, **para** começar a acompanhar sua leitura.
-**Cobre:** RF-001 (livro) · **Tamanho:** M · **Depende de:** US-006
+**Cobre:** RF-001 (livro) · **Tamanho:** M · **Depende de:** US-006, US-033
 
 **Critérios de aceite**
 - [ ] Formulário (shadcn + RHF + Zod) com **título obrigatório** e autor opcional (D-08). Sem campo de capa. A unidade das metas é sempre **páginas** (D-02), então não há seletor de unidade.
 - [ ] Validação com mensagens em pt-BR via i18n.
 - [ ] Livro salvo vinculado ao usuário logado; após salvar, abre a página do livro.
-- [ ] Migração do schema `book` incluída.
+- [ ] Migração do schema `book` incluída, com RLS e política de dono (convenção da US-033); o repositório roda por `withOwner`.
 - [ ] Testes de isolamento: outro usuário não vê nem acessa o livro por URL (404).
 
 **Versões fixadas** — validadas no Context7 em 2026-10-15 (evidências em [stack-versions.md](../../architecture/stack-versions.md))
@@ -62,7 +62,7 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 - [ ] A hierarquia é exibida em lista aninhada simples (a versão interativa é a US-015).
 - [ ] Cadastro ágil para livros longos: adicionar vários capítulos em sequência sem sair do formulário (ex.: colar uma lista de títulos, um por linha). *Mitiga o risco registrado no PRD §9.*
 - [ ] Profundidade máxima respeitada (parte → capítulo → tópico).
-- [ ] Domínio da árvore (validação de hierarquia) com testes unitários; migração `book_node` incluída.
+- [ ] Domínio da árvore (validação de hierarquia) com testes unitários; migração `book_node` incluída, com RLS e política de dono (US-033).
 - [ ] Testes de isolamento para todas as operações de nó.
 
 **Notas técnicas:** ADR-0009.
