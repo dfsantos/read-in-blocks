@@ -1,15 +1,25 @@
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import messages from "../../../messages/pt-BR.json";
-import Home from "./page";
+import messages from "../../../../messages/pt-BR.json";
 
-describe("Home", () => {
-  it("renders the app heading, a button and formatted values", () => {
+const requireUser = vi.hoisted(() => vi.fn());
+vi.mock("@/server/auth/session", () => ({ requireUser }));
+
+import HomePage from "./page";
+
+describe("HomePage", () => {
+  it("requires a signed-in user before rendering", async () => {
+    requireUser.mockRejectedValue(new Error("NEXT_REDIRECT"));
+    await expect(HomePage()).rejects.toThrow("NEXT_REDIRECT");
+  });
+
+  it("renders the app heading, a button and formatted values", async () => {
+    requireUser.mockResolvedValue({ id: "user-1" });
     render(
       <NextIntlClientProvider locale="pt-BR" messages={messages}>
-        <Home />
+        {await HomePage()}
       </NextIntlClientProvider>,
     );
 

@@ -9,13 +9,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { requireUser } from "@/server/auth/session";
 
 // Fixed sample values: they only demonstrate the next-intl formatters.
 const SAMPLE_DATE = new Date(Date.UTC(2026, 9, 15, 12));
 const SAMPLE_NUMBER = 1234.5;
 const SAMPLE_PERCENT = 0.425;
 
-export default function Home() {
+// The page guards itself: the layout's check does not run again on client navigations.
+export default async function HomePage() {
+  await requireUser();
+  return <Home />;
+}
+
+function Home() {
   const t = useTranslations("home");
   const format = useFormatter();
 
