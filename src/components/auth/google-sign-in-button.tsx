@@ -5,13 +5,16 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { LOGIN_PATH } from "@/lib/routes";
 
 // Relative paths only: Better Auth stores them in the OAuth state and redirects to them after
-// the Google callback (`?error=<code>` is appended on failure).
-const CALLBACK_URL = "/";
-const ERROR_CALLBACK_URL = "/login";
+// the Google callback (`?error=<code>` is appended to the error path on failure).
+type Props = Readonly<{
+  // Already checked on the server with safeNextPath (login page).
+  callbackURL: string;
+}>;
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({ callbackURL }: Props) {
   const t = useTranslations("login");
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -21,8 +24,8 @@ export function GoogleSignInButton() {
     setFailed(false);
     const { error } = await authClient.signIn.social({
       provider: "google",
-      callbackURL: CALLBACK_URL,
-      errorCallbackURL: ERROR_CALLBACK_URL,
+      callbackURL,
+      errorCallbackURL: LOGIN_PATH,
     });
     // On success the browser is already leaving for Google; only a failed start returns here.
     if (error) {

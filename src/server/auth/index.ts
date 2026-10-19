@@ -1,10 +1,11 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
+import { nextCookies } from "better-auth/next-js";
 
 import { getDb, type Database } from "../../db/client";
 import * as authSchema from "../../db/auth-schema";
 import { findSignInCandidate } from "../repositories/sign-in";
-import { parseAuthEnv } from "./env";
+import { parseAuthEnv, type AuthEnv } from "./env";
 import { createAuthOptions } from "./options";
 
 // The app's auth instance for a database and an environment; tests build it the same way. The app
@@ -26,13 +27,27 @@ export function createAuth<Plugins extends BetterAuthPlugin[] = []>(
   });
 }
 
-let auth: ReturnType<typeof createAuth> | undefined;
+function createAppAuth() {
+  // nextCookies lets Server Actions (sign-out) set and clear the session cookie; it must stay last.
+  return createAuth(getDb(), process.env, [nextCookies()]);
+}
+
+let auth: ReturnType<typeof createAppAuth> | undefined;
 
 // Built on first use, like the database client, so `next build` and tests that never touch auth
 // need neither the database nor the auth variables. Invalid configuration fails here, closed.
 export function getAuth() {
-  auth ??= createAuth(getDb(), process.env);
+  auth ??= createAppAuth();
   return auth;
+}
+
+let authEnv: AuthEnv | undefined;
+
+// The validated auth environment, parsed once per server instance (requireUser reads the
+// allowlist on every request).
+export function getAuthEnv(): AuthEnv {
+  authEnv ??= parseAuthEnv(process.env);
+  return authEnv;
 }
 
 // Whether Google sign-in is configured in this environment (absent on Preview, ADR-0016).

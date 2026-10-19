@@ -12,10 +12,10 @@ vi.mock("@/lib/auth-client", () => ({
 
 import { GoogleSignInButton } from "./google-sign-in-button";
 
-function renderButton() {
+function renderButton(callbackURL = "/") {
   render(
     <NextIntlClientProvider locale="pt-BR" messages={messages}>
-      <GoogleSignInButton />
+      <GoogleSignInButton callbackURL={callbackURL} />
     </NextIntlClientProvider>,
   );
 }
@@ -41,6 +41,19 @@ describe("GoogleSignInButton", () => {
     expect(
       screen.getByRole("button", { name: "Redirecionando…" }),
     ).toBeDisabled();
+  });
+
+  it("returns to the page the visitor tried to open", async () => {
+    signInSocial.mockReturnValue(new Promise(() => {}));
+    renderButton("/books?tab=notes");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Entrar com Google" }),
+    );
+
+    expect(signInSocial).toHaveBeenCalledWith(
+      expect.objectContaining({ callbackURL: "/books?tab=notes" }),
+    );
   });
 
   it("shows a friendly message when the sign-in cannot start", async () => {

@@ -26,5 +26,17 @@
       "cancelled": "O login foi cancelado. Tente de novo quando quiser.",
       "failed": "Não foi possível concluir o login. Tente de novo em instantes."
     }
+  },
+  "app": {
+    "name": "Read in Blocks",
+    "navLabel": "Navegação principal",
+    "nav": {
+      "library": "Biblioteca"
+    }
+  },
+  "userMenu": {
+    "open": "Abrir o menu de {name}",
+    "signOut": "Sair",
+    "signingOut": "Saindo…"
   }
 }

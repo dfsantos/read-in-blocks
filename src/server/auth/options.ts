@@ -63,9 +63,8 @@ export function createAuthOptions({
           },
         }
       : {},
-    // Fixed 12-hour sessions, never extended: the allowlist is only checked when a session is
-    // created, so every session ends at most 12 hours after its sign-in and the next sign-in checks
-    // the allowlist again (an e-mail removed from it, or a stolen cookie, lasts 12 hours at most).
+    // Fixed 12-hour sessions, never extended: a stolen cookie lasts 12 hours at most. The allowlist
+    // is checked when a session is created and again on every request by requireUser() (US-005).
     // No cookie cache: every request reads the session from the database, so deleting the row
     // revokes it at once.
     session: {

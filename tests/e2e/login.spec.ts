@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { closeTestAuth, E2E_EMAIL, seedSession } from "./auth-helpers";
+import { closeTestAuth, E2E_ACCOUNTS, seedSession } from "./auth-helpers";
 
 test.afterAll(closeTestAuth);
 
@@ -69,7 +69,7 @@ test("a seeded session cookie is accepted by the server", async ({
   const anonymous = await page.request.get("/api/auth/get-session");
   expect(await anonymous.json()).toBeNull();
 
-  const { cookies, cleanUp } = await seedSession();
+  const { cookies, cleanUp } = await seedSession(E2E_ACCOUNTS.login);
   try {
     expect(
       cookies.find((cookie: { name: string }) =>
@@ -81,7 +81,7 @@ test("a seeded session cookie is accepted by the server", async ({
     const signedIn = await page.request.get("/api/auth/get-session");
     expect(signedIn.ok()).toBe(true);
     const body = (await signedIn.json()) as { user: { email: string } };
-    expect(body.user.email).toBe(E2E_EMAIL);
+    expect(body.user.email).toBe(E2E_ACCOUNTS.login);
   } finally {
     await cleanUp();
   }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import {
@@ -12,7 +12,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { routing } from "@/i18n/routing";
+import { LIBRARY_PATH, NEXT_PARAM, safeNextPath } from "@/lib/routes";
 import { isGoogleSignInEnabled } from "@/server/auth";
+import { findSessionUser } from "@/server/auth/session";
 
 import { loginErrorKey } from "./login-error";
 
@@ -38,8 +40,13 @@ export async function generateMetadata({
 export default async function LoginPage({ params, searchParams }: Props) {
   const locale = await resolveLocale(params);
   setRequestLocale(locale);
+  const query = await searchParams;
+  // Where to go after signing in: the page the visitor tried to open, if it is safe, else the library.
+  const destination = safeNextPath(query[NEXT_PARAM]) ?? LIBRARY_PATH;
+  if (await findSessionUser()) redirect(destination);
+
   const t = await getTranslations("login");
-  const errorKey = loginErrorKey((await searchParams).error);
+  const errorKey = loginErrorKey(query.error);
   const googleEnabled = isGoogleSignInEnabled();
 
   return (
@@ -58,7 +65,7 @@ export default async function LoginPage({ params, searchParams }: Props) {
             </p>
           ) : null}
           {googleEnabled ? (
-            <GoogleSignInButton />
+            <GoogleSignInButton callbackURL={destination} />
           ) : (
             <p className="text-muted-foreground text-sm">{t("unavailable")}</p>
           )}
