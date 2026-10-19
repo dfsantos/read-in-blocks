@@ -108,7 +108,7 @@ describe("content-table migration convention", () => {
       /ALTER TABLE "rls_proof_note" ENABLE ROW LEVEL SECURITY/,
     );
     expect(ddl).toMatch(
-      /CREATE POLICY "owner_only" ON "rls_proof_note" AS PERMISSIVE FOR ALL TO "app" USING \(owner_id = current_setting\('app\.user_id', true\)\) WITH CHECK \(owner_id = current_setting\('app\.user_id', true\)\)/,
+      /CREATE POLICY "owner_only" ON "rls_proof_note" AS PERMISSIVE FOR ALL TO "app" USING \(owner_id = nullif\(current_setting\('app\.user_id', true\), ''\)\) WITH CHECK \(owner_id = nullif\(current_setting\('app\.user_id', true\), ''\)\)/,
     );
     expect(ddl).not.toMatch(/CREATE ROLE/i);
   });
@@ -242,6 +242,19 @@ describe("without withOwner (a forgotten helper fails closed)", () => {
         db.insert(proofNote).values({ ownerId: READER_A, body: "x" }),
       ),
     ).toMatch(/row-level security/);
+  });
+
+  // After a withOwner the pooled connection keeps app.user_id = '': nullif keeps it from acting as
+  // an owner, so a row with an empty owner cannot be written and then seen by unscoped queries.
+  it("refuses an empty owner left on the connection by a previous withOwner", async () => {
+    await withOwner(READER_A, (tx) => bodies(tx), db);
+    expect(await currentOwner()).toBe("");
+    expect(
+      await postgresError(
+        db.insert(proofNote).values({ ownerId: "", body: "orphan" }),
+      ),
+    ).toMatch(/row-level security/);
+    expect(await bodies(db)).toEqual([]);
   });
 
   it("the app role cannot switch RLS off", async () => {

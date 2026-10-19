@@ -9,15 +9,20 @@ import { pgPolicy, pgRole } from "drizzle-orm/pg-core";
 //     () => [ownerPolicy()]);
 //
 // The owner is set per transaction by withOwner (src/server/repositories/with-owner.ts). With no
-// owner set, current_setting(..., true) is NULL or '' and matches no owner_id: no rows (fails
-// closed). This only holds while owner_id is text, like Better Auth's user.id; a uuid column would
-// need nullif(current_setting('app.user_id', true), '')::uuid.
+// owner set, current_setting(..., true) is NULL, or '' on a connection a previous withOwner used;
+// nullif turns '' into NULL too, so no owner_id matches: no rows, and no row can be written with an
+// empty owner (fails closed). owner_id is text, like Better Auth's user.id; a uuid column would need
+// nullif(current_setting('app.user_id', true), '')::uuid.
 
 // Created by src/db/bootstrap/roles.sql; drizzle-kit must not create or drop it.
 export const appRole = pgRole("app").existing();
 
-const isOwner = sql.raw(`owner_id = current_setting('app.user_id', true)`);
+const isOwner = sql.raw(
+  `owner_id = nullif(current_setting('app.user_id', true), '')`,
+);
 
+// Changing this policy rewrites it on every content table in the next generated migration, and the
+// expected expressions in tests/integration/rls-catalog.test.ts must change with it.
 export function ownerPolicy() {
   return pgPolicy("owner_only", {
     as: "permissive",
