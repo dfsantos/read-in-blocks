@@ -32,7 +32,7 @@ Defesa em camadas:
 
 Itens 1, 3, 4 e 5 implementados como fundação: `ownedBy` e o repositório de exemplo (`sessions`), que obtém o próprio cliente; as regras de lint que restringem o acesso ao banco (e à instância do Better Auth, cujo adaptador não tem escopo de dono) a `src/server/repositories`, `src/db` e `src/server/auth`; `foundOrNotFound` para o 404; e o utilitário de dois leitores. Guia: [data-access.md](../architecture/data-access.md).
 
-**Spike do item 6** (`tests/integration/rls-spike.test.ts`, Postgres 17 local, papel `app`, `pg` `Pool` com uma única conexão para simular a reutilização do pool):
+**Spike do item 6** (`tests/integration/rls-spike.test.ts`, substituído na US-033 por `rls.test.ts`; Postgres 17 local, papel `app`, `pg` `Pool` com uma única conexão para simular a reutilização do pool):
 
 | Pergunta | Resultado |
 |---|---|
@@ -49,3 +49,26 @@ Itens 1, 3, 4 e 5 implementados como fundação: `ownedBy` e o repositório de e
 **Custos:** cada operação de repositório passa a rodar numa transação com um `set_config` (mais três idas ao banco: `BEGIN`, `set_config`, `COMMIT`), o que pesa com a latência até o Neon; políticas em todas as tabelas de conteúdo; o `migrator` (dono das tabelas) ignora RLS, a menos que se use `FORCE ROW LEVEL SECURITY`; as tabelas do Better Auth ficam fora, porque o adaptador dele não define o dono.
 
 **Recomendação:** viável e compatível com a stack; adotar nas tabelas de conteúdo (`book`, `book_node`, `note`) como **história própria**, com um helper `withOwner(userId, fn)` em `src/server/repositories` que todo repositório use, e as políticas criadas por migração. **Decisão (D-14, 2026-10-19):** adotar, na **US-033**, antes da US-007, de modo que `book` já nasça com RLS. Até lá, o isolamento continua garantido pelos itens 1 a 5.
+
+## Adendo (US-033, 2026-10-19) — RLS adotado
+
+Item 6 implementado como segunda barreira, junto com os itens 1 a 5 (nada deles foi removido):
+
+- **Helper:** `withOwner(userId, fn, db)` em `src/server/repositories/with-owner.ts`: transação + `set_config('app.user_id', userId, true)`; recusa `userId` vazio. Todo repositório de tabela de conteúdo roda por ele **e** filtra com `ownedBy`. Só repositórios o importam e nenhum outro código define `app.user_id` (`owner-setting.test.ts`).
+- **Convenção de migração:** `ownerPolicy()` em `src/db/rls.ts`, declarado no `pgTable`; o drizzle-kit gera `ENABLE ROW LEVEL SECURITY` e a política `owner_only` (`FOR ALL TO app`, `USING` e `WITH CHECK` em `owner_id = nullif(current_setting('app.user_id', true), '')`; o `nullif` vem da revisão de segurança: depois de um `withOwner`, a conexão do pool guarda `''`, e sem ele uma linha com `owner_id = ''` passaria no `WITH CHECK` fora do `withOwner`). Guia: [database.md](../architecture/database.md#rls-nas-tabelas-de-conteúdo).
+- **Catálogo:** `tests/integration/rls-catalog.test.ts` nega por padrão: toda tabela que o `app` alcança tem `owner_id` com RLS e só a política de dono, ou está numa lista explícita de tabelas sem conteúdo do leitor (`app_meta` e Better Auth). Também falha com view sem `security_invoker`, view materializada, regra, função `SECURITY DEFINER`, tabela cujo dono seja o `app`, `TRUNCATE`/`REFERENCES`/`TRIGGER` para o `app` ou `BYPASSRLS` (mais restrito que "alcança tabela de conteúdo", de propósito; endurecido pela revisão de segurança).
+- **Fronteira do helper:** só repositórios importam `withOwner` (regra de lint e teste de fronteira, sem reexportação), e `no-floating-promises` vale nos repositórios.
+- **Comportamento** (`tests/integration/rls.test.ts`, tabela de prova criada pelo SQL que o drizzle-kit gera para a convenção): só as linhas do dono numa consulta sem filtro; sem `withOwner`, nada e `insert` recusado; o dono não sobrevive a `COMMIT`, a erro da aplicação nem a erro de consulta na mesma conexão do pool; mudar o dono e criar linha para outro leitor são recusados.
+
+**Pooler do Neon e custo** (`scripts/check-rls-pooler.ts`: 1000 transações em 5 conexões, latência de `select 1` sozinho e embrulhado como no `withOwner`, 100 amostras após aquecimento):
+
+| Ambiente | Dono vazou para a transação seguinte? | `select 1` (mediana / p95) | Com `withOwner` (mediana / p95) | Custo a mais (mediana) |
+|---|---|---|---|---|
+| Local (Postgres 17 em contêiner, conexão direta) | Não (0 de 1000) | 0,08 / 0,12 ms | 0,31 / 0,60 ms | +0,23 ms |
+| Preview (branch `preview`, host `-pooler`), a partir da máquina do responsável, 2026-10-19 | Não (0 de 1000; nenhuma falha em ver o dono dentro da transação) | 202,72 / 235,35 ms | 818,34 / 921,47 ms | +615,62 ms |
+
+O custo a mais vem das três idas ao banco (`BEGIN`, `set_config`, `COMMIT`), cada uma com uma volta de rede inteira: na medição do Preview, o `select 1` sozinho (~200 ms) é quase só a distância entre a máquina do responsável e a região do Neon, e o `withOwner` custou cerca de 3 voltas a mais (~615 ms). Numa função da Vercel na mesma região do banco, a volta é de poucos milissegundos, então o custo esperado em produção é de 3 voltas nessa escala, **não** medido aqui (a medição saiu de fora da Vercel). Consequências:
+
+- **Pooler validado:** o dono definido numa transação não apareceu na seguinte em nenhuma das 1000 transações, em 5 conexões paralelas pelo PgBouncer em modo transação (critério da US-033).
+- Consultas de uma mesma operação ficam dentro de **um único** `withOwner`; nunca um `withOwner` por consulta.
+- A região das funções da Vercel precisa ser a mesma do banco (já recomendado em [database.md](../architecture/database.md)); se a latência das telas pesar (US-025), reavaliar juntar `BEGIN` e `set_config` numa ida só.

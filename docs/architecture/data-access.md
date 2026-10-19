@@ -88,6 +88,7 @@ O próprio utilitário é testado contra um repositório que ignora o dono (`ses
 Bloqueante em toda história que toca dados (também no [template de PR](../../.github/pull_request_template.md) e no [Definition of Done](../plan/README.md)):
 
 - [ ] Toda consulta tem escopo de dono: nenhuma consulta fora de `src/server/repositories`/`src/db` e todo método de repositório usa `ownedBy` com o `userId` de `requireUser()`.
+- [ ] Tabela de conteúdo nova com `ownerPolicy()` (RLS) e repositório rodando por `withOwner`, usando o `tx` recebido.
 - [ ] Recurso alheio responde igual a recurso inexistente (404 / mesma `errorKey`).
 - [ ] Operações novas registradas no `describeIsolation` do recurso.
 - [ ] Nenhuma exceção nova nas regras de fronteira (nem `eslint-disable`) sem justificativa nesta página.
@@ -95,4 +96,30 @@ Bloqueante em toda história que toca dados (também no [template de PR](../../.
 
 ## RLS do Postgres
 
-Avaliado no spike da US-006 (`tests/integration/rls-spike.test.ts`): viável com o driver e o pooler atuais, desde que o dono seja definido **por transação**. Resultado no [adendo do ADR-0008](../adr/0008-data-isolation-per-user.md#adendo-us-006-2026-10-19--resultado-do-spike-de-rls). Adotado pela D-14: a US-033 cria o helper `withOwner` e a convenção de políticas, antes da US-007.
+Segunda barreira (US-033, D-14): as tabelas de conteúdo têm RLS com a política de dono ([database.md](database.md#rls-nas-tabelas-de-conteúdo)), e o repositório roda suas consultas dentro de `withOwner`, que define o dono só naquela transação. O filtro `ownedBy` continua em toda consulta: as duas barreiras valem juntas.
+
+```ts
+export async function findBook(userId: string, bookId: string, db: Database = getDb()) {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const [row] = await tx
+        .select(bookColumns)
+        .from(schema.book)
+        .where(ownedBy(schema.book.ownerId, userId, eq(schema.book.id, bookId)))
+        .limit(1);
+      return row;
+    },
+    db,
+  );
+}
+```
+
+- Use sempre o `tx` recebido, nunca o `db`, dentro do `withOwner`: consulta fora da transação não tem dono e não vê nada (falha fechada).
+- `withOwner` lança erro com `userId` vazio, como `ownedBy`.
+- Só repositórios importam `withOwner` (regra `no-restricted-imports` em `eslint.config.mjs`, que também proíbe reexportá-lo; o teste de fronteira confere que nenhum repositório o exporta e pega `import()` dinâmico), e só ele define `app.user_id` (teste `owner-setting.test.ts`). Com ele, quem chama escolheria o dono do RLS e receberia uma transação sobre o schema inteiro.
+- Nos repositórios, `@typescript-eslint/no-floating-promises` é erro: uma consulta sem `await` continuaria depois do `COMMIT`, fora da transação do dono.
+- Limite: o RLS pega um filtro esquecido, não um servidor comprometido. O `app` define o dono que quiser; o `userId` continua vindo só do `requireUser()`.
+- As tabelas do Better Auth ficam fora (o adaptador dele não define o dono); o acesso a elas já é restrito a `src/server/auth` e ao repositório de sessões.
+
+Provas: `tests/integration/rls.test.ts` (dono, falha fechada, fim da transação e erro na mesma conexão do pool, mudança de dono recusada), `tests/integration/rls-catalog.test.ts` (catálogo) e o resultado no pooler do Neon no [adendo da US-033 do ADR-0008](../adr/0008-data-isolation-per-user.md).

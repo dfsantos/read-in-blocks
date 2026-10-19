@@ -15,6 +15,7 @@ Política: `docs/security/zero-trust.md`. Marque ou escreva "N/A" com motivo.
 - [ ] Autenticação e autorização no ponto de acesso a dados (não só em middleware/UI)
 - [ ] Acesso a dados somente via `src/server/repositories`, com `userId` da sessão
 - [ ] Toda consulta tem escopo de dono (`ownedBy`); recurso alheio responde igual a inexistente (404) — ver `docs/architecture/data-access.md`
+- [ ] Tabela de conteúdo nova com RLS e `ownerPolicy()`; o repositório roda por `withOwner` (teste de catálogo passando)
 - [ ] Toda entrada validada no servidor com Zod (IDs, enums, tamanhos)
 - [ ] Sem segredos no código/cliente; `.env.example` atualizado
 - [ ] Nenhum HTML de usuário renderizado sem sanitização
