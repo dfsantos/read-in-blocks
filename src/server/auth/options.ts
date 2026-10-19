@@ -74,10 +74,26 @@ export function createAuthOptions({
     },
     // Google's access/refresh/id tokens are stored encrypted with the auth secret, not in clear.
     account: { encryptOAuthTokens: true },
-    // Secure (`__Secure-` prefix) whenever the base URL is https, Better Auth's default: always in
-    // production and Preview, never on http://localhost.
+    // Second barrier behind the Vercel Firewall rule (US-028, docs/security/headers.md). Counters
+    // live in the database so every serverless instance shares them; the in-memory default would
+    // reset per instance. On in production only (Better Auth's default), so tests are not throttled.
+    rateLimit: {
+      storage: "database",
+      window: 60,
+      max: 60,
+      customRules: {
+        // Starting a sign-in and finishing it: a person needs a handful per minute at most.
+        "/sign-in/*": { window: 60, max: 10 },
+        "/callback/*": { window: 60, max: 10 },
+      },
+    },
     advanced: {
+      // Secure (`__Secure-` prefix) whenever the base URL is https, Better Auth's default: always
+      // in production and Preview, never on http://localhost.
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
+      // Client IP for the rate limit. On Vercel this header is set by the platform, which
+      // overwrites whatever the client sent.
+      ipAddress: { ipAddressHeaders: ["x-forwarded-for"] },
     },
     databaseHooks: {
       // Google is used only to sign in; the app never calls Google APIs. Its tokens are dropped
