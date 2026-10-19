@@ -1,6 +1,6 @@
 # ADR-0016 — Sem login com Google nos Preview Deployments
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-19)
 - **Data:** 2026-10-18
 
 ## Contexto
