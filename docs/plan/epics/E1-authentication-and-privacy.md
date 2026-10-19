@@ -54,12 +54,12 @@ Cobre RF-010 e a regra crítica de privacidade (PRD §6.1). Persona: **Leitor**.
 **Cobre:** RF-010, regra §6.1 · **Tamanho:** M · **Depende de:** US-005
 
 **Critérios de aceite**
-- [ ] Padrão de repositório com `userId` obrigatório implementado e documentado, com um recurso de exemplo.
-- [ ] Utilitário de teste que cria dois usuários e verifica que cada operação sobre recurso do outro falha como “não encontrado”.
-- [ ] Regra de lint ou teste de arquitetura que impede importar o cliente de banco fora de `src/server/repositories` e `src/db`.
-- [ ] Checklist de revisão de PR (“toda consulta tem escopo de dono”) adicionado a [plan/README](../README.md) ou ao template de PR.
-- [ ] Respostas a recursos de terceiros são 404, não 403, indistinguíveis das de recurso inexistente.
-- [ ] **Spike de RLS** (ADR-0008 item 6): protótipo do Postgres RLS com papel `app` sem `BYPASSRLS` e `set_config` por requisição no driver serverless; resultado documentado (adotar ou justificar não adotar).
+- [x] Padrão de repositório com `userId` obrigatório implementado e documentado, com um recurso de exemplo.
+- [x] Utilitário de teste que cria dois usuários e verifica que cada operação sobre recurso do outro falha como “não encontrado”.
+- [x] Regra de lint ou teste de arquitetura que impede importar o cliente de banco fora de `src/server/repositories` e `src/db`.
+- [x] Checklist de revisão de PR (“toda consulta tem escopo de dono”) adicionado a [plan/README](../README.md) ou ao template de PR.
+- [x] Respostas a recursos de terceiros são 404, não 403, indistinguíveis das de recurso inexistente. *Provado nos repositórios (utilitário de dois leitores) e em `foundOrNotFound`; nenhuma rota usa ainda.*
+- [x] **Spike de RLS** (ADR-0008 item 6): protótipo do Postgres RLS com papel `app` sem `BYPASSRLS` e `set_config` por requisição no driver serverless; resultado documentado (adotar ou justificar não adotar). *Rodou com `pg` contra Postgres local; o pooler do Neon ficou para a US-033. Resultado no adendo do ADR-0008; adotado pela D-14.*
 
 **Notas técnicas:** ADR-0008.
 **Fora desta história:** adoção definitiva de RLS (decidida a partir do resultado do spike; se adotada, vira história própria).
