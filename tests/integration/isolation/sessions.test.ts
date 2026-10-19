@@ -57,10 +57,14 @@ const sessionsSpec: IsolationSpec<{ id: string }> = {
   seed: seedSession,
   missing: () => ({ id: randomUUID() }),
   snapshot: (_ownerId, owned) => sessionRow(owned.id),
+  contains: (result, owned) =>
+    (Array.isArray(result) ? result : [result]).some(
+      (item) => (item as { id?: unknown } | undefined)?.id === owned.id,
+    ),
   operations: {
-    list: (userId) => listSessions(db, userId),
-    find: (userId, target) => findSession(db, userId, target.id),
-    delete: (userId, target) => deleteSession(db, userId, target.id),
+    list: (userId) => listSessions(userId, db),
+    find: (userId, target) => findSession(userId, target.id, db),
+    delete: (userId, target) => deleteSession(userId, target.id, db),
   },
 };
 
@@ -75,7 +79,7 @@ describe("sessions repository", () => {
     const second = await seedSession(owner.id);
     await seedSession(intruder.id);
 
-    const sessions = await listSessions(db, owner.id);
+    const sessions = await listSessions(owner.id, db);
 
     expect(sessions.map((session) => session.id).sort()).toEqual(
       [first.id, second.id].sort(),
@@ -94,16 +98,16 @@ describe("sessions repository", () => {
     const { owner } = await create();
     const own = await seedSession(owner.id);
 
-    expect(await findSession(db, owner.id, own.id)).toMatchObject({
+    expect(await findSession(owner.id, own.id, db)).toMatchObject({
       id: own.id,
     });
-    expect(await deleteSession(db, owner.id, own.id)).toBe(true);
+    expect(await deleteSession(owner.id, own.id, db)).toBe(true);
     expect(await sessionRow(own.id)).toBeUndefined();
-    expect(await findSession(db, owner.id, own.id)).toBeUndefined();
+    expect(await findSession(owner.id, own.id, db)).toBeUndefined();
   });
 
   it("refuses to run without a userId", async () => {
-    await expect(listSessions(db, "")).rejects.toThrow(
+    await expect(listSessions("", db)).rejects.toThrow(
       "repository called without a userId",
     );
   });
@@ -118,7 +122,7 @@ describe("isolation harness", () => {
     const leaky: IsolationSpec<{ id: string }> = {
       ...sessionsSpec,
       operations: {
-        find: async (_userId, target) => (await sessionRow(target.id))?.id,
+        find: (_userId, target) => sessionRow(target.id),
         delete: async (_userId, target) =>
           (
             await db
@@ -131,12 +135,29 @@ describe("isolation harness", () => {
 
     expect(await checkIsolation(leaky, "find", owner, intruder)).toEqual([
       "find: another reader's resource is distinguishable from a missing one",
+      "find: an intruder received the owner's resource",
       "find: the owner does not reach their own resource",
     ]);
     expect(await checkIsolation(leaky, "delete", owner, intruder)).toEqual([
       "delete: another reader's resource is distinguishable from a missing one",
       "delete: an intruder changed the owner's resource",
     ]);
+  });
+
+  it("reports a list that adds another reader's items to the caller's", async () => {
+    const { owner, intruder } = await create();
+    await seedSession(intruder.id);
+    const leaky: IsolationSpec<{ id: string }> = {
+      ...sessionsSpec,
+      operations: {
+        list: async () =>
+          db.select({ id: schema.session.id }).from(schema.session),
+      },
+    };
+
+    expect(await checkIsolation(leaky, "list", owner, intruder)).toContain(
+      "list: an intruder received the owner's resource",
+    );
   });
 
   it("reports an operation that never finds anything", async () => {

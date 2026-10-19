@@ -21,6 +21,9 @@ export type IsolationSpec<Resource> = {
   missing: (owned: Resource) => Resource;
   // The owner's view of the resource, compared before and after the intruder's calls.
   snapshot: (ownerId: string, owned: Resource) => Promise<unknown>;
+  // Whether an operation's result carries the owned resource (an item of a list, a found row…).
+  // Catches a list that returns the intruder's own items plus someone else's.
+  contains: (result: unknown, owned: Resource) => boolean;
   // Read, list, update, delete, move…: every repository function that takes a target.
   operations: Record<
     string,
@@ -58,6 +61,10 @@ export async function checkIsolation<Resource>(
     problems.push(
       `${operation}: another reader's resource is distinguishable from a missing one`,
     );
+  }
+
+  if ("value" in onForeign && spec.contains(onForeign.value, owned)) {
+    problems.push(`${operation}: an intruder received the owner's resource`);
   }
 
   const after = await spec.snapshot(owner.id, owned);

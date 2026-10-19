@@ -20,8 +20,12 @@ describe("foundOrNotFound", () => {
     expect(mocks.notFound).toHaveBeenCalledOnce();
   });
 
+  it("treats null as a miss too", () => {
+    expect(() => foundOrNotFound(null)).toThrow("NEXT_NOT_FOUND");
+  });
+
   it("keeps falsy resources that were found", () => {
     expect(foundOrNotFound(0)).toBe(0);
-    expect(foundOrNotFound(null)).toBeNull();
+    expect(foundOrNotFound("")).toBe("");
   });
 });
