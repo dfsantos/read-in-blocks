@@ -27,3 +27,23 @@ Defesa em camadas:
 
 - Um pouco mais de código padronizado em repositórios.
 - Revisão de PR tem uma regra clara: “consulta fora de repositório ou sem `userId` é bloqueante”.
+
+## Adendo (US-006, 2026-10-19) — resultado do spike de RLS
+
+Itens 1, 3, 4 e 5 implementados como fundação: `ownedBy` e o repositório de exemplo (`sessions`), a regra de lint que restringe o acesso ao banco a `src/server/repositories` e `src/db`, `foundOrNotFound` para o 404 e o utilitário de dois leitores. Guia: [data-access.md](../architecture/data-access.md).
+
+**Spike do item 6** (`tests/integration/rls-spike.test.ts`, Postgres 17 local, papel `app`, `pg` `Pool` com uma única conexão para simular a reutilização do pool):
+
+| Pergunta | Resultado |
+|---|---|
+| O `app` contorna RLS? | Não: `rolbypassrls = false` (imposto pelo `roles.sql`); não pode `DISABLE ROW LEVEL SECURITY` (não é dono) e `row_security = off` vira erro, não acesso. |
+| Política `owner_id = current_setting('app.user_id', true)` | Mostra só as linhas do dono mesmo numa consulta **sem** filtro; `update`/`delete` de linhas alheias afetam 0 linhas; `insert` com outro dono e mudança de dono são recusados (`WITH CHECK`). |
+| Sem dono definido | Nenhuma linha visível e `insert` recusado: falha fechada. |
+| `set_config('app.user_id', id, true)` dentro de `db.transaction` | Vale só na transação; depois do `COMMIT` ou do `ROLLBACK`, a mesma conexão do pool não vê mais nada. |
+| `set_config(..., false)` (de sessão) | **Vaza** para a próxima requisição na mesma conexão. Proibido. |
+| Pooler do Neon (PgBouncer em modo transação) | Pela documentação do Neon (Context7, `/websites/neon`), `SET`/`RESET` de sessão não são suportados, mas o que é local à transação funciona; o padrão acima é o compatível. Não testado contra o Neon (os testes de integração só rodam em host local). |
+| Limite | RLS protege contra um filtro de dono esquecido, não contra um servidor comprometido: o `app` define o dono que quiser. O `userId` continua vindo só do `requireUser()`. |
+
+**Custos:** cada operação de repositório passa a rodar numa transação com um `set_config` (mais três idas ao banco: `BEGIN`, `set_config`, `COMMIT`), o que pesa com a latência até o Neon; políticas em todas as tabelas de conteúdo; o `migrator` (dono das tabelas) ignora RLS, a menos que se use `FORCE ROW LEVEL SECURITY`; as tabelas do Better Auth ficam fora, porque o adaptador dele não define o dono.
+
+**Recomendação:** viável e compatível com a stack; adotar nas tabelas de conteúdo (`book`, `book_node`, `note`) como **história própria**, com um helper `withOwner(userId, fn)` em `src/server/repositories` que todo repositório use, e as políticas criadas por migração. A decisão de adotar fica com o responsável (D-14 em [open-decisions.md](../plan/open-decisions.md)); até lá, o isolamento continua garantido pelos itens 1 a 5.
