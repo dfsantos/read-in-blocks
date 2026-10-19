@@ -54,15 +54,35 @@ Cobre RF-010 e a regra crítica de privacidade (PRD §6.1). Persona: **Leitor**.
 **Cobre:** RF-010, regra §6.1 · **Tamanho:** M · **Depende de:** US-005
 
 **Critérios de aceite**
-- [ ] Padrão de repositório com `userId` obrigatório implementado e documentado, com um recurso de exemplo.
-- [ ] Utilitário de teste que cria dois usuários e verifica que cada operação sobre recurso do outro falha como “não encontrado”.
-- [ ] Regra de lint ou teste de arquitetura que impede importar o cliente de banco fora de `src/server/repositories` e `src/db`.
-- [ ] Checklist de revisão de PR (“toda consulta tem escopo de dono”) adicionado a [plan/README](../README.md) ou ao template de PR.
-- [ ] Respostas a recursos de terceiros são 404, não 403, indistinguíveis das de recurso inexistente.
-- [ ] **Spike de RLS** (ADR-0008 item 6): protótipo do Postgres RLS com papel `app` sem `BYPASSRLS` e `set_config` por requisição no driver serverless; resultado documentado (adotar ou justificar não adotar).
+- [x] Padrão de repositório com `userId` obrigatório implementado e documentado, com um recurso de exemplo.
+- [x] Utilitário de teste que cria dois usuários e verifica que cada operação sobre recurso do outro falha como “não encontrado”.
+- [x] Regra de lint ou teste de arquitetura que impede importar o cliente de banco fora de `src/server/repositories` e `src/db`.
+- [x] Checklist de revisão de PR (“toda consulta tem escopo de dono”) adicionado a [plan/README](../README.md) ou ao template de PR.
+- [x] Respostas a recursos de terceiros são 404, não 403, indistinguíveis das de recurso inexistente. *Provado nos repositórios (utilitário de dois leitores) e em `foundOrNotFound`; nenhuma rota usa ainda.*
+- [x] **Spike de RLS** (ADR-0008 item 6): protótipo do Postgres RLS com papel `app` sem `BYPASSRLS` e `set_config` por requisição no driver serverless; resultado documentado (adotar ou justificar não adotar). *Rodou com `pg` contra Postgres local; o pooler do Neon ficou para a US-033. Resultado no adendo do ADR-0008; adotado pela D-14.*
 
 **Notas técnicas:** ADR-0008.
 **Fora desta história:** adoção definitiva de RLS (decidida a partir do resultado do spike; se adotada, vira história própria).
+
+---
+
+### US-033 — RLS do Postgres nas tabelas de conteúdo
+**Como** leitor, **quero** uma segunda barreira no próprio banco, **para** que um filtro de dono esquecido no código não exponha meus livros e anotações.
+**Cobre:** RF-010, regra §6.1, ADR-0008 item 6, ADR-0011 (assumir violação) · **Tamanho:** M · **Depende de:** US-006
+
+> O ID é um identificador, não a ordem: esta história entra no marco M2, logo após a US-006 e antes da US-007 (D-14, resolvida em 2026-10-19). Ponto de partida: o spike da US-006 (`tests/integration/rls-spike.test.ts`) e o [adendo do ADR-0008](../../adr/0008-data-isolation-per-user.md).
+
+**Critérios de aceite**
+- [ ] Helper `withOwner(userId, fn)` em `src/server/repositories`: abre uma transação, define o dono com `set_config('app.user_id', userId, true)` (local à transação) e recusa `userId` vazio. Todo repositório de tabela de conteúdo roda suas consultas por ele, sem deixar de filtrar por dono com `ownedBy` (as duas barreiras valem juntas).
+- [ ] Convenção de migração para tabela de conteúdo documentada ([database.md](../../architecture/database.md), regra `migrations` e skill `vertical-slice`): `ENABLE ROW LEVEL SECURITY` e política de dono para o papel `app`, com `USING` e `WITH CHECK` em `owner_id = current_setting('app.user_id', true)` (com `nullif(..., '')` se a coluna não for `text`).
+- [ ] Teste de integração sobre o catálogo do Postgres: toda tabela com coluna `owner_id` tem RLS habilitado e política de dono para o `app`; nenhuma view sem `security_invoker` e nenhuma função `SECURITY DEFINER` alcança tabela de conteúdo. O teste já vale para as tabelas criadas a partir da US-007.
+- [ ] Teste de arquitetura: nenhum `set_config(..., false)` nem `SET` sem `LOCAL` de `app.user_id` no código; dono só por `withOwner`.
+- [ ] Testes de integração com a tabela de prova: consulta sem filtro dentro de `withOwner` só vê linhas do dono; sem `withOwner`, nada (falha fechada); o dono não sobrevive ao fim da transação, nem a erro, na mesma conexão do pool; mudar `owner_id` para outro leitor é recusado.
+- [ ] Validação no **Preview** (pooler do Neon em modo transação) documentada: o dono definido numa transação não aparece na seguinte. Os testes de integração só rodam em host local, então esta é a prova contra o Neon que faltou no spike.
+- [ ] Custo medido e registrado (latência a mais por operação, local e Preview) no adendo do ADR-0008.
+
+**Notas técnicas:** ADR-0008 (adendo da US-006), ADR-0014 (papéis e pooler).
+**Fora desta história:** as políticas de `book`, `book_node` e `note` entram nas histórias que criam cada tabela (US-007, US-010, US-018), seguindo a convenção e cobertas pelo teste de catálogo; tabelas do Better Auth (o adaptador dele não define o dono; acesso já limitado a `src/server/auth`).
 
 ---
 

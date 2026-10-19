@@ -15,7 +15,7 @@ Cada requisito do [PRD](../prd/prd-read-in-blocks.md) mapeado para as histórias
 | RF-007 | Formatação rica | Essencial | US-019 |
 | RF-008 | Progresso ponderado | Essencial | US-016 |
 | RF-009 | Biblioteca pessoal | Essencial | US-008 (lista), US-021 (retomada) |
-| RF-010 | Conteúdo privado | Essencial | US-004, US-005, US-006, US-028 e casos de isolamento em cada história; auditoria na US-026 |
+| RF-010 | Conteúdo privado | Essencial | US-004, US-005, US-006, US-033, US-028 e casos de isolamento em cada história; auditoria na US-026 |
 | RF-011 | Visão em blocos | Desejável | US-017 |
 | RF-012 | Diagramas nas anotações | Desejável | US-022 |
 | RF-013 | Ritmo e previsão | Desejável | US-023 |
@@ -25,17 +25,17 @@ Cada requisito do [PRD](../prd/prd-read-in-blocks.md) mapeado para as histórias
 
 | Regra | Onde é garantida |
 |---|---|
-| §6.1 Privacidade do conteúdo | ADR-0008; US-006 (arcabouço), testes de isolamento em cada história, US-026 (auditoria) |
+| §6.1 Privacidade do conteúdo | ADR-0008; US-006 (arcabouço), US-033 (RLS), testes de isolamento em cada história, US-026 (auditoria) |
 | §6.2 Progresso ponderado | ADR-0009; US-011 (peso), US-016 (cálculo e painel) |
 | RF-003: pai concluído ⇔ todos os filhos concluídos | US-014 |
 | RF-008: parte de 40% avança o progresso em 40% | Teste unitário explícito na US-016 |
-| RF-010: não há como ver/acessar conteúdo de outro leitor | US-006, US-026 |
+| RF-010: não há como ver/acessar conteúdo de outro leitor | US-006, US-033 (RLS), US-026 |
 
 ## Diretrizes transversais
 
 | Diretriz | Onde é garantida |
 |---|---|
-| Zero Trust ([ADR-0011](../adr/0011-zero-trust-security.md)) | Política em `docs/security/zero-trust.md`; checklist no Definition of Done de toda história; US-004 (allowlist), US-006 (RLS), US-028 (cabeçalhos), US-019/022 (conteúdo), US-029 (endurecimento do banco e das migrações), US-026 (auditoria) |
+| Zero Trust ([ADR-0011](../adr/0011-zero-trust-security.md)) | Política em `docs/security/zero-trust.md`; checklist no Definition of Done de toda história; US-004 (allowlist), US-006 (isolamento e spike de RLS), US-033 (RLS), US-028 (cabeçalhos), US-019/022 (conteúdo), US-029 (endurecimento do banco e das migrações), US-026 (auditoria) |
 | Conventional Commits ([ADR-0012](../adr/0012-conventional-commits.md)) | `CLAUDE.md` (agente), `commitlint` + CI (US-001) |
 | Stack atualizada via Context7 ([ADR-0013](../adr/0013-context7-docs-first.md)) | `CLAUDE.md`, regra `stack-docs`, skill `stack-change`, hook `require-context7.py` (endurecido na US-029 e na US-030; autoproteção e configuração do gerenciador na US-031); seção “Documentação consultada” no PR (US-001) |
 | Código em inglês / UI em pt-BR | [conventions.md](../architecture/conventions.md); US-002 (verificação automática) |

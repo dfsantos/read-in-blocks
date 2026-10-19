@@ -6,7 +6,7 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 
 | Ativo | Ameaça | Controle principal |
 |---|---|---|
-| Livros, estruturas e anotações do usuário (direitos autorais) | Leitura/alteração por outro usuário (IDOR) | Repositórios com `userId`; 404 em recurso alheio; testes de dois usuários; RLS avaliada |
+| Livros, estruturas e anotações do usuário (direitos autorais) | Leitura/alteração por outro usuário (IDOR) | Repositórios com `userId`; 404 em recurso alheio; testes de dois usuários; RLS (US-033) |
 | Sessão / conta Google | Roubo de sessão, CSRF, login indevido | Cookies httpOnly/secure/SameSite, sessão curta e revogável, OAuth com PKCE/state, allowlist |
 | Conteúdo rico do editor | XSS armazenado | JSON (não HTML), sanitização, CSP, Mermaid em modo estrito |
 | Segredos (OAuth, DB, auth secret) | Vazamento em código, logs, cliente, preview | Variáveis por ambiente, sem `NEXT_PUBLIC_` sensível, secret scanning |
@@ -17,7 +17,7 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 
 ### 1. Verificar explicitamente
 
-1. **Autorização no ponto do dado.** O middleware/redirecionamentos são conveniência de UX, **não** controle de segurança. Toda página, Server Action e Route Handler chama `requireUser()` e usa repositórios que exigem `userId`.
+1. **Autorização no ponto do dado.** O middleware/redirecionamentos são conveniência de UX, **não** controle de segurança. Toda página, Server Action e Route Handler chama `requireUser()` e usa repositórios que exigem `userId`. Só `src/server/repositories` e `src/db` alcançam o banco (regra de lint e teste de arquitetura, US-006; ver [data-access.md](../architecture/data-access.md)).
    - **Exceções explícitas** (públicas por design, sem dados de usuário). Toda nova exceção entra nesta lista com justificativa:
 
      | Rota | Por que é pública | Salvaguardas |
@@ -43,7 +43,7 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 
 ### 3. Assumir violação
 
-1. **Raio de impacto pequeno:** `owner_id` em toda tabela de conteúdo; RLS do Postgres como segunda barreira (spike na US-006).
+1. **Raio de impacto pequeno:** `owner_id` em toda tabela de conteúdo; RLS do Postgres como segunda barreira: spike da US-006 viável (por transação, com `set_config(..., true)`); adotado (D-14) na US-033, antes da primeira tabela de conteúdo ([ADR-0008, adendo](../adr/0008-data-isolation-per-user.md)).
 2. **Sessões:** curtas, com rotação e revogação no servidor; logout invalida a sessão.
 3. **Logs/auditoria:** registrar eventos de segurança (login, falha, exclusão, negação de acesso) com `userId` e carimbo de tempo, **nunca** conteúdo de livros/anotações, tokens ou e-mails em claro além do necessário.
 4. **Rate limiting** em login e ações de escrita (Vercel Firewall/WAF); limites de tamanho de payload.

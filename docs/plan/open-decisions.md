@@ -17,6 +17,7 @@ Itens que **dependem de você** ou que o PRD deixou sem resposta. Cada um indica
 | D-11 | **Base do shadcn/ui:** Base UI (padrão atual da CLI 4.21.0) ou Radix (assumido no ADR-0002). | US-001 | — | **Resolvida (2026-10-15):** usar o **padrão do shadcn = Base UI** (`@base-ui/react`), sem `-b radix`. ADR-0002 ajustado |
 | D-12 | **Drizzle:** 1.0 em release candidate (`@rc`) ou versão estável. | US-003 | — | **Resolvida (2026-10-15):** **estável** — drizzle-orm 0.44.7 + drizzle-kit 0.31.5; sem RC |
 | D-13 | **pnpm:** 11.28.5 (exato) ou linha 12. | US-001 | — | **Resolvida (2026-10-15):** **pnpm 12** (linha estável corrente); patch gravado por `pnpm init` na US-001 |
+| D-14 | **Adotar RLS do Postgres** como segunda barreira nas tabelas de conteúdo (ADR-0008, item 6), depois do spike da US-006. | Antes da US-026 (idealmente antes da US-007, para nascer com a primeira tabela de conteúdo) | **Adotar**, numa história própria: helper `withOwner(userId, fn)` (transação + `set_config('app.user_id', …, true)`) usado por todo repositório e políticas `owner_id = current_setting(...)` criadas por migração em `book`, `book_node` e `note`. Custo: uma transação por operação. Resultado do spike no [adendo do ADR-0008](../adr/0008-data-isolation-per-user.md) | **Resolvida (2026-10-19):** "adopt RLS as its own story, before US-007" — **adotar**, na nova **US-033**, que entra em M2 antes da US-007; a US-007 passa a depender dela |
 
 ### Regra permanente (2026-10-15)
 

@@ -31,7 +31,7 @@ Nada além da história corrente é implementado. Se algo fora do escopo for des
 - Testes automatizados da história escritos e passando (unitário/integração; E2E quando listado).
 - Lint, typecheck e build passando no CI.
 - Todo texto de interface em `messages/pt-BR.json`; código, commits e comentários em inglês.
-- Se houver dados do usuário: casos de isolamento entre usuários adicionados à suíte (ADR-0008).
+- Se houver dados do usuário: casos de isolamento entre usuários adicionados à suíte (ADR-0008) e o checklist de revisão "toda consulta tem escopo de dono" de [data-access.md](../architecture/data-access.md#checklist-de-revisão-de-pr) conferido.
 - **Mudanças de stack documentadas:** toda dependência/config criada ou atualizada foi precedida de consulta ao Context7, com a tabela “Documentação consultada” (biblioteca, ID Context7, versão) no PR ([política](../architecture/stack-docs-policy.md)).
 - **Checklist de segurança Zero Trust** da [política](../security/zero-trust.md) preenchido no PR.
 - **Todos os commits em Conventional Commits** ([git-workflow.md](../architecture/git-workflow.md)); `commitlint` passando.

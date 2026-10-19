@@ -8,7 +8,8 @@ paths:
 # Acesso a dados (Zero Trust, ADR-0008)
 
 - Consulta ao banco **somente** em `src/server/repositories/*` e `src/db/*`. Nunca importar o cliente de banco em páginas, componentes, actions ou `lib/`.
-- Todo método de repositório recebe `userId` (da sessão, via `requireUser()`) como parâmetro obrigatório e o aplica em **toda** consulta e mutação (`WHERE owner_id = $userId`).
+- Todo método de repositório recebe `userId` (da sessão, via `requireUser()`) como parâmetro obrigatório e o aplica em **toda** consulta e mutação com `ownedBy` (`src/server/repositories/owner-scope.ts`). Referência: `src/server/repositories/sessions.ts`; guia: `docs/architecture/data-access.md`. O repositório obtém o próprio cliente (`db = getDb()` como último parâmetro, só os testes injetam) e nunca exporta/reexporta cliente ou tabelas. As regras de lint de fronteira bloqueiam o banco e a instância do Better Auth (`getAuth`, `$context`) fora das pastas permitidas; não adicione exceção nem `eslint-disable` sem justificativa no guia.
+- Páginas transformam a ausência em 404 com `foundOrNotFound` (`src/server/not-found.ts`).
 - Não existe leitura "por id" sem escopo de dono. Nunca confiar em `userId`/`ownerId` vindo do cliente.
 - Tabelas de conteúdo (`book`, `book_node`, `note`) têm `owner_id` próprio, mesmo havendo `book_id`.
 - Recurso de outro usuário se comporta exatamente como recurso inexistente: **404**, mesma mensagem, sem diferença observável.
