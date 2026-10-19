@@ -6,9 +6,9 @@
 // from the request's Content-Security-Policy header itself; this one is for our own <Script>s).
 export const NONCE_HEADER = "x-nonce";
 
-// Google profile photos shown in the user menu (US-005). Any other image host falls back to the
-// initials.
-const GOOGLE_PHOTOS = "https://*.googleusercontent.com";
+// Host of the Google profile photos shown in the user menu (US-005). Only this one: the rest of
+// googleusercontent.com serves third-party content. Any other image host falls back to the initials.
+const GOOGLE_PHOTOS = "https://lh3.googleusercontent.com";
 
 export type CspOptions = {
   nonce: string;
