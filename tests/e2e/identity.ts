@@ -4,6 +4,7 @@
 export const E2E_ACCOUNTS = {
   login: "e2e-login@example.test",
   session: "e2e-session@example.test",
+  headers: "e2e-headers@example.test",
 } as const;
 
 export const E2E_ALLOWLIST = Object.values(E2E_ACCOUNTS).join(",");
