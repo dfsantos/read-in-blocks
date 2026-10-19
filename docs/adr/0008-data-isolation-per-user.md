@@ -64,6 +64,10 @@ Item 6 implementado como segunda barreira, junto com os itens 1 a 5 (nada deles 
 | Ambiente | Dono vazou para a transação seguinte? | `select 1` (mediana / p95) | Com `withOwner` (mediana / p95) | Custo a mais (mediana) |
 |---|---|---|---|---|
 | Local (Postgres 17 em contêiner, conexão direta) | Não (0 de 1000) | 0,08 / 0,12 ms | 0,31 / 0,60 ms | +0,23 ms |
-| Preview (branch `preview`, host `-pooler`) | *a medir pelo responsável* | — | — | — |
+| Preview (branch `preview`, host `-pooler`), a partir da máquina do responsável, 2026-10-19 | Não (0 de 1000; nenhuma falha em ver o dono dentro da transação) | 202,72 / 235,35 ms | 818,34 / 921,47 ms | +615,62 ms |
 
-O custo a mais vem das três idas ao banco (`BEGIN`, `set_config`, `COMMIT`); contra o Neon, cada uma custa uma volta de rede da função até o banco. Consultas de uma mesma operação devem ficar dentro de um único `withOwner`.
+O custo a mais vem das três idas ao banco (`BEGIN`, `set_config`, `COMMIT`), cada uma com uma volta de rede inteira: na medição do Preview, o `select 1` sozinho (~200 ms) é quase só a distância entre a máquina do responsável e a região do Neon, e o `withOwner` custou cerca de 3 voltas a mais (~615 ms). Numa função da Vercel na mesma região do banco, a volta é de poucos milissegundos, então o custo esperado em produção é de 3 voltas nessa escala, **não** medido aqui (a medição saiu de fora da Vercel). Consequências:
+
+- **Pooler validado:** o dono definido numa transação não apareceu na seguinte em nenhuma das 1000 transações, em 5 conexões paralelas pelo PgBouncer em modo transação (critério da US-033).
+- Consultas de uma mesma operação ficam dentro de **um único** `withOwner`; nunca um `withOwner` por consulta.
+- A região das funções da Vercel precisa ser a mesma do banco (já recomendado em [database.md](../architecture/database.md)); se a latência das telas pesar (US-025), reavaliar juntar `BEGIN` e `set_config` numa ida só.
