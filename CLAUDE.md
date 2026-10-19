@@ -80,6 +80,7 @@ Nunca confiar em rede, cliente, sessão, ambiente ou entrada. Verificar explicit
 | Produto | [`docs/prd/prd-read-in-blocks.md`](docs/prd/prd-read-in-blocks.md) |
 | Stack e arquitetura | [`docs/architecture/tech-stack.md`](docs/architecture/tech-stack.md) |
 | Convenções de código | [`docs/architecture/conventions.md`](docs/architecture/conventions.md) |
+| Acesso a dados e isolamento | [`docs/architecture/data-access.md`](docs/architecture/data-access.md) |
 | Stack e Context7 | [`docs/architecture/stack-docs-policy.md`](docs/architecture/stack-docs-policy.md) |
 | Git e commits | [`docs/architecture/git-workflow.md`](docs/architecture/git-workflow.md) |
 | Segurança | [`docs/security/zero-trust.md`](docs/security/zero-trust.md) |

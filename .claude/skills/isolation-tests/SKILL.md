@@ -6,7 +6,7 @@ argument-hint: "<recurso ou arquivo de repositório>"
 
 # Testes de isolamento entre usuários
 
-Local: `tests/integration/isolation/<resource>.test.ts` (Vitest + Postgres real). Use o utilitário de dois usuários criado na US-006; se ainda não existir, pare e avise.
+Local: `tests/integration/isolation/<resource>.test.ts` (Vitest + Postgres real). Use o utilitário de dois usuários da US-006, `tests/integration/isolation/two-readers.ts`: descreva o recurso num `IsolationSpec` (`seed`, `missing`, `snapshot`, `operations`) e chame `describeIsolation(db, "<resource>", spec)`. Ele roda cada operação como intruso sobre o recurso do dono e sobre um id inexistente, exige resultados idênticos e o recurso do dono intacto, e confere que o próprio dono alcança o recurso. Exemplo: `tests/integration/isolation/sessions.test.ts`. Guia: `docs/architecture/data-access.md`.
 
 Para **cada** operação pública do repositório/action do recurso:
 
