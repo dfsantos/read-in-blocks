@@ -20,7 +20,7 @@ página / Server Action / Route Handler
 
   | Arquivo | Motivo |
   |---|---|
-  | `src/server/auth/index.ts` | Camada de dados do próprio Better Auth (tabelas `user`, `session`, `account`, `verification`) |
+  | `src/server/auth/index.ts` | Camada de dados do próprio Better Auth (tabelas `user`, `session`, `account`, `verification` e, desde a US-028, `rate_limit`) |
   | `src/server/auth/cli.ts` | Entrada só do CLI do Better Auth; não abre conexão |
   | `src/app/api/health/route.ts` | Verificação pública de saúde; só `src/db/health.ts` (consulta fixa, sem dado de usuário) |
   | `src/server/auth/**`, `src/app/api/auth/**`, `src/server/actions/auth.ts` | Podem usar a instância do Better Auth (sessão, rota, sair), mas não o banco |
