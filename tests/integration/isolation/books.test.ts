@@ -6,7 +6,7 @@ import { Pool } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 
 import * as schema from "@/db/schema";
-import { createBook, findBook } from "@/server/repositories/books";
+import { createBook, findBook, listBooks } from "@/server/repositories/books";
 import { consumeWriteQuota } from "@/server/repositories/write-quota";
 
 import { requireTestEnv } from "../db-env";
@@ -40,9 +40,13 @@ const booksSpec: IsolationSpec<{ id: string }> = {
   // Through the repository: under RLS a plain select by the app role sees no book at all.
   snapshot: (ownerId, owned) => findBook(ownerId, owned.id, db),
   contains: (result, owned) =>
-    (result as { id?: unknown } | undefined)?.id === owned.id,
+    (Array.isArray(result) ? result : [result]).some(
+      (item) => (item as { id?: unknown } | undefined)?.id === owned.id,
+    ),
   operations: {
     find: (userId, target) => findBook(userId, target.id, db),
+    // The target is ignored: a list takes no id, and must not carry someone else's book.
+    list: (userId) => listBooks(userId, { limit: 100 }, db),
   },
 };
 
@@ -68,6 +72,74 @@ describe("books repository", () => {
       "title",
     ]);
     expect(await findBook(owner.id, created.id, db)).toEqual(created);
+  });
+
+  it("lists only the reader's books, the most recent first", async () => {
+    const { owner, intruder } = await create();
+    const first = await createBook(
+      owner.id,
+      { title: "First", author: null },
+      db,
+    );
+    const second = await createBook(
+      owner.id,
+      { title: "Second", author: "B" },
+      db,
+    );
+    await createBook(intruder.id, { title: "Not mine", author: null }, db);
+
+    expect(await listBooks(owner.id, { limit: 100 }, db)).toEqual([
+      second,
+      first,
+    ]);
+    expect(await listBooks(owner.id, { limit: 100 }, db)).not.toContainEqual(
+      expect.objectContaining({ title: "Not mine" }),
+    );
+  });
+
+  it("orders books created in the same instant by id, so the order is stable", async () => {
+    const { owner } = await create();
+    // One statement: both rows get the same now().
+    const rows = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select set_config('app.user_id', ${owner.id}, true)`,
+      );
+      return tx
+        .insert(schema.book)
+        .values([
+          { ownerId: owner.id, title: "A" },
+          { ownerId: owner.id, title: "B" },
+        ])
+        .returning({ id: schema.book.id, createdAt: schema.book.createdAt });
+    });
+    expect(rows[0].createdAt).toEqual(rows[1].createdAt);
+
+    const listed = (await listBooks(owner.id, { limit: 100 }, db)).map(
+      (book) => book.id,
+    );
+    expect(listed).toEqual(
+      rows
+        .map((row) => row.id)
+        .sort()
+        .reverse(),
+    );
+  });
+
+  it("lists at most the limit, keeping the most recent", async () => {
+    const { owner } = await create();
+    await createBook(owner.id, { title: "Old", author: null }, db);
+    const recent = await createBook(
+      owner.id,
+      { title: "New", author: null },
+      db,
+    );
+
+    expect(await listBooks(owner.id, { limit: 1 }, db)).toEqual([recent]);
+  });
+
+  it("lists nothing for a reader without books", async () => {
+    const { owner } = await create();
+    expect(await listBooks(owner.id, { limit: 100 }, db)).toEqual([]);
   });
 
   it("writes the owner from the userId, whatever the input carries", async () => {

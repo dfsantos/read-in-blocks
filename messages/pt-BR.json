@@ -3,16 +3,18 @@
     "title": "Read in Blocks",
     "description": "Acompanhe sua leitura por partes, capítulos e tópicos."
   },
-  "home": {
-    "title": "Read in Blocks",
-    "description": "Acompanhe sua leitura por partes, capítulos e tópicos.",
-    "body": "O projeto base está pronto. As funcionalidades chegam por história.",
-    "cta": "Cadastrar livro",
-    "formatting": {
-      "date": "Data: {value}",
-      "number": "Número: {value}",
-      "percent": "Progresso: {value}"
-    }
+  "library": {
+    "metadataTitle": "Biblioteca — Read in Blocks",
+    "title": "Sua biblioteca",
+    "create": "Cadastrar livro",
+    "listLabel": "Seus livros",
+    "noAuthor": "Autor não informado",
+    "empty": {
+      "title": "Nenhum livro ainda",
+      "description": "Cadastre o primeiro livro para começar a acompanhar sua leitura.",
+      "cta": "Cadastrar o primeiro livro"
+    },
+    "truncated": "Mostrando os {count, number} livros mais recentes."
   },
   "login": {
     "metadataTitle": "Entrar — Read in Blocks",
