@@ -89,6 +89,17 @@ function logFailure(action: string, error: unknown) {
   });
 }
 
+// Security events (zero-trust.md, 3.3): ids and a timestamp, never the title or author.
+type BookEvent = {
+  event: "books.deleted" | "books.delete_rate_limited";
+  userId: string;
+  bookId: string;
+};
+
+function logBookEvent(entry: BookEvent) {
+  console.info(JSON.stringify({ ...entry, at: new Date().toISOString() }));
+}
+
 export async function createBook(input: unknown): Promise<CreateBookResult> {
   const parsed = parseBookInput(input);
   if (!parsed.ok) return parsed;
@@ -140,11 +151,19 @@ export async function deleteBook(bookId: unknown): Promise<DeleteBookResult> {
 
   try {
     if (!(await consumeWriteQuota(user.id, DELETE_BOOK_QUOTA))) {
+      logBookEvent({
+        event: "books.delete_rate_limited",
+        userId: user.id,
+        bookId: id.data,
+      });
       return { ok: false, errorKey: "rateLimited" };
     }
-    return (await removeBook(user.id, id.data))
-      ? { ok: true }
-      : { ok: false, errorKey: "notFound" };
+    if (!(await removeBook(user.id, id.data))) {
+      return { ok: false, errorKey: "notFound" };
+    }
+    // Deleting cannot be undone: leave a trace of who did it and when (zero-trust.md, 3.3).
+    logBookEvent({ event: "books.deleted", userId: user.id, bookId: id.data });
+    return { ok: true };
   } catch (error) {
     logFailure(DELETE_BOOK_QUOTA.action, error);
     return { ok: false, errorKey: "failed" };

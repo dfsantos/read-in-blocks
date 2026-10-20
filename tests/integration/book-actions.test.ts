@@ -333,8 +333,19 @@ describe("deleteBook Server Action", () => {
     const book = await seedBook(owner.id, { title: "Gone", author: null }, db);
     signIn(owner);
 
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
     expect(await deleteBook(book.id)).toEqual({ ok: true });
     expect(await findBook(owner.id, book.id, db)).toBeUndefined();
+    // A security event with ids only, never the title.
+    expect(info).toHaveBeenCalledOnce();
+    expect(JSON.parse(info.mock.calls[0][0] as string)).toEqual({
+      event: "books.deleted",
+      userId: owner.id,
+      bookId: book.id,
+      at: expect.any(String),
+    });
+    expect(JSON.stringify(info.mock.calls)).not.toContain("Gone");
     expect(await deleteBook(book.id)).toEqual({
       ok: false,
       errorKey: "notFound",
@@ -390,9 +401,15 @@ describe("deleteBook Server Action", () => {
       { title: "Spared", author: null },
       db,
     );
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
     expect(await deleteBook(book.id)).toEqual({
       ok: false,
       errorKey: "rateLimited",
+    });
+    expect(JSON.parse(info.mock.calls[0][0] as string)).toMatchObject({
+      event: "books.delete_rate_limited",
+      userId: owner.id,
+      bookId: book.id,
     });
     expect(await findBook(owner.id, book.id, db)).toEqual(book);
   });
