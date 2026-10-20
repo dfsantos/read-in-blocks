@@ -82,8 +82,8 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 | Pacote | Versão | Status | Fonte (Context7) | Evidência / compatibilidade |
 |---|---|---|---|---|
 | `zod` | **4.6.5** | ✅ Fixada | `/colinhacks/zod` | Maior tag indexada (3.24.2, 4.0.x, 4.3.6, 4.6.5). |
-| `react-hook-form` | **7.66.0** | ✅ Fixada | `/react-hook-form/react-hook-form` | Única tag indexada; pode haver patch mais novo. Confirmar na US-007. |
-| `@hookform/resolvers` | **a fechar na US-007** | 🟡 Linha (patch a fechar) | `/react-hook-form/resolvers` | `zodResolver` detecta Zod v3/v4 automaticamente. Versão exata não indexada. |
+| `react-hook-form` | **7.66.0** | ✅ Fixada | `/react-hook-form/react-hook-form` | Única tag indexada (reconfirmada na US-007, 2026-10-19). |
+| `@hookform/resolvers` | **5.3.0** | ✅ Fixada (US-007) | `/react-hook-form/resolvers` | Versão documentada no Context7 em 2026-10-19 (referência técnica v5.3.0). Peer `react-hook-form ^7.55.0`; `zodResolver` detecta Zod v3/v4 automaticamente. |
 | `@tiptap/react, @tiptap/pm, @tiptap/starter-kit, @tiptap/extension-code-block-lowlight` | **3.x (a fechar na US-019)** | 🟡 Linha (patch a fechar) | `/ueberdosis/tiptap-docs` | Docs v3 estável (guia de upgrade v2→v3); evitar `3.0.0-next.*`. Next.js: `immediatelyRender: false`. Patch não indexado. |
 | `lowlight` | **a fechar na US-019** | 🟡 Linha (patch a fechar) | `/wooorm/lowlight` | Peer da extensão CodeBlockLowlight (versão controlada pelo app). |
 | `mermaid` | **11.x (a fechar na US-022)** | 🟡 Linha (patch a fechar) | `/mermaid-js/mermaid` | Docs `develop`; tag indexada só `v11_0_0`. `securityLevel: 'strict'`. |

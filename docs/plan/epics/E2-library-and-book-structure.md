@@ -21,7 +21,7 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 |---|---|---|---|
 | `zod` | **4.6.5** | ✅ Fixada | `/colinhacks/zod` |
 | `react-hook-form` | **7.66.0** | ✅ Fixada | `/react-hook-form/react-hook-form` |
-| `@hookform/resolvers` | **a fechar na US-007** | 🟡 Linha (patch a fechar) | `/react-hook-form/resolvers` |
+| `@hookform/resolvers` | **5.3.0** | ✅ Fixada (Context7, 2026-10-19) | `/react-hook-form/resolvers` |
 
 - [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. **Somente versões estáveis:** nada de `rc`, `beta`, `alpha`, `canary`, `next`, `nightly` ou versões com sufixo `-x.y` (o hook bloqueia).
 
