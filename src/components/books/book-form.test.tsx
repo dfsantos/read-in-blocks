@@ -82,7 +82,9 @@ describe("BookForm", () => {
     await user.type(screen.getByLabelText("Autor"), " Martin Fowler ");
     await user.click(submit());
 
-    await vi.waitFor(() => expect(push).toHaveBeenCalledWith(`/books/${BOOK_ID}`));
+    await vi.waitFor(() =>
+      expect(push).toHaveBeenCalledWith(`/books/${BOOK_ID}`),
+    );
     expect(action).toHaveBeenCalledWith({
       title: "Refactoring",
       author: "Martin Fowler",
@@ -120,7 +122,10 @@ describe("BookForm", () => {
       "rateLimited",
       "Muitos cadastros em pouco tempo. Aguarde um minuto e tente de novo.",
     ],
-    ["failed", "Não foi possível cadastrar o livro. Tente de novo em instantes."],
+    [
+      "failed",
+      "Não foi possível cadastrar o livro. Tente de novo em instantes.",
+    ],
   ] as const)(
     "shows the form error %s and lets the reader try again",
     async (errorKey, text) => {
