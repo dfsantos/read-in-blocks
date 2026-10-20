@@ -22,10 +22,10 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 
      | Rota | Por que é pública | Salvaguardas |
      |---|---|---|
-     | `GET /api/health` (US-003) | Verificação de disponibilidade do deploy e do banco | Só `{"status":"ok"}`/`{"status":"error"}`, `Cache-Control: no-store`, consulta fixa (uma linha de `app_meta`, tabela técnica sem dados de usuário) com o papel `app`, erro só no log (código do Postgres). Rate limit planejado na US-028 (Vercel Firewall), já que cada chamada abre conexão com o banco. |
-     | `GET/POST /api/auth/*` (US-004) | Endpoints do Better Auth: é aqui que a sessão nasce (início do login, callback do Google, leitura da sessão, logout) | O Better Auth valida a própria entrada e confere `Origin`/CSRF; allowlist e `email_verified` nos *database hooks* (recusa sem gravar nada); `state` e PKCE (S256); cookie `httpOnly`/`SameSite=Lax`/`Secure` em https; erros só como código genérico em `?error=`; login com e-mail/senha desabilitado. O rate limit embutido do Better Auth é por instância serverless; o limite real fica para a US-028. Ver [authentication.md](../architecture/authentication.md). |
+     | `GET /api/health` (US-003) | Verificação de disponibilidade do deploy e do banco | Só `{"status":"ok"}`/`{"status":"error"}`, `Cache-Control: no-store`, consulta fixa (uma linha de `app_meta`, tabela técnica sem dados de usuário) com o papel `app`, erro só no log (código do Postgres). Rate limit pela regra do Vercel Firewall (US-028), já que cada chamada abre conexão com o banco. |
+     | `GET/POST /api/auth/*` (US-004) | Endpoints do Better Auth: é aqui que a sessão nasce (início do login, callback do Google, leitura da sessão, logout) | O Better Auth valida a própria entrada e confere `Origin`/CSRF; allowlist e `email_verified` nos *database hooks* (recusa sem gravar nada); `state` e PKCE (S256); cookie `httpOnly`/`SameSite=Lax`/`Secure` em https; erros só como código genérico em `?error=`; login com e-mail/senha desabilitado. Rate limit pela regra do Vercel Firewall e pelo do Better Auth com contadores no banco; `POST` passa antes por `guardWrite()` (origem e tamanho do corpo) (US-028, [headers.md](headers.md)). Ver [authentication.md](../architecture/authentication.md). |
      | Página `/login` (US-004, US-005) | Tela de entrada para quem ainda não tem sessão | Só sabe se o Google está configurado e se já existe sessão válida (`findSessionUser()`, que manda para a biblioteca). O `?error=` vira uma de três mensagens fixas e nunca é exibido; o `?next=` só é usado depois de `safeNextPath` (caminho deste site, conferido também depois de normalizado, sem `//`, `\`, `%`, `/api` ou a própria página de login). |
-2. **Server Actions são endpoints públicos.** Validam entrada (Zod), autenticam, autorizam e verificam origem (proteção CSRF padrão do Next + checagem de `Origin`).
+2. **Server Actions são endpoints públicos.** Validam entrada (Zod), autenticam, autorizam e verificam origem (proteção CSRF padrão do Next + checagem de `Origin`). Route Handlers de escrita começam com `guardWrite()` (`src/server/request-guard.ts`): mesma origem e corpo limitado ([headers.md](headers.md)).
 3. **Identidade só do servidor.** `userId`, `ownerId`, papéis e preços/pesos nunca vêm de parâmetros, cookies não assinados ou campos de formulário.
 4. **Recurso alheio = inexistente.** Resposta 404 idêntica à de recurso que não existe (sem diferença de mensagem nem de tempo perceptível).
 5. **Entrada nunca é confiável.** Validar tipo, formato, tamanho e enum de tudo (IDs como UUID, textos com limite, JSON do editor com schema e limite de tamanho).
@@ -39,14 +39,14 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 3. **CI/CD:** `GITHUB_TOKEN` com `permissions: contents: read` por padrão, elevando por job; GitHub Actions de terceiros fixadas por SHA; sem segredos expostos a PRs de forks.
 4. **Dependências:** adicionar o mínimo necessário; lockfile obrigatório (`pnpm install --frozen-lockfile`); Dependabot/audit no CI.
 5. **Previews:** *Deployment Protection* da Vercel ativa (somente o dono acessa).
-6. **Cabeçalhos e navegador:** CSP restritiva (sem `unsafe-eval`; `unsafe-inline` evitado via nonce), `frame-ancestors 'none'`, HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` mínima. Respostas autenticadas com `Cache-Control: private, no-store`.
+6. **Cabeçalhos e navegador:** CSP restritiva (sem `unsafe-eval`; `unsafe-inline` evitado via nonce), `frame-ancestors 'none'`, HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` mínima. Respostas autenticadas com `Cache-Control: private, no-store`. Implementado na US-028; como liberar uma origem nova na CSP: [headers.md](headers.md).
 
 ### 3. Assumir violação
 
 1. **Raio de impacto pequeno:** `owner_id` em toda tabela de conteúdo; RLS do Postgres como segunda barreira (US-033): toda tabela de conteúdo tem RLS e a política de dono (`ownerPolicy()`), e os repositórios definem o dono por transação com `withOwner` ([ADR-0008, adendos](../adr/0008-data-isolation-per-user.md); [database.md](../architecture/database.md#rls-nas-tabelas-de-conteúdo)).
 2. **Sessões:** curtas, com rotação e revogação no servidor; logout invalida a sessão.
 3. **Logs/auditoria:** registrar eventos de segurança (login, falha, exclusão, negação de acesso) com `userId` e carimbo de tempo, **nunca** conteúdo de livros/anotações, tokens ou e-mails em claro além do necessário.
-4. **Rate limiting** em login e ações de escrita (Vercel Firewall/WAF); limites de tamanho de payload.
+4. **Rate limiting** em login e ações de escrita (Vercel Firewall/WAF, e Better Auth com contadores no banco); limites de tamanho de payload (100 kB nas Server Actions, 16 kB nos Route Handlers de escrita). Ver [headers.md](headers.md).
 5. **Dados:** criptografia em trânsito (TLS) e em repouso (provedor); backups e restauração testados antes do go-live (US-027).
 6. **Contas administrativas:** MFA obrigatório nas contas do dono em Google, GitHub, Vercel e Neon (verificado na US-027).
 

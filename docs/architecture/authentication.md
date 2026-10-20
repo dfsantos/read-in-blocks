@@ -61,7 +61,7 @@ Código: `src/server/auth/` (`options.ts` é a configuração única, `env.ts` v
 
 ## Limites conhecidos
 
-- **Rate limit:** o embutido do Better Auth guarda contadores na memória de cada instância serverless, então não protege de fato na Vercel. O limite real fica para a US-028 (Vercel Firewall).
+- **Rate limit (US-028):** regra do Vercel Firewall por IP e, como segunda barreira, o `rateLimit` do Better Auth com contadores na tabela `rate_limit` (o padrão em memória não protegeria entre instâncias serverless). Ligado só em produção. Detalhes em [headers.md](../security/headers.md).
 - **Datas sem fuso:** as tabelas geradas pelo CLI usam `timestamp` sem fuso. O Better Auth grava instantes em UTC e o driver converte, então o risco prático é baixo. Mudar para `timestamptz` exige migração própria e regenerar o schema com o tipo aceito pelo CLI; fica registrado como exceção à convenção.
 - **Tabela `"user"`:** nome reservado no Postgres. O SQL gerado sempre usa aspas, e qualquer SQL manual também precisa delas.
 

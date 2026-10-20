@@ -28,6 +28,7 @@ Endurecimento e entrada em produção. Podem ser executadas assim que M6 estiver
 - [ ] Verificação de cabeçalhos de segurança, cookies (httpOnly, secure, SameSite), CSRF das Server Actions e sanitização do conteúdo do editor.
 - [ ] Varredura de dependências e segredos (ex.: audit do pnpm, secret scanning) sem pendências críticas.
 - [ ] Nenhum dado de usuário em logs; páginas autenticadas sem cache compartilhado.
+- [ ] Retenção da tabela `rate_limit` (chave com IP; o Better Auth apaga as linhas vencidas só quando há tráfego; achado da US-028): política confirmada ou limpeza periódica implementada.
 - [ ] Revisão da [política Zero Trust](../../security/zero-trust.md): cada regra verificada ou com desvio justificado; allowlist, papéis de banco, RLS (ADR-0008) e CSP confirmados em produção.
 - [ ] Relatório curto registrado em `docs/security/` com achados e correções.
 

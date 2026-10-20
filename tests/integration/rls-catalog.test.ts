@@ -30,6 +30,8 @@ const NOT_CONTENT = new Set([
   "public.session",
   "public.account",
   "public.verification",
+  // Better Auth's rate-limit counters (US-028): one row per client IP and path, no reader.
+  "public.rate_limit",
 ]);
 
 type AppTable = {
