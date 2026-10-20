@@ -36,6 +36,13 @@
       "when": 1792451989720,
       "tag": "0004_create_rate_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792460453100,
+      "tag": "0005_create_book_and_write_quota",
+      "breakpoints": true
     }
   ]
 }
