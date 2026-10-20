@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import * as schema from "@/db/schema";
 import { createBook, findBook } from "@/server/repositories/books";
+import { consumeWriteQuota } from "@/server/repositories/write-quota";
 
 import { requireTestEnv } from "../db-env";
 import {
@@ -117,6 +118,17 @@ describe("books repository", () => {
     await expect(
       createBook(owner.id, { title: "a".repeat(201), author: null }, db),
     ).rejects.toThrow();
+    // An empty author is stored as null, never as "".
+    await expect(
+      createBook(owner.id, { title: "t", author: "" }, db),
+    ).rejects.toThrow();
+    await expect(
+      createBook(owner.id, { title: "t", author: "a".repeat(201) }, db),
+    ).rejects.toThrow();
+    // 23514: check_violation, the constraint and not something else.
+    await expect(
+      createBook(owner.id, { title: "", author: null }, db),
+    ).rejects.toMatchObject({ cause: { code: "23514" } });
   });
 
   it("refuses to run without a userId", async () => {
@@ -125,7 +137,7 @@ describe("books repository", () => {
     );
   });
 
-  it("removes the reader's books with the reader", async () => {
+  it("removes the reader's books and quotas with the reader", async () => {
     const { owner } = await create();
     const created = await createBook(
       owner.id,
@@ -133,8 +145,22 @@ describe("books repository", () => {
       db,
     );
 
+    // A quota row too, so the cascade of both owner tables is checked.
+    await consumeWriteQuota(
+      owner.id,
+      { action: "test.cascade", limit: 1, windowSeconds: 60 },
+      db,
+    );
+
     await db.delete(schema.user).where(eq(schema.user.id, owner.id));
 
     expect(await findBook(owner.id, created.id, db)).toBeUndefined();
+    const quotas = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select set_config('app.user_id', ${owner.id}, true)`,
+      );
+      return tx.select().from(schema.writeQuota);
+    });
+    expect(quotas).toEqual([]);
   });
 });
