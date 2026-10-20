@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -12,7 +14,7 @@ import {
 } from "vitest";
 
 import * as schema from "@/db/schema";
-import { findBook } from "@/server/repositories/books";
+import { createBook as seedBook, findBook } from "@/server/repositories/books";
 import { consumeWriteQuota } from "@/server/repositories/write-quota";
 
 import { requireTestEnv } from "./db-env";
@@ -32,7 +34,7 @@ const mocks = vi.hoisted(() => ({ requireUser: vi.fn() }));
 vi.mock("@/server/auth/session", () => ({ requireUser: mocks.requireUser }));
 vi.mock("@/db/client", () => ({ getDb: () => db }));
 
-import { createBook } from "@/server/actions/books";
+import { createBook, deleteBook, updateBook } from "@/server/actions/books";
 
 afterAll(() => pool.end());
 
@@ -158,6 +160,258 @@ describe("createBook Server Action", () => {
       code: "XX000",
     });
     expect(JSON.stringify(error.mock.calls)).not.toContain("Secret Title");
+  });
+});
+
+// Signs `reader` in for the actions below.
+function signIn(reader: { id: string; email: string }) {
+  mocks.requireUser.mockResolvedValue({
+    id: reader.id,
+    name: "reader",
+    email: reader.email,
+    image: null,
+  });
+}
+
+describe("updateBook Server Action", () => {
+  const { create } = useReaders(db, "book-update-action.test");
+
+  beforeEach(() => {
+    mocks.requireUser.mockReset();
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("is refused without a session and writes nothing", async () => {
+    mocks.requireUser.mockRejectedValue(new Error("NEXT_REDIRECT /login"));
+    const transaction = vi.spyOn(db, "transaction");
+
+    await expect(
+      updateBook(randomUUID(), { title: "Anonymous" }),
+    ).rejects.toThrow("NEXT_REDIRECT /login");
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("saves the trimmed values of the reader's book, ignoring an owner in the payload", async () => {
+    const { owner, intruder } = await create();
+    const book = await seedBook(owner.id, { title: "Old", author: "A" }, db);
+    signIn(owner);
+
+    expect(
+      await updateBook(book.id, {
+        title: "  New ",
+        author: " ",
+        ownerId: intruder.id,
+      }),
+    ).toEqual({ ok: true, data: { id: book.id } });
+    expect(await findBook(owner.id, book.id, db)).toMatchObject({
+      title: "New",
+      author: null,
+    });
+    expect(await findBook(intruder.id, book.id, db)).toBeUndefined();
+  });
+
+  it("answers another reader's book exactly like a missing one, and leaves it alone", async () => {
+    const { owner, intruder } = await create();
+    const book = await seedBook(owner.id, { title: "Mine", author: null }, db);
+    signIn(intruder);
+
+    const onForeign = await updateBook(book.id, { title: "Taken" });
+    const onMissing = await updateBook(randomUUID(), { title: "Taken" });
+
+    expect(onForeign).toEqual({ ok: false, errorKey: "notFound" });
+    expect(onMissing).toEqual(onForeign);
+    expect(await findBook(owner.id, book.id, db)).toEqual(book);
+  });
+
+  it.each([
+    ["not a uuid", "not-a-uuid"],
+    ["an injection", "1' or '1'='1"],
+    ["a number", 42],
+    ["an object", { id: randomUUID() }],
+    ["nothing", undefined],
+  ])(
+    "answers %s as the id like a missing book, without a query",
+    async (_name, bookId) => {
+      const { owner } = await create();
+      signIn(owner);
+      const transaction = vi.spyOn(db, "transaction");
+
+      expect(await updateBook(bookId, { title: "t" })).toEqual({
+        ok: false,
+        errorKey: "notFound",
+      });
+      expect(transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["no title", {}, "titleRequired", "title"],
+    ["a long title", { title: "a".repeat(201) }, "titleTooLong", "title"],
+    ["a line break", { title: "a\nb" }, "invalidCharacters", "title"],
+    ["not an object", "New", "titleRequired", "title"],
+  ])(
+    "answers %s with an error key, before the session, and writes nothing",
+    async (_name, input, errorKey, field) => {
+      const { owner } = await create();
+      const book = await seedBook(
+        owner.id,
+        { title: "Kept", author: null },
+        db,
+      );
+      signIn(owner);
+
+      expect(await updateBook(book.id, input)).toEqual({
+        ok: false,
+        errorKey,
+        field,
+      });
+      expect(mocks.requireUser).not.toHaveBeenCalled();
+      expect(await findBook(owner.id, book.id, db)).toEqual(book);
+    },
+  );
+
+  it("stops a reader after 30 edits a minute", async () => {
+    const { owner } = await create();
+    const book = await seedBook(owner.id, { title: "Busy", author: null }, db);
+    signIn(owner);
+
+    for (let i = 0; i < 30; i += 1) {
+      expect(await updateBook(book.id, { title: `Edit ${i}` })).toMatchObject({
+        ok: true,
+      });
+    }
+    expect(await updateBook(book.id, { title: "One too many" })).toEqual({
+      ok: false,
+      errorKey: "updateRateLimited",
+    });
+    expect(await findBook(owner.id, book.id, db)).toMatchObject({
+      title: "Edit 29",
+    });
+  });
+
+  it("answers a database failure with a generic key and logs no content", async () => {
+    const { owner } = await create();
+    signIn(owner);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(db, "transaction").mockRejectedValueOnce(
+      Object.assign(new Error('update "Secret Title" failed'), {
+        code: "XX000",
+      }),
+    );
+
+    expect(await updateBook(randomUUID(), { title: "Secret Title" })).toEqual({
+      ok: false,
+      errorKey: "updateFailed",
+    });
+    expect(error).toHaveBeenCalledWith("books.update failed", {
+      code: "XX000",
+    });
+    expect(JSON.stringify(error.mock.calls)).not.toContain("Secret Title");
+  });
+});
+
+describe("deleteBook Server Action", () => {
+  const { create } = useReaders(db, "book-delete-action.test");
+
+  beforeEach(() => {
+    mocks.requireUser.mockReset();
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("is refused without a session and deletes nothing", async () => {
+    mocks.requireUser.mockRejectedValue(new Error("NEXT_REDIRECT /login"));
+    const transaction = vi.spyOn(db, "transaction");
+
+    await expect(deleteBook(randomUUID())).rejects.toThrow(
+      "NEXT_REDIRECT /login",
+    );
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("deletes the reader's book", async () => {
+    const { owner } = await create();
+    const book = await seedBook(owner.id, { title: "Gone", author: null }, db);
+    signIn(owner);
+
+    expect(await deleteBook(book.id)).toEqual({ ok: true });
+    expect(await findBook(owner.id, book.id, db)).toBeUndefined();
+    expect(await deleteBook(book.id)).toEqual({
+      ok: false,
+      errorKey: "notFound",
+    });
+  });
+
+  it("answers another reader's book exactly like a missing one, and keeps it", async () => {
+    const { owner, intruder } = await create();
+    const book = await seedBook(owner.id, { title: "Mine", author: null }, db);
+    signIn(intruder);
+
+    const onForeign = await deleteBook(book.id);
+    const onMissing = await deleteBook(randomUUID());
+
+    expect(onForeign).toEqual({ ok: false, errorKey: "notFound" });
+    expect(onMissing).toEqual(onForeign);
+    expect(await findBook(owner.id, book.id, db)).toEqual(book);
+  });
+
+  it.each([
+    ["not a uuid", "not-a-uuid"],
+    ["an injection", "1' or '1'='1"],
+    ["a number", 42],
+    ["an array", [randomUUID()]],
+    ["nothing", undefined],
+  ])(
+    "answers %s as the id like a missing book, without a query",
+    async (_name, bookId) => {
+      const { owner } = await create();
+      signIn(owner);
+      const transaction = vi.spyOn(db, "transaction");
+
+      expect(await deleteBook(bookId)).toEqual({
+        ok: false,
+        errorKey: "notFound",
+      });
+      expect(transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it("stops a reader after 20 deletions a minute", async () => {
+    const { owner } = await create();
+    signIn(owner);
+
+    for (let i = 0; i < 20; i += 1) {
+      expect(await deleteBook(randomUUID())).toEqual({
+        ok: false,
+        errorKey: "notFound",
+      });
+    }
+    const book = await seedBook(
+      owner.id,
+      { title: "Spared", author: null },
+      db,
+    );
+    expect(await deleteBook(book.id)).toEqual({
+      ok: false,
+      errorKey: "rateLimited",
+    });
+    expect(await findBook(owner.id, book.id, db)).toEqual(book);
+  });
+
+  it("answers a database failure with a generic key", async () => {
+    const { owner } = await create();
+    signIn(owner);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(db, "transaction").mockRejectedValueOnce(
+      Object.assign(new Error("delete failed"), { code: "XX000" }),
+    );
+
+    expect(await deleteBook(randomUUID())).toEqual({
+      ok: false,
+      errorKey: "failed",
+    });
+    expect(error).toHaveBeenCalledWith("books.delete failed", {
+      code: "XX000",
+    });
   });
 });
 
