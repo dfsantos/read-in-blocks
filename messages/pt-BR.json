@@ -13,7 +13,8 @@
       "title": "Nenhum livro ainda",
       "description": "Cadastre o primeiro livro para começar a acompanhar sua leitura.",
       "cta": "Cadastrar o primeiro livro"
-    }
+    },
+    "truncated": "Mostrando os {count, number} livros mais recentes."
   },
   "login": {
     "metadataTitle": "Entrar — Read in Blocks",

@@ -67,7 +67,8 @@ describe("LibraryPage", () => {
 
     await renderPage();
 
-    expect(mocks.listBooks).toHaveBeenCalledWith(READER.id);
+    expect(mocks.listBooks).toHaveBeenCalledWith(READER.id, { limit: 501 });
+    expect(screen.queryByText(/Mostrando os/)).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 1, name: "Sua biblioteca" }),
     ).toBeInTheDocument();
@@ -98,6 +99,29 @@ describe("LibraryPage", () => {
       screen.getByRole("link", { name: "Cadastrar o primeiro livro" }),
     ).toHaveAttribute("href", "/books/new");
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
+  });
+
+  it("shows at most 500 books and says when there are more", async () => {
+    mocks.listBooks.mockResolvedValue(
+      Array.from({ length: 501 }, (_, i) => ({
+        id: `b-${i}`,
+        title: `Book ${i}`,
+        author: null,
+        createdAt: new Date(),
+      })),
+    );
+
+    await renderPage();
+
+    expect(
+      within(screen.getByRole("list", { name: "Seus livros" })).getAllByRole(
+        "link",
+      ),
+    ).toHaveLength(500);
+    expect(screen.queryByText("Book 500")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Mostrando os 500 livros mais recentes."),
+    ).toBeInTheDocument();
   });
 
   it("titles the page as the library", async () => {

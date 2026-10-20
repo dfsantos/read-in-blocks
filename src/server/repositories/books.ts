@@ -44,9 +44,11 @@ export async function createBook(
 }
 
 // The reader's library (US-008): only their books, the most recently created first. The id breaks
-// ties between books created in the same instant, so the order is stable.
+// ties between books created in the same instant, so the order is stable. Always bounded: the
+// create quota still lets a reader pile up thousands of books (security review).
 export async function listBooks(
   userId: string,
+  options: { limit: number },
   db: Database = getDb(),
 ): Promise<Book[]> {
   return withOwner(
@@ -56,7 +58,8 @@ export async function listBooks(
         .select(bookColumns)
         .from(book)
         .where(ownedBy(book.ownerId, userId))
-        .orderBy(desc(book.createdAt), desc(book.id)),
+        .orderBy(desc(book.createdAt), desc(book.id))
+        .limit(options.limit),
     db,
   );
 }

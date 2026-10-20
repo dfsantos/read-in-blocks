@@ -14,6 +14,9 @@ import { bookPath, NEW_BOOK_PATH } from "@/lib/routes";
 import { requireUser } from "@/server/auth/session";
 import { listBooks } from "@/server/repositories/books";
 
+// Far beyond a personal library; past it, the page shows the most recent ones and says so.
+const LIBRARY_LIMIT = 500;
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("library");
   return { title: t("metadataTitle") };
@@ -23,7 +26,9 @@ export async function generateMetadata(): Promise<Metadata> {
 // page guards itself: the layout's check does not run again on client navigations.
 export default async function LibraryPage() {
   const user = await requireUser();
-  const books = await listBooks(user.id);
+  // One more than shown, to know whether there are more.
+  const found = await listBooks(user.id, { limit: LIBRARY_LIMIT + 1 });
+  const books = found.slice(0, LIBRARY_LIMIT);
   const t = await getTranslations("library");
 
   return (
@@ -68,6 +73,11 @@ export default async function LibraryPage() {
           ))}
         </ul>
       )}
+      {found.length > LIBRARY_LIMIT ? (
+        <p className="text-muted-foreground text-sm">
+          {t("truncated", { count: LIBRARY_LIMIT })}
+        </p>
+      ) : null}
     </main>
   );
 }

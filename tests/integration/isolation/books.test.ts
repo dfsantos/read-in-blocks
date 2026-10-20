@@ -46,7 +46,7 @@ const booksSpec: IsolationSpec<{ id: string }> = {
   operations: {
     find: (userId, target) => findBook(userId, target.id, db),
     // The target is ignored: a list takes no id, and must not carry someone else's book.
-    list: (userId) => listBooks(userId, db),
+    list: (userId) => listBooks(userId, { limit: 100 }, db),
   },
 };
 
@@ -88,8 +88,11 @@ describe("books repository", () => {
     );
     await createBook(intruder.id, { title: "Not mine", author: null }, db);
 
-    expect(await listBooks(owner.id, db)).toEqual([second, first]);
-    expect(await listBooks(owner.id, db)).not.toContainEqual(
+    expect(await listBooks(owner.id, { limit: 100 }, db)).toEqual([
+      second,
+      first,
+    ]);
+    expect(await listBooks(owner.id, { limit: 100 }, db)).not.toContainEqual(
       expect.objectContaining({ title: "Not mine" }),
     );
   });
@@ -111,7 +114,9 @@ describe("books repository", () => {
     });
     expect(rows[0].createdAt).toEqual(rows[1].createdAt);
 
-    const listed = (await listBooks(owner.id, db)).map((book) => book.id);
+    const listed = (await listBooks(owner.id, { limit: 100 }, db)).map(
+      (book) => book.id,
+    );
     expect(listed).toEqual(
       rows
         .map((row) => row.id)
@@ -120,9 +125,21 @@ describe("books repository", () => {
     );
   });
 
+  it("lists at most the limit, keeping the most recent", async () => {
+    const { owner } = await create();
+    await createBook(owner.id, { title: "Old", author: null }, db);
+    const recent = await createBook(
+      owner.id,
+      { title: "New", author: null },
+      db,
+    );
+
+    expect(await listBooks(owner.id, { limit: 1 }, db)).toEqual([recent]);
+  });
+
   it("lists nothing for a reader without books", async () => {
     const { owner } = await create();
-    expect(await listBooks(owner.id, db)).toEqual([]);
+    expect(await listBooks(owner.id, { limit: 100 }, db)).toEqual([]);
   });
 
   it("writes the owner from the userId, whatever the input carries", async () => {
