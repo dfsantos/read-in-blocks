@@ -5,7 +5,7 @@ import path from "node:path";
 import { is } from "drizzle-orm";
 import { PgDatabase, PgTable } from "drizzle-orm/pg-core";
 import { ESLint } from "eslint";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { getDb } from "@/db/client";
 import { withOwner } from "@/server/repositories/with-owner";
@@ -73,6 +73,15 @@ const authInstanceUses = [
 ];
 
 describe("data-access boundary", () => {
+  // Repositories are linted with type information: the first lint of one builds the TypeScript
+  // program of the whole project, seconds on a slow CI runner. Pay that once here, so each test's
+  // own timeout measures only the rule it checks.
+  beforeAll(async () => {
+    await eslint.lintText("", {
+      filePath: "src/server/repositories/sessions.ts",
+    });
+  }, 60_000);
+
   describe.each([
     "src/app/[locale]/(app)/page.tsx",
     "src/components/library/book-card.tsx",
