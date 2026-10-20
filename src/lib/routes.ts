@@ -3,7 +3,7 @@ import { routing } from "@/i18n/routing";
 // App paths shared by the proxy, pages and actions (US-005). Paths have no locale prefix
 // (`localePrefix: "as-needed"` with a single locale).
 export const LOGIN_PATH = "/login";
-// Where signed-in readers land. The library page itself arrives in US-008.
+// Where signed-in readers land: the library (US-008).
 export const LIBRARY_PATH = "/";
 // Book pages (US-007).
 export const NEW_BOOK_PATH = "/books/new";
