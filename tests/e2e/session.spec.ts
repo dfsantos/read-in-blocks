@@ -63,9 +63,9 @@ test.describe("signed-in reader", () => {
     await page.goto("/");
 
     await expect(page).toHaveURL("/");
-    await expect(page).toHaveTitle("Read in Blocks");
+    await expect(page).toHaveTitle("Biblioteca — Read in Blocks");
     await expect(
-      page.getByRole("heading", { level: 1, name: "Read in Blocks" }),
+      page.getByRole("heading", { level: 1, name: "Sua biblioteca" }),
     ).toBeVisible();
     const nav = page.getByRole("navigation", { name: "Navegação principal" });
     await expect(nav.getByRole("link", { name: "Biblioteca" })).toBeVisible();
