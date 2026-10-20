@@ -65,7 +65,7 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 - [ ] Domínio da árvore (validação de hierarquia) com testes unitários; migração `book_node` incluída, com RLS e política de dono (US-033).
 - [ ] Testes de isolamento para todas as operações de nó.
 
-**Notas técnicas:** ADR-0009.
+**Notas técnicas:** ADR-0009. A FK de `book_node` para o livro é composta `(owner_id, book_id)` → `book (owner_id, id)` com `ON DELETE CASCADE` (D-09, US-009); o teste de catálogo "foreign keys to book" exige isso, e a história inclui um teste que exclui o livro e confere que a estrutura sumiu.
 **Fora desta história:** importação automática da estrutura (fora de escopo do PRD).
 
 ---
