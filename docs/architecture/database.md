@@ -61,7 +61,7 @@ pnpm dev
 
 Segunda barreira do isolamento ([ADR-0008](../adr/0008-data-isolation-per-user.md), item 6; US-033). O filtro de dono dos repositórios (`ownedBy`) continua obrigatório; o RLS pega o filtro esquecido.
 
-**Convenção de migração.** Toda tabela de conteúdo (`book`, `book_node`, `note` e as próximas) tem `owner_id text not null` e declara `ownerPolicy()` (`src/db/rls.ts`) no `pgTable`:
+**Convenção de migração.** Toda tabela de conteúdo (`book` e `write_quota` desde a US-007; `book_node`, `note` e as próximas) tem `owner_id text not null` e declara `ownerPolicy()` (`src/db/rls.ts`) no `pgTable`:
 
 ```ts
 export const book = pgTable(
