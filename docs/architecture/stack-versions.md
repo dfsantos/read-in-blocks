@@ -83,7 +83,7 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 |---|---|---|---|---|
 | `zod` | **4.6.5** | ✅ Fixada | `/colinhacks/zod` | Maior tag indexada (3.24.2, 4.0.x, 4.3.6, 4.6.5). |
 | `react-hook-form` | **7.66.0** | ✅ Fixada | `/react-hook-form/react-hook-form` | Única tag indexada (reconfirmada na US-007, 2026-10-19). |
-| `@hookform/resolvers` | **5.3.0** | ✅ Fixada (US-007) | `/react-hook-form/resolvers` | Versão documentada no Context7 em 2026-10-19 (referência técnica v5.3.0). Peer `react-hook-form ^7.55.0`; `zodResolver` detecta Zod v3/v4 automaticamente. |
+| `@hookform/resolvers` | **5.9.1** | ✅ Fixada (US-007) | `/react-hook-form/resolvers` | O Context7 documenta a API v5 como "v5.3.0" (2026-10-19), versão que nunca foi publicada no npm (a série pula de 5.2.2 para 5.4.0). O responsável escolheu a 5.9.1: última 5.x com mais de duas semanas (a 5.9.2 tinha 2 dias e a 6.0.0, major, saiu no mesmo dia). Peer `react-hook-form ^7.55.0`; `zodResolver` detecta Zod v3/v4 automaticamente. |
 | `@tiptap/react, @tiptap/pm, @tiptap/starter-kit, @tiptap/extension-code-block-lowlight` | **3.x (a fechar na US-019)** | 🟡 Linha (patch a fechar) | `/ueberdosis/tiptap-docs` | Docs v3 estável (guia de upgrade v2→v3); evitar `3.0.0-next.*`. Next.js: `immediatelyRender: false`. Patch não indexado. |
 | `lowlight` | **a fechar na US-019** | 🟡 Linha (patch a fechar) | `/wooorm/lowlight` | Peer da extensão CodeBlockLowlight (versão controlada pelo app). |
 | `mermaid` | **11.x (a fechar na US-022)** | 🟡 Linha (patch a fechar) | `/mermaid-js/mermaid` | Docs `develop`; tag indexada só `v11_0_0`. `securityLevel: 'strict'`. |
