@@ -15,6 +15,7 @@ async function signIn(context: BrowserContext, email: string) {
   cleanUps.push(seeded.cleanUp);
   await context.clearCookies();
   await context.addCookies(seeded.cookies);
+  return seeded.cookies;
 }
 
 test.afterEach(async () => {
@@ -82,4 +83,66 @@ test("a reader creates a book, finds it in the library, and only they see it", a
   expect(missing?.status()).toBe(404);
   const malformed = await page.goto("/books/not-a-uuid");
   expect(malformed?.status()).toBe(404);
+});
+
+// US-009: the reader fixes the title and author, then deletes the book after confirming; another
+// reader gets the 404 page for the edit page (the actions on a foreign id are covered by
+// tests/integration/book-actions.test.ts).
+test("a reader edits a book and deletes it after confirming", async ({
+  context,
+  page,
+}) => {
+  const ownerCookies = await signIn(context, E2E_ACCOUNTS.books);
+  await page.goto("/books/new");
+  await page.getByLabel("Título").fill("Refactorng");
+  await page.getByRole("button", { name: "Cadastrar" }).click();
+  await expect(page).toHaveURL(
+    /^http:\/\/localhost:3000\/books\/[0-9a-f-]{36}$/,
+  );
+  const bookUrl = page.url();
+
+  await page.getByRole("link", { name: "Editar" }).click();
+  await expect(page).toHaveURL(`${bookUrl}/edit`);
+  await expect(page).toHaveTitle("Editar Refactorng — Read in Blocks");
+  await expect(page.getByLabel("Título")).toHaveValue("Refactorng");
+  await page.getByLabel("Título").fill("Refactoring");
+  await page.getByLabel("Autor").fill("Martin Fowler");
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+
+  await expect(page).toHaveURL(bookUrl);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Refactoring" }),
+  ).toBeVisible();
+  await expect(page.getByText("de Martin Fowler")).toBeVisible();
+
+  // Another reader gets the 404 page for the edit page too.
+  await signIn(context, E2E_ACCOUNTS.booksIntruder);
+  const foreign = await page.goto(`${bookUrl}/edit`);
+  expect(foreign?.status()).toBe(404);
+  await expect(page.getByText("Refactoring")).toHaveCount(0);
+
+  // Back as the owner: cancelling the dialog keeps the book.
+  await context.clearCookies();
+  await context.addCookies(ownerCookies);
+  await page.goto(bookUrl);
+  await page.getByRole("button", { name: "Excluir livro" }).click();
+  const dialog = page.getByRole("alertdialog", {
+    name: "Excluir “Refactoring”?",
+  });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Refactoring" }),
+  ).toBeVisible();
+
+  // Confirming deletes it and goes back to the library, now empty.
+  await page.getByRole("button", { name: "Excluir livro" }).click();
+  await dialog.getByRole("button", { name: "Excluir", exact: true }).click();
+  await expect(page).toHaveURL("/");
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Nenhum livro ainda" }),
+  ).toBeVisible();
+  const gone = await page.goto(bookUrl);
+  expect(gone?.status()).toBe(404);
 });
