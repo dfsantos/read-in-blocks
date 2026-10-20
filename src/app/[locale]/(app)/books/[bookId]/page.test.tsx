@@ -17,7 +17,8 @@ vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("next-intl/server", async () => {
   const { createTranslator } = await import("next-intl");
   return {
-    getTranslations: async (namespace: string) =>
+    // The page only asks for books.detail.
+    getTranslations: async (namespace: "books.detail") =>
       createTranslator({ locale: "pt-BR", messages, namespace }),
   };
 });
