@@ -16,7 +16,7 @@ Cobre RF-005, RF-006, RF-007 e RF-009 (retomada). Persona: **Leitor**.
 - [ ] Migração `note` incluída, com RLS e política de dono (US-033); `owner_id`, `book_id` e `node_id` presentes; excluir um nó/livro remove suas anotações.
 - [ ] Testes de isolamento para todas as operações.
 
-**Notas técnicas:** ADR-0007 (modelo de anotação), ADR-0008.
+**Notas técnicas:** ADR-0007 (modelo de anotação), ADR-0008. A FK de `note` para o livro é composta `(owner_id, book_id)` → `book (owner_id, id)` com `ON DELETE CASCADE` (D-09, US-009), exigida pelo teste de catálogo "foreign keys to book"; incluir teste que exclui o livro e confere que as anotações sumiram.
 
 ---
 

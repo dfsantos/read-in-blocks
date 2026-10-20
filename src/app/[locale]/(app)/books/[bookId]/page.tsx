@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { cache } from "react";
 
+import { DeleteBookButton } from "@/components/books/delete-book-button";
+import { buttonVariants } from "@/components/ui/button";
 import { bookIdSchema } from "@/domain/books/book-input";
 import { Link } from "@/i18n/navigation";
-import { LIBRARY_PATH } from "@/lib/routes";
+import { editBookPath, LIBRARY_PATH } from "@/lib/routes";
+import { deleteBook } from "@/server/actions/books";
 import { requireUser } from "@/server/auth/session";
 import { foundOrNotFound } from "@/server/not-found";
 import { findBook } from "@/server/repositories/books";
@@ -27,7 +30,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: t("metadataTitle", { title: book.title }) };
 }
 
-// The book page (US-007). Its structure (parts, chapters, topics) arrives in US-010.
+// The book page (US-007), with its edit and delete actions (US-009). Its structure (parts,
+// chapters, topics) arrives in US-010.
 export default async function BookPage({ params }: Props) {
   const book = await loadBook((await params).bookId);
   const t = await getTranslations("books.detail");
@@ -46,6 +50,23 @@ export default async function BookPage({ params }: Props) {
           {book.author ? t("byAuthor", { author: book.author }) : t("noAuthor")}
         </p>
       </header>
+      <div
+        role="group"
+        aria-label={t("actionsLabel")}
+        className="flex flex-wrap gap-3"
+      >
+        <Link
+          href={editBookPath(book.id)}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          {t("edit")}
+        </Link>
+        {/* The bound id is still an argument the client sends: the action parses it again. */}
+        <DeleteBookButton
+          title={book.title}
+          action={deleteBook.bind(null, book.id)}
+        />
+      </div>
       <p className="text-muted-foreground text-sm">{t("structurePending")}</p>
     </main>
   );

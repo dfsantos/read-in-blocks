@@ -53,13 +53,37 @@
       "authorHint": "Opcional.",
       "submit": "Cadastrar",
       "submitting": "Cadastrando…",
+      "save": "Salvar alterações",
+      "saving": "Salvando…",
       "errors": {
         "titleRequired": "Informe o título do livro.",
         "titleTooLong": "O título pode ter no máximo 200 caracteres.",
         "authorTooLong": "O autor pode ter no máximo 200 caracteres.",
         "rateLimited": "Muitos cadastros em pouco tempo. Aguarde um minuto e tente de novo.",
         "failed": "Não foi possível cadastrar o livro. Tente de novo em instantes.",
-        "invalidCharacters": "Use só texto comum, sem quebras de linha nem caracteres de controle."
+        "invalidCharacters": "Use só texto comum, sem quebras de linha nem caracteres de controle.",
+        "updateRateLimited": "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
+        "updateFailed": "Não foi possível salvar as alterações. Tente de novo em instantes.",
+        "notFound": "Este livro não existe mais."
+      }
+    },
+    "edit": {
+      "metadataTitle": "Editar {title} — Read in Blocks",
+      "title": "Editar livro",
+      "description": "Corrija o título ou o autor.",
+      "cancel": "Cancelar"
+    },
+    "delete": {
+      "trigger": "Excluir livro",
+      "title": "Excluir “{title}”?",
+      "description": "O livro, a estrutura e as anotações dele serão apagados para sempre. Não é possível desfazer.",
+      "cancel": "Cancelar",
+      "confirm": "Excluir",
+      "deleting": "Excluindo…",
+      "errors": {
+        "notFound": "Este livro não existe mais.",
+        "rateLimited": "Muitas exclusões em pouco tempo. Aguarde um minuto e tente de novo.",
+        "failed": "Não foi possível excluir o livro. Tente de novo em instantes."
       }
     },
     "detail": {
@@ -67,7 +91,9 @@
       "byAuthor": "de {author}",
       "noAuthor": "Autor não informado",
       "structurePending": "A estrutura do livro (partes, capítulos e tópicos) chega nas próximas versões.",
-      "backToLibrary": "Voltar para a biblioteca"
+      "backToLibrary": "Voltar para a biblioteca",
+      "edit": "Editar",
+      "actionsLabel": "Ações do livro"
     }
   }
 }
