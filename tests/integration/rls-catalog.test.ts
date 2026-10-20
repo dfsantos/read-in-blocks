@@ -237,3 +237,71 @@ describe("RLS catalog", () => {
     }
   });
 });
+
+// Deleting a book takes everything that hangs from it (US-009, D-09): every foreign key pointing at
+// a book must be ON DELETE CASCADE, and composite with the owner, (owner_id, book_id) →
+// book (owner_id, id), so a row can never hang from another reader's book (an FK ignores RLS;
+// docs/architecture/database.md). Empty today; it bites from the first table that points at a book
+// (US-010 on).
+async function bookReferenceProblems(client: Client): Promise<string[]> {
+  const references = await client.query<{
+    name: string;
+    on_delete: string;
+    pairs: string[];
+  }>(`
+    select c.conrelid::regclass::text || '.' || c.conname as name,
+           c.confdeltype::text as on_delete,
+           array(select a.attname || '->' || f.attname
+                   from unnest(c.conkey, c.confkey) as k(col, ref)
+                   join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.col
+                   join pg_attribute f on f.attrelid = c.confrelid and f.attnum = k.ref
+                  order by 1) as pairs
+      from pg_constraint c
+     where c.contype = 'f' and c.confrelid = 'public.book'::regclass
+     order by 1`);
+
+  const problems: string[] = [];
+  for (const reference of references.rows) {
+    // 'c': ON DELETE CASCADE.
+    if (reference.on_delete !== "c") {
+      problems.push(`${reference.name}: not ON DELETE CASCADE`);
+    }
+    const pairs = new Set(reference.pairs);
+    const toId = reference.pairs.filter((pair) => pair.endsWith("->id"));
+    if (
+      reference.pairs.length !== 2 ||
+      !pairs.has("owner_id->owner_id") ||
+      toId.length !== 1
+    ) {
+      problems.push(`${reference.name}: not (owner_id, book_id) → book`);
+    }
+  }
+  return problems;
+}
+
+describe("foreign keys to book", () => {
+  it("cascade the deletion of a book and keep the owner", async () => {
+    expect(await bookReferenceProblems(migrator)).toEqual([]);
+  });
+
+  // Control, in a transaction that is rolled back like the one above.
+  it("catches a reference that would outlive its book or cross owners", async () => {
+    await migrator.query("begin");
+    try {
+      await migrator.query(`
+        create table book_ref_good (owner_id text not null, book_id uuid not null,
+          foreign key (owner_id, book_id) references book (owner_id, id) on delete cascade);
+        create table book_ref_restrict (owner_id text not null, book_id uuid not null,
+          foreign key (owner_id, book_id) references book (owner_id, id));
+        create table book_ref_id_only (book_id uuid not null references book (id)
+          on delete cascade);
+      `);
+      expect(await bookReferenceProblems(migrator)).toEqual([
+        "book_ref_id_only.book_ref_id_only_book_id_fkey: not (owner_id, book_id) → book",
+        "book_ref_restrict.book_ref_restrict_owner_id_book_id_fkey: not ON DELETE CASCADE",
+      ]);
+    } finally {
+      await migrator.query("rollback");
+    }
+  });
+});
