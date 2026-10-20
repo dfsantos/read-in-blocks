@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import { getDb, type Database } from "@/db/client";
 import { book } from "@/db/schema";
@@ -80,6 +80,54 @@ export async function findBook(
         .where(ownedBy(book.ownerId, userId, eq(book.id, bookId)))
         .limit(1);
       return row;
+    },
+    db,
+  );
+}
+
+// undefined, with nothing written, both when the book does not exist and when it belongs to someone
+// else (US-009). bookId must already be a UUID (bookIdSchema).
+export async function updateBook(
+  userId: string,
+  bookId: string,
+  input: BookInput,
+  db: Database = getDb(),
+): Promise<Book | undefined> {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const [updated] = await tx
+        .update(book)
+        .set({
+          title: input.title,
+          author: input.author,
+          updatedAt: sql`now()`,
+        })
+        .where(ownedBy(book.ownerId, userId, eq(book.id, bookId)))
+        .returning(bookColumns);
+      return updated;
+    },
+    db,
+  );
+}
+
+// Whether the reader's book was deleted (US-009, D-09): false both for a missing book and for
+// someone else's. What hangs from a book (structure, notes) goes with it through composite foreign
+// keys with ON DELETE CASCADE, which tests/integration/rls-catalog.test.ts requires of every table
+// that points at a book.
+export async function deleteBook(
+  userId: string,
+  bookId: string,
+  db: Database = getDb(),
+): Promise<boolean> {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const deleted = await tx
+        .delete(book)
+        .where(ownedBy(book.ownerId, userId, eq(book.id, bookId)))
+        .returning({ id: book.id });
+      return deleted.length > 0;
     },
     db,
   );

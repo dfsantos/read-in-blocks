@@ -6,7 +6,13 @@ import { Pool } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 
 import * as schema from "@/db/schema";
-import { createBook, findBook, listBooks } from "@/server/repositories/books";
+import {
+  createBook,
+  deleteBook,
+  findBook,
+  listBooks,
+  updateBook,
+} from "@/server/repositories/books";
 import { consumeWriteQuota } from "@/server/repositories/write-quota";
 
 import { requireTestEnv } from "../db-env";
@@ -47,6 +53,14 @@ const booksSpec: IsolationSpec<{ id: string }> = {
     find: (userId, target) => findBook(userId, target.id, db),
     // The target is ignored: a list takes no id, and must not carry someone else's book.
     list: (userId) => listBooks(userId, { limit: 100 }, db),
+    update: (userId, target) =>
+      updateBook(
+        userId,
+        target.id,
+        { title: "Overwritten", author: "Intruder" },
+        db,
+      ),
+    delete: (userId, target) => deleteBook(userId, target.id, db),
   },
 };
 
@@ -204,9 +218,151 @@ describe("books repository", () => {
   });
 
   it("refuses to run without a userId", async () => {
-    await expect(findBook("", randomUUID(), db)).rejects.toThrow(
-      "repository called without a userId",
+    for (const call of [
+      () => findBook("", randomUUID(), db),
+      () => updateBook("", randomUUID(), { title: "t", author: null }, db),
+      () => deleteBook("", randomUUID(), db),
+    ]) {
+      await expect(call()).rejects.toThrow(
+        "repository called without a userId",
+      );
+    }
+  });
+
+  it("updates the title and author of the reader's book and its updated_at", async () => {
+    const { owner } = await create();
+    const created = await createBook(
+      owner.id,
+      { title: "Refactorng", author: "Fowler" },
+      db,
     );
+    const updatedAt = async () =>
+      db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select set_config('app.user_id', ${owner.id}, true)`,
+        );
+        const [row] = await tx
+          .select({ updatedAt: schema.book.updatedAt })
+          .from(schema.book)
+          .where(eq(schema.book.id, created.id));
+        return row.updatedAt;
+      });
+    const before = await updatedAt();
+
+    const updated = await updateBook(
+      owner.id,
+      created.id,
+      { title: "Refactoring", author: null },
+      db,
+    );
+
+    expect(updated).toEqual({
+      ...created,
+      title: "Refactoring",
+      author: null,
+    });
+    expect(await findBook(owner.id, created.id, db)).toEqual(updated);
+    expect((await updatedAt()).getTime()).toBeGreaterThan(before.getTime());
+  });
+
+  it("writes nothing for a missing book", async () => {
+    const { owner } = await create();
+    expect(
+      await updateBook(
+        owner.id,
+        randomUUID(),
+        { title: "t", author: null },
+        db,
+      ),
+    ).toBeUndefined();
+    expect(await deleteBook(owner.id, randomUUID(), db)).toBe(false);
+  });
+
+  it("keeps the database limits on an update", async () => {
+    const { owner } = await create();
+    const created = await createBook(
+      owner.id,
+      { title: "Kept", author: null },
+      db,
+    );
+
+    await expect(
+      updateBook(owner.id, created.id, { title: "", author: null }, db),
+    ).rejects.toMatchObject({ cause: { code: "23514" } });
+    expect(await findBook(owner.id, created.id, db)).toEqual(created);
+  });
+
+  it("deletes only the given book of the reader", async () => {
+    const { owner } = await create();
+    const kept = await createBook(
+      owner.id,
+      { title: "Kept", author: null },
+      db,
+    );
+    const gone = await createBook(
+      owner.id,
+      { title: "Gone", author: null },
+      db,
+    );
+
+    expect(await deleteBook(owner.id, gone.id, db)).toBe(true);
+
+    expect(await findBook(owner.id, gone.id, db)).toBeUndefined();
+    expect(await listBooks(owner.id, { limit: 100 }, db)).toEqual([kept]);
+    // A second deletion answers like a missing book.
+    expect(await deleteBook(owner.id, gone.id, db)).toBe(false);
+  });
+
+  it("lets RLS refuse an update or delete of another reader's book without the owner filter", async () => {
+    const { owner, intruder } = await create();
+    const created = await createBook(
+      owner.id,
+      { title: "Guarded", author: null },
+      db,
+    );
+
+    await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select set_config('app.user_id', ${intruder.id}, true)`,
+      );
+      expect(
+        await tx
+          .update(schema.book)
+          .set({ title: "Forged" })
+          .where(eq(schema.book.id, created.id))
+          .returning({ id: schema.book.id }),
+      ).toEqual([]);
+      expect(
+        await tx
+          .delete(schema.book)
+          .where(eq(schema.book.id, created.id))
+          .returning({ id: schema.book.id }),
+      ).toEqual([]);
+    });
+    expect(await findBook(owner.id, created.id, db)).toEqual(created);
+  });
+
+  it("does not let an update hand the book to someone else", async () => {
+    const { owner, intruder } = await create();
+    const created = await createBook(
+      owner.id,
+      { title: "Mine", author: null },
+      db,
+    );
+    const input = {
+      title: "Still mine",
+      author: null,
+      ownerId: intruder.id,
+      id: randomUUID(),
+    } as Parameters<typeof updateBook>[2];
+
+    await updateBook(owner.id, created.id, input, db);
+
+    expect(await findBook(owner.id, created.id, db)).toMatchObject({
+      id: created.id,
+      title: "Still mine",
+    });
+    expect(await findBook(intruder.id, created.id, db)).toBeUndefined();
   });
 
   it("removes the reader's books and quotas with the reader", async () => {
