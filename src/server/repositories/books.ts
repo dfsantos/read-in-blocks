@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { getDb, type Database } from "@/db/client";
 import { book } from "@/db/schema";
@@ -39,6 +39,24 @@ export async function createBook(
         .returning(bookColumns);
       return created;
     },
+    db,
+  );
+}
+
+// The reader's library (US-008): only their books, the most recently created first. The id breaks
+// ties between books created in the same instant, so the order is stable.
+export async function listBooks(
+  userId: string,
+  db: Database = getDb(),
+): Promise<Book[]> {
+  return withOwner(
+    userId,
+    async (tx) =>
+      tx
+        .select(bookColumns)
+        .from(book)
+        .where(ownedBy(book.ownerId, userId))
+        .orderBy(desc(book.createdAt), desc(book.id)),
     db,
   );
 }
