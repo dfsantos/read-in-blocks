@@ -32,10 +32,10 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 **Cobre:** RF-009 (listagem) · **Tamanho:** P · **Depende de:** US-007
 
 **Critérios de aceite**
-- [ ] Página inicial autenticada lista os livros do usuário, ordenados pelo mais recente.
-- [ ] Estado vazio com chamada para cadastrar o primeiro livro.
-- [ ] Cada item abre a página do livro.
-- [ ] Lista exibe apenas livros do próprio usuário (teste de isolamento).
+- [x] Página inicial autenticada lista os livros do usuário, ordenados pelo mais recente.
+- [x] Estado vazio com chamada para cadastrar o primeiro livro.
+- [x] Cada item abre a página do livro.
+- [x] Lista exibe apenas livros do próprio usuário (teste de isolamento).
 
 **Fora desta história:** progresso e “retomar de onde parou” (US-021).
 
