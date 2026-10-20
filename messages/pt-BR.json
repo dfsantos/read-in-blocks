@@ -7,7 +7,7 @@
     "title": "Read in Blocks",
     "description": "Acompanhe sua leitura por partes, capítulos e tópicos.",
     "body": "O projeto base está pronto. As funcionalidades chegam por história.",
-    "cta": "Em breve",
+    "cta": "Cadastrar livro",
     "formatting": {
       "date": "Data: {value}",
       "number": "Número: {value}",
@@ -38,5 +38,33 @@
     "open": "Abrir o menu de {name}",
     "signOut": "Sair",
     "signingOut": "Saindo…"
+  },
+  "books": {
+    "create": {
+      "metadataTitle": "Cadastrar livro — Read in Blocks",
+      "title": "Cadastrar livro",
+      "description": "Comece pelo título. Partes, capítulos e metas vêm depois."
+    },
+    "form": {
+      "title": "Título",
+      "author": "Autor",
+      "authorHint": "Opcional.",
+      "submit": "Cadastrar",
+      "submitting": "Cadastrando…",
+      "errors": {
+        "titleRequired": "Informe o título do livro.",
+        "titleTooLong": "O título pode ter no máximo 200 caracteres.",
+        "authorTooLong": "O autor pode ter no máximo 200 caracteres.",
+        "rateLimited": "Muitos cadastros em pouco tempo. Aguarde um minuto e tente de novo.",
+        "failed": "Não foi possível cadastrar o livro. Tente de novo em instantes."
+      }
+    },
+    "detail": {
+      "metadataTitle": "{title} — Read in Blocks",
+      "byAuthor": "de {author}",
+      "noAuthor": "Autor não informado",
+      "structurePending": "A estrutura do livro (partes, capítulos e tópicos) chega nas próximas versões.",
+      "backToLibrary": "Voltar para a biblioteca"
+    }
   }
 }

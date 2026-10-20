@@ -1,0 +1,52 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
+import { cache } from "react";
+
+import { bookIdSchema } from "@/domain/books/book-input";
+import { Link } from "@/i18n/navigation";
+import { LIBRARY_PATH } from "@/lib/routes";
+import { requireUser } from "@/server/auth/session";
+import { foundOrNotFound } from "@/server/not-found";
+import { findBook } from "@/server/repositories/books";
+
+type Props = Readonly<{ params: Promise<{ bookId: string }> }>;
+
+// The reader's book, or the 404 page: a malformed id, a missing book and another reader's book
+// all get the same answer (zero-trust.md, 1.4). Memoized so metadata and page query once.
+const loadBook = cache(async (bookId: string) => {
+  const user = await requireUser();
+  const id = bookIdSchema.safeParse(bookId);
+  return foundOrNotFound(
+    id.success ? await findBook(user.id, id.data) : undefined,
+  );
+});
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const book = await loadBook((await params).bookId);
+  const t = await getTranslations("books.detail");
+  return { title: t("metadataTitle", { title: book.title }) };
+}
+
+// The book page (US-007). Its structure (parts, chapters, topics) arrives in US-010.
+export default async function BookPage({ params }: Props) {
+  const book = await loadBook((await params).bookId);
+  const t = await getTranslations("books.detail");
+
+  return (
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
+      <Link
+        href={LIBRARY_PATH}
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 self-start rounded-md text-sm outline-none focus-visible:ring-3"
+      >
+        {t("backToLibrary")}
+      </Link>
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold break-words">{book.title}</h1>
+        <p className="text-muted-foreground break-words">
+          {book.author ? t("byAuthor", { author: book.author }) : t("noAuthor")}
+        </p>
+      </header>
+      <p className="text-muted-foreground text-sm">{t("structurePending")}</p>
+    </main>
+  );
+}

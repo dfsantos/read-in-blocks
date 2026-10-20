@@ -5,6 +5,11 @@ import { routing } from "@/i18n/routing";
 export const LOGIN_PATH = "/login";
 // Where signed-in readers land. The library page itself arrives in US-008.
 export const LIBRARY_PATH = "/";
+// Book pages (US-007).
+export const NEW_BOOK_PATH = "/books/new";
+export function bookPath(bookId: string): string {
+  return `/books/${encodeURIComponent(bookId)}`;
+}
 // Query parameter carrying the page an anonymous visitor tried to open.
 export const NEXT_PARAM = "next";
 
