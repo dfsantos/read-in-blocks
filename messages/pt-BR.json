@@ -56,7 +56,8 @@
         "titleTooLong": "O título pode ter no máximo 200 caracteres.",
         "authorTooLong": "O autor pode ter no máximo 200 caracteres.",
         "rateLimited": "Muitos cadastros em pouco tempo. Aguarde um minuto e tente de novo.",
-        "failed": "Não foi possível cadastrar o livro. Tente de novo em instantes."
+        "failed": "Não foi possível cadastrar o livro. Tente de novo em instantes.",
+        "invalidCharacters": "Use só texto comum, sem quebras de linha nem caracteres de controle."
       }
     },
     "detail": {

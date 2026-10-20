@@ -13,7 +13,13 @@ export const bookInputErrors = {
   titleRequired: "titleRequired",
   titleTooLong: "titleTooLong",
   authorTooLong: "authorTooLong",
+  invalidCharacters: "invalidCharacters",
 } as const;
+
+// Control characters (tabs, line breaks, NUL…) and bidirectional overrides/isolates, which can make
+// a title display as something else (security review, US-007). Plain text on one line only.
+const HIDDEN_CHARACTERS = /[\p{Cc}\u202A-\u202E\u2066-\u2069]/u;
+const visibleText = (text: string) => !HIDDEN_CHARACTERS.test(text);
 
 export type BookInputError =
   (typeof bookInputErrors)[keyof typeof bookInputErrors];
@@ -24,12 +30,14 @@ export const bookInputSchema = z.object({
     .string({ error: bookInputErrors.titleRequired })
     .trim()
     .min(1, { error: bookInputErrors.titleRequired })
-    .max(BOOK_TITLE_MAX, { error: bookInputErrors.titleTooLong }),
+    .max(BOOK_TITLE_MAX, { error: bookInputErrors.titleTooLong })
+    .refine(visibleText, { error: bookInputErrors.invalidCharacters }),
   // Blank (or missing) means no author: stored as null, never as "".
   author: z
     .string({ error: bookInputErrors.authorTooLong })
     .trim()
     .max(BOOK_AUTHOR_MAX, { error: bookInputErrors.authorTooLong })
+    .refine(visibleText, { error: bookInputErrors.invalidCharacters })
     .optional()
     .transform((author) => (author ? author : null)),
 });

@@ -94,6 +94,34 @@ describe("bookInputSchema", () => {
       { ok: true, data: { title: "t", author: null } },
     ],
     [
+      "a line break inside the title",
+      { title: "Clean\nCode" },
+      { ok: false, errors: ["title:invalidCharacters"] },
+    ],
+    [
+      "a NUL in the title",
+      { title: "Clean\u0000Code" },
+      { ok: false, errors: ["title:invalidCharacters"] },
+    ],
+    [
+      "a right-to-left override in the title",
+      { title: "evil\u202Etxt.exe" },
+      { ok: false, errors: ["title:invalidCharacters"] },
+    ],
+    [
+      "a bidi isolate in the author",
+      { title: "t", author: "a\u2067b" },
+      { ok: false, errors: ["author:invalidCharacters"] },
+    ],
+    [
+      "accents and other scripts are plain text",
+      { title: "Memórias Póstumas", author: "Machado de Assis 機械" },
+      {
+        ok: true,
+        data: { title: "Memórias Póstumas", author: "Machado de Assis 機械" },
+      },
+    ],
+    [
       "not an object",
       "title",
       { ok: false, errors: [expect.stringMatching(/^:/)] },
