@@ -10,6 +10,10 @@ export const NEW_BOOK_PATH = "/books/new";
 export function bookPath(bookId: string): string {
   return `/books/${encodeURIComponent(bookId)}`;
 }
+// Editing a book (US-009).
+export function editBookPath(bookId: string): string {
+  return `${bookPath(bookId)}/edit`;
+}
 // Query parameter carrying the page an anonymous visitor tried to open.
 export const NEXT_PARAM = "next";
 

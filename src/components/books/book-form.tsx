@@ -23,21 +23,31 @@ import { bookPath } from "@/lib/routes";
 import type {
   BookActionErrorKey,
   CreateBookResult,
+  UpdateBookResult,
 } from "@/server/actions/books";
 
 type Props = Readonly<{
-  // The Server Action; injected so tests can replace it.
-  action: (input: BookFormValues) => Promise<CreateBookResult>;
+  // The Server Action (createBook, or updateBook bound to the book); injected so tests can replace
+  // it.
+  action: (
+    input: BookFormValues,
+  ) => Promise<CreateBookResult | UpdateBookResult>;
+  // "edit" starts from the book's current values and saves instead of creating (US-009).
+  mode?: "create" | "edit";
+  initialValues?: { title: string; author: string | null };
 }>;
 
-// Book creation form (US-007, D-08). The schema here is only for quick feedback: the Server Action
-// parses the input again and decides.
-export function BookForm({ action }: Props) {
+// Book creation and edition form (US-007, US-009, D-08). The schema here is only for quick
+// feedback: the Server Action parses the input again and decides.
+export function BookForm({ action, mode = "create", initialValues }: Props) {
   const t = useTranslations("books.form");
   const router = useRouter();
   const form = useForm<BookFormValues, unknown, BookInput>({
     resolver: zodResolver(bookInputSchema),
-    defaultValues: { title: "", author: "" },
+    defaultValues: {
+      title: initialValues?.title ?? "",
+      author: initialValues?.author ?? "",
+    },
   });
 
   // Field errors carry a key of books.form.errors (bookInputErrors), never text.
@@ -128,7 +138,13 @@ export function BookForm({ action }: Props) {
         ) : null}
         <Field orientation="horizontal">
           <Button type="submit" disabled={submitting}>
-            {submitting ? t("submitting") : t("submit")}
+            {mode === "edit"
+              ? submitting
+                ? t("saving")
+                : t("save")
+              : submitting
+                ? t("submitting")
+                : t("submit")}
           </Button>
         </Field>
       </FieldGroup>

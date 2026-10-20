@@ -7,6 +7,7 @@ import messages from "../../../../../../messages/pt-BR.json";
 const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
   findBook: vi.fn(),
+  deleteBook: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NEXT_HTTP_ERROR_FALLBACK;404");
   }),
@@ -25,7 +26,9 @@ vi.mock("next-intl/server", async () => {
 // next-intl's navigation does not load outside Next.js.
 vi.mock("@/i18n/navigation", () => ({
   Link: (props: React.ComponentProps<"a">) => <a {...props} />,
+  useRouter: () => ({ replace: vi.fn() }),
 }));
+vi.mock("@/server/actions/books", () => ({ deleteBook: mocks.deleteBook }));
 
 import BookPage, { generateMetadata } from "./page";
 
@@ -74,6 +77,30 @@ describe("BookPage", () => {
       screen.getByRole("heading", { level: 1, name: "<b>Refactoring</b>" }),
     ).toBeInTheDocument();
     expect(screen.getByText("de Martin Fowler")).toBeInTheDocument();
+  });
+
+  it("offers editing and deleting the book", async () => {
+    mocks.findBook.mockResolvedValue({
+      id: BOOK_ID,
+      title: "SICP",
+      author: null,
+      createdAt: new Date(),
+    });
+
+    render(
+      <NextIntlClientProvider locale="pt-BR" messages={messages}>
+        {await BookPage(props(BOOK_ID))}
+      </NextIntlClientProvider>,
+    );
+
+    const actions = screen.getByRole("group", { name: "Ações do livro" });
+    expect(screen.getByRole("link", { name: "Editar" })).toHaveAttribute(
+      "href",
+      `/books/${BOOK_ID}/edit`,
+    );
+    expect(actions).toContainElement(
+      screen.getByRole("button", { name: "Excluir livro" }),
+    );
   });
 
   it("says when the author is unknown", async () => {

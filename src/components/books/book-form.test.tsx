@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CreateBookResult } from "@/server/actions/books";
+import type {
+  CreateBookResult,
+  UpdateBookResult,
+} from "@/server/actions/books";
 
 import messages from "../../../messages/pt-BR.json";
 
@@ -139,4 +142,79 @@ describe("BookForm", () => {
       expect(push).not.toHaveBeenCalled();
     },
   );
+
+  describe("in edit mode", () => {
+    function renderEdit(result: UpdateBookResult) {
+      const action = vi.fn().mockResolvedValue(result);
+      render(
+        <NextIntlClientProvider locale="pt-BR" messages={messages}>
+          <BookForm
+            mode="edit"
+            action={action}
+            initialValues={{ title: "Refactorng", author: null }}
+          />
+        </NextIntlClientProvider>,
+      );
+      return { action, user: userEvent.setup() };
+    }
+
+    const save = () =>
+      screen.getByRole("button", { name: "Salvar alterações" });
+
+    it("starts from the book's current values", () => {
+      renderEdit({ ok: true, data: { id: BOOK_ID } });
+
+      expect(screen.getByLabelText("Título")).toHaveValue("Refactorng");
+      expect(screen.getByLabelText("Autor")).toHaveValue("");
+    });
+
+    it("saves the corrected values and opens the book's page", async () => {
+      const { action, user } = renderEdit({ ok: true, data: { id: BOOK_ID } });
+
+      await user.clear(screen.getByLabelText("Título"));
+      await user.type(screen.getByLabelText("Título"), "Refactoring ");
+      await user.type(screen.getByLabelText("Autor"), "Martin Fowler");
+      await user.click(save());
+
+      await vi.waitFor(() =>
+        expect(push).toHaveBeenCalledWith(`/books/${BOOK_ID}`),
+      );
+      expect(action).toHaveBeenCalledWith({
+        title: "Refactoring",
+        author: "Martin Fowler",
+      });
+    });
+
+    it("refuses a title cleared to nothing without calling the server", async () => {
+      const { action, user } = renderEdit({ ok: true, data: { id: BOOK_ID } });
+
+      await user.clear(screen.getByLabelText("Título"));
+      await user.click(save());
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Informe o título do livro.",
+      );
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["notFound", "Este livro não existe mais."],
+      [
+        "updateRateLimited",
+        "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
+      ],
+      [
+        "updateFailed",
+        "Não foi possível salvar as alterações. Tente de novo em instantes.",
+      ],
+    ] as const)("shows the form error %s", async (errorKey, text) => {
+      const { user } = renderEdit({ ok: false, errorKey });
+
+      await user.click(save());
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(text);
+      expect(save()).toBeEnabled();
+      expect(push).not.toHaveBeenCalled();
+    });
+  });
 });
