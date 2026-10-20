@@ -15,6 +15,7 @@ História: US-028. Política: [zero-trust.md](zero-trust.md) (itens 1.2, 2.6 e 3
 | Origem e tamanho do corpo nos Route Handlers de escrita | `guardWrite()` em `src/server/request-guard.ts` | `POST /api/auth/*` e todo handler de escrita futuro |
 | Lista de endpoints do Better Auth | `ENDPOINTS` em `src/app/api/auth/[...all]/route.ts` | `/api/auth/*`: o resto é 404 antes do Better Auth |
 | Rate limit | Regra do Vercel Firewall + `rateLimit` do Better Auth no banco | `/api/auth/*` e `/api/health` |
+| Rate limit por leitor das Server Actions de escrita | `consumeWriteQuota()` em `src/server/repositories/write-quota.ts` (tabela `write_quota`) | Toda Server Action que grava (hoje `createBook`) |
 
 ## Content Security Policy
 
@@ -55,7 +56,7 @@ upgrade-insecure-requests        (só em https)
 
 ### Server Actions
 
-O Next.js compara a `Origin` com o `Host` (ou `X-Forwarded-Host`) e aborta a action quando diferem. Não configuramos `allowedOrigins`: só o próprio site chama actions. O corpo é limitado a **100 kB** (`serverActions.bodySizeLimit`); as actions de hoje não recebem entrada, e o limite deve ser revisto quando o editor de anotações chegar (US-019), só o necessário.
+O Next.js compara a `Origin` com o `Host` (ou `X-Forwarded-Host`) e aborta a action quando diferem. Não configuramos `allowedOrigins`: só o próprio site chama actions. O corpo é limitado a **100 kB** (`serverActions.bodySizeLimit`); a maior entrada de hoje é o cadastro de livro (título e autor, até 200 caracteres cada, US-007), e o limite deve ser revisto quando o editor de anotações chegar (US-019), só o necessário.
 
 As actions continuam validando a entrada com Zod e chamando `requireUser()` (regra `server-actions`): a checagem de origem não autentica ninguém.
 
@@ -77,7 +78,7 @@ O handler de `/api/auth/*` só repassa ao Better Auth os endpoints que o app usa
 
 ## Rate limit
 
-Duas camadas, porque nenhuma basta sozinha:
+Duas camadas nos Route Handlers, porque nenhuma basta sozinha, e uma terceira nas Server Actions:
 
 1. **Vercel Firewall** (fora do repositório, aplicada pelo responsável): uma regra de rate limit por IP para os caminhos que começam com `/api/auth/` **ou** são iguais a `/api/health`, respondendo 429 acima do limite (100 requisições por minuto, janela fixa). No plano Hobby cabe uma única regra de rate limit por projeto, com janela de 10 s a 10 min. Para conferir:
 
@@ -89,12 +90,13 @@ Duas camadas, porque nenhuma basta sozinha:
 
 2. **Better Auth** (`rateLimit` em `src/server/auth/options.ts`): contadores na tabela `rate_limit`, compartilhados entre as instâncias serverless (o padrão em memória zeraria a cada instância). Limites: 60 requisições por minuto por IP em `/api/auth/*`, e 10 por minuto em `/sign-in/*` e `/callback/*`. O IP vem de `x-forwarded-for`, que a Vercel sobrescreve. Ligado só em produção (padrão do Better Auth), para não atrasar os testes; o teste de integração `auth-rate-limit.test.ts` o liga explicitamente.
 
-As Server Actions de escrita ainda não têm limite próprio: as que existem não gravam conteúdo. Quando chegarem (US-007 em diante), o limite por leitor entra junto.
+3. **Server Actions de escrita** (US-007): limite por leitor e por ação, em janela fixa, com `consumeWriteQuota(userId, { action, limit, windowSeconds })`. Os contadores ficam na tabela `write_quota` (uma linha por leitor e ação, com `owner_id` e a política de dono do RLS, acessada por `withOwner`), então valem entre as instâncias serverless. Um único `INSERT … ON CONFLICT DO UPDATE` conta e decide, com o relógio do banco (`now()`): chamadas simultâneas não passam do limite juntas. Chamadas acima do limite também contam, então um cliente insistente continua bloqueado até a janela acabar. A action chama a cota depois do Zod e do `requireUser()` e antes do repositório, e responde `errorKey: "rateLimited"`. Limite atual: `books.create`, 20 por minuto. Toda Server Action de escrita nova declara a sua cota.
 
 ## Limites conhecidos
 
 - **IP na tabela `rate_limit`:** a chave guarda IP e caminho, um dado pessoal. O Better Auth 1.6.23 apaga as linhas mais antigas que a maior janela (60 s) sempre que alguma chave reinicia a janela, então com tráfego a retenção é de minutos; sem tráfego, as últimas linhas ficam até a próxima requisição. A política de retenção é conferida na auditoria da US-026.
 - **IP não resolvido:** se o `x-forwarded-for` vier vazio ou com mais de um valor, o Better Auth conta todos os clientes num único balde (`no-trusted-ip`), e 10 tentativas por minuto do mundo inteiro bloqueariam o login de todos. Na Vercel o cabeçalho tem um único valor; conferir no Preview que a chave gravada traz o IP real e ficar atento ao aviso "could not determine a client IP" nos logs.
+- **Janela fixa das Server Actions:** a cota por leitor (`write_quota`) zera de uma vez no fim da janela, então um leitor pode fazer até o dobro do limite em poucos segundos ao redor da virada (20 no fim de um minuto, 20 no começo do próximo). Com 20 por minuto o efeito é pequeno; janela deslizante só se algum abuso real aparecer.
 - **IPv6 por /64:** o Better Auth conta IPv6 por sub-rede /64, o que é o comportamento desejado contra quem troca de endereço dentro da mesma rede.
 - **Página 404 de rota inexistente:** a página padrão do Next (`/_not-found`) é estática e não recebe nonce; como não tem interação, o efeito esperado é só o aviso de CSP no console (não verificado no E2E). Um `notFound()` dentro de página dinâmica (o caso de recurso alheio, `foundOrNotFound`) é renderizado na própria requisição e recebe o nonce.
 - **HSTS sem `preload`:** o domínio é um subdomínio de `vercel.app`; `preload` só faz sentido com domínio próprio (US-027).

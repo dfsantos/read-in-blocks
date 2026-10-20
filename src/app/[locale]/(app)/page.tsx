@@ -1,6 +1,6 @@
 import { useFormatter, useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -9,6 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Link } from "@/i18n/navigation";
+import { NEW_BOOK_PATH } from "@/lib/routes";
 import { requireUser } from "@/server/auth/session";
 
 // Fixed sample values: they only demonstrate the next-intl formatters.
@@ -62,7 +64,9 @@ function Home() {
           </ul>
         </CardContent>
         <CardFooter>
-          <Button disabled>{t("cta")}</Button>
+          <Link href={NEW_BOOK_PATH} className={buttonVariants()}>
+            {t("cta")}
+          </Link>
         </CardFooter>
       </Card>
     </main>

@@ -120,6 +120,7 @@ export async function findBook(userId: string, bookId: string, db: Database = ge
 - Só repositórios importam `withOwner` (regra `no-restricted-imports` em `eslint.config.mjs`, que também proíbe reexportá-lo; o teste de fronteira confere que nenhum repositório o exporta e pega `import()` dinâmico), e só ele define `app.user_id` (teste `owner-setting.test.ts`). Com ele, quem chama escolheria o dono do RLS e receberia uma transação sobre o schema inteiro.
 - Nos repositórios, `@typescript-eslint/no-floating-promises` é erro: uma consulta sem `await` continuaria depois do `COMMIT`, fora da transação do dono.
 - Limite: o RLS pega um filtro esquecido, não um servidor comprometido. O `app` define o dono que quiser; o `userId` continua vindo só do `requireUser()`.
+- Referência de repositório de tabela de conteúdo: `src/server/repositories/books.ts` (US-007), com isolamento em `tests/integration/isolation/books.test.ts`. Na harness de dois leitores, o `snapshot` lê pelo próprio repositório: um `select` do `app` sem dono definido não vê linha nenhuma e compararia vazio com vazio.
 - As tabelas do Better Auth ficam fora (o adaptador dele não define o dono); o acesso a elas já é restrito a `src/server/auth` e ao repositório de sessões.
 
 Provas: `tests/integration/rls.test.ts` (dono, falha fechada, fim da transação e erro na mesma conexão do pool, mudança de dono recusada), `tests/integration/rls-catalog.test.ts` (catálogo) e o resultado no pooler do Neon no [adendo da US-033 do ADR-0008](../adr/0008-data-isolation-per-user.md).
