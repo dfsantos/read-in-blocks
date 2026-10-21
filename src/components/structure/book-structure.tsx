@@ -246,7 +246,9 @@ function NodeItem({
             <span className="text-muted-foreground text-xs uppercase">
               {t(`kinds.${node.kind}`)}
             </span>
-            <span className="min-w-0 flex-1 break-words">{node.title}</span>
+            <span className="min-w-0 grow basis-40 break-words">
+              {node.title}
+            </span>
             <span className="text-muted-foreground text-xs">
               {defaultWeight
                 ? t("details.defaultWeight")
