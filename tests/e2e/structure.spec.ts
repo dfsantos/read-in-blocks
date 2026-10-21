@@ -4,7 +4,7 @@ import { closeTestAuth, E2E_ACCOUNTS, seedSession } from "./auth-helpers";
 
 // US-010: the reader builds a book's structure from its page, pasting a table of contents, adds a
 // topic inside a chapter, edits a node's title, summary and goal (US-011), reorders and moves chapters (US-012), marks a leaf's reading state
-// (US-013) and deletes a part with its subtree after confirming.
+// (US-013), sees parents follow their children and completes a part at once (US-014) and deletes a part with its subtree after confirming.
 test.afterAll(closeTestAuth);
 
 test("a reader builds, renames and prunes a book's structure", async ({
@@ -129,6 +129,43 @@ test("a reader builds, renames and prunes a book's structure", async ({
     await expect(page.getByLabel("Estado de Prefácio")).toHaveValue(
       "completed",
     );
+
+    // Parents follow their children (US-014): a topic in progress puts its chapter and part in
+    // progress; "complete all" on the part completes the topic, after confirming.
+    const partOneHeader = structure
+      .getByRole("listitem")
+      .filter({ hasText: "Parte I" })
+      .first()
+      .locator("> div")
+      .first();
+    await expect(partOneHeader).toContainText("Não iniciado");
+    await page
+      .getByLabel("Estado de O que é design?")
+      .selectOption("in_progress");
+    await expect(partOneHeader).toContainText("Em andamento");
+    await page
+      .getByRole("button", { name: "Concluir tudo em Parte I", exact: true })
+      .click();
+    const completeAll = page.getByRole("alertdialog", {
+      name: "Concluir tudo em “Parte I”?",
+    });
+    await expect(completeAll).toContainText(
+      "O item ainda não concluído dentro dele será marcado como concluído hoje.",
+    );
+    await completeAll
+      .getByRole("button", { name: "Concluir tudo", exact: true })
+      .click();
+    await expect(completeAll).toBeHidden();
+    await expect(partOneHeader).toContainText("Concluído");
+    await expect(page.getByLabel("Estado de O que é design?")).toHaveValue(
+      "completed",
+    );
+    await expect(
+      page.getByRole("button", {
+        name: "Concluir tudo em Parte I",
+        exact: true,
+      }),
+    ).toHaveCount(0);
 
     // Edit in place: title, summary and goal in pages (US-011).
     await page
