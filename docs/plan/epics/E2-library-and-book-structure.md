@@ -92,4 +92,6 @@ Cobre RF-001, RF-002 e a primeira parte de RF-009. Persona: **Leitor**.
 - [ ] Ordem persistida e estável após recarregar; reindexação em transação.
 - [ ] Testes unitários/integração para as regras de movimento.
 
+**Notas técnicas (revisão de migração da US-010):** a unicidade `book_node_sibling_position_unique` é imediata e `position >= 0`, então um `UPDATE` que desloca irmãos falha no meio. Reindexar em duas fases na mesma transação (primeiro somar um deslocamento grande às posições afetadas, depois gravar as finais) ou tornar a constraint `DEFERRABLE` em migração nova. O banco não impede ciclos: mover exige conferir, sob o mesmo `FOR UPDATE` do livro, que o novo pai não está na subárvore do nó (CTE recursiva) e reaplicar `canPlace`, com teste. Exclusões deixam buracos em `position`; a reordenação pode renumerar de 0 a n−1.
+
 > *Inferido:* o PRD não pede explicitamente reordenação, mas o cadastro manual de estruturas longas torna corrigir ordem inevitável. Se preferir cortar, remova esta história sem afetar as demais.
