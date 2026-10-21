@@ -4,6 +4,7 @@ import { bookIdSchema } from "@/domain/books/book-input";
 import {
   addNodesSchema,
   nodeIdSchema,
+  moveNodeSchema,
   nodeDetailsSchema,
   type NodeInputError,
 } from "@/domain/structure/node-input";
@@ -11,6 +12,7 @@ import { requireUser } from "@/server/auth/session";
 import {
   addNodes as insertNodes,
   deleteNode as removeNode,
+  moveNode as relocateNode,
   updateNode as changeNode,
 } from "@/server/repositories/book-nodes";
 import {
@@ -45,6 +47,13 @@ export type UpdateNodeResult =
       field?: "title" | "summary" | "goalPages";
     };
 
+export type MoveNodeResult =
+  | { ok: true }
+  | {
+      ok: false;
+      errorKey: "notFound" | "invalidPlacement" | "rateLimited" | "failed";
+    };
+
 export type DeleteNodeResult =
   { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
 
@@ -57,6 +66,12 @@ const ADD_NODES_QUOTA = {
 // Fixing several titles, summaries or goals in a row is normal; 60 a minute still stops a script.
 const UPDATE_NODE_QUOTA = {
   action: "structure.update",
+  limit: 60,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+// Moving a node a few places up or down is one call per click; 60 a minute still stops a script.
+const MOVE_NODE_QUOTA = {
+  action: "structure.move",
   limit: 60,
   windowSeconds: 60,
 } satisfies WriteQuota;
@@ -162,6 +177,31 @@ export async function updateNode(
       : { ok: false, errorKey: "notFound" };
   } catch (error) {
     logFailure(UPDATE_NODE_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+// Reorders a node among its siblings or moves it under another parent of the same book (US-012).
+export async function moveNode(
+  nodeId: unknown,
+  input: unknown,
+): Promise<MoveNodeResult> {
+  const id = nodeIdSchema.safeParse(nodeId);
+  const parsed = moveNodeSchema.safeParse(input);
+
+  const user = await requireUser();
+  // A malformed destination is answered like a missing one.
+  if (!id.success || !parsed.success)
+    return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, MOVE_NODE_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    const moved = await relocateNode(user.id, id.data, parsed.data);
+    return moved.ok ? { ok: true } : { ok: false, errorKey: moved.reason };
+  } catch (error) {
+    logFailure(MOVE_NODE_QUOTA.action, error);
     return { ok: false, errorKey: "failed" };
   }
 }

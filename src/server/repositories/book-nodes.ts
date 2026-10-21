@@ -1,10 +1,12 @@
-import { and, asc, count, eq, isNull, max, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, max, sql } from "drizzle-orm";
 
 import { getDb, type Database } from "@/db/client";
 import { book, bookNode } from "@/db/schema";
 import { canPlace, type NodeKind } from "@/domain/structure/hierarchy";
+import { planMove } from "@/domain/structure/move";
 import {
   MAX_NODES_PER_BOOK,
+  type MoveNodeInput,
   type NodeDetails,
 } from "@/domain/structure/node-input";
 import type { FlatNode } from "@/domain/structure/tree";
@@ -197,6 +199,135 @@ export async function deleteNode(
         .where(ownedBy(bookNode.ownerId, userId, eq(bookNode.id, nodeId)))
         .returning({ id: bookNode.id });
       return deleted.length > 0;
+    },
+    db,
+  );
+}
+
+export type MoveNodeResult =
+  { ok: true } | { ok: false; reason: "notFound" | "invalidPlacement" };
+
+// Above any position a book can hold (MAX_NODES_PER_BOOK), so parked rows never meet real ones.
+const PARKING_OFFSET = 1_000_000;
+
+// Moves the reader's node to `index` among the children of `parentId` (null: the book's root), in
+// the same book, or reorders it among its siblings when the parent stays (US-012). Both sibling
+// groups are renumbered 0..n-1 in two phases (migration review, US-010): the sibling position is
+// unique and checked per row, so every affected row is first parked above the real positions and
+// only then written to its final place.
+export async function moveNode(
+  userId: string,
+  nodeId: string,
+  input: MoveNodeInput,
+  db: Database = getDb(),
+): Promise<MoveNodeResult> {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const findNode = async () => {
+        const [row] = await tx
+          .select({
+            bookId: bookNode.bookId,
+            parentId: bookNode.parentId,
+            kind: bookNode.kind,
+          })
+          .from(bookNode)
+          .where(ownedBy(bookNode.ownerId, userId, eq(bookNode.id, nodeId)))
+          .limit(1);
+        return row;
+      };
+
+      const found = await findNode();
+      if (!found) return { ok: false, reason: "notFound" };
+      // Same lock as addNodes: structure changes of one book run one after the other.
+      await tx.execute(
+        sql`select ${book.id} from ${book} where ${ownedBy(book.ownerId, userId, eq(book.id, found.bookId))} for update`,
+      );
+      // Read again under the lock: the node may have moved or gone meanwhile.
+      const node = await findNode();
+      if (!node) return { ok: false, reason: "notFound" };
+
+      let parentKind: NodeKind | null = null;
+      if (input.parentId !== null) {
+        const [parent] = await tx
+          .select({ kind: bookNode.kind })
+          .from(bookNode)
+          .where(
+            ownedBy(
+              bookNode.ownerId,
+              userId,
+              eq(bookNode.bookId, node.bookId),
+              eq(bookNode.id, input.parentId),
+            ),
+          )
+          .limit(1);
+        if (!parent) return { ok: false, reason: "notFound" };
+        parentKind = parent.kind as NodeKind;
+      }
+      // The kinds also rule out cycles (src/domain/structure/move.ts).
+      if (
+        input.parentId === nodeId ||
+        !canPlace(node.kind as NodeKind, parentKind)
+      ) {
+        return { ok: false, reason: "invalidPlacement" };
+      }
+
+      const childrenOf = async (parentId: string | null) =>
+        (
+          await tx
+            .select({ id: bookNode.id })
+            .from(bookNode)
+            .where(
+              ownedBy(
+                bookNode.ownerId,
+                userId,
+                eq(bookNode.bookId, node.bookId),
+                parentId === null
+                  ? isNull(bookNode.parentId)
+                  : eq(bookNode.parentId, parentId),
+              ),
+            )
+            .orderBy(asc(bookNode.position))
+        ).map((row) => row.id);
+
+      const stays = input.parentId === node.parentId;
+      const plan = planMove(
+        await childrenOf(node.parentId),
+        stays ? null : await childrenOf(input.parentId),
+        nodeId,
+        input.index,
+      );
+      const positions = new Map<string, number>();
+      plan.source.forEach((id, position) => positions.set(id, position));
+      plan.target.forEach((id, position) => positions.set(id, position));
+      const ids = [...positions.keys()];
+
+      // Phase 1: park every affected row out of the way of the unique sibling position.
+      await tx
+        .update(bookNode)
+        .set({ position: sql`${bookNode.position} + ${PARKING_OFFSET}` })
+        .where(ownedBy(bookNode.ownerId, userId, inArray(bookNode.id, ids)));
+      // Phase 2: final positions, and the new parent of the moved node.
+      const finalPosition = sql.join(
+        [
+          sql`(case`,
+          ...ids.map(
+            (id) =>
+              sql`when ${bookNode.id} = ${id} then ${positions.get(id)}::integer`,
+          ),
+          sql`end)`,
+        ],
+        sql.raw(" "),
+      );
+      await tx
+        .update(bookNode)
+        .set({
+          position: finalPosition,
+          parentId: sql`(case when ${bookNode.id} = ${nodeId} then ${input.parentId}::uuid else ${bookNode.parentId} end)`,
+          updatedAt: sql`case when ${bookNode.id} = ${nodeId} then now() else ${bookNode.updatedAt} end`,
+        })
+        .where(ownedBy(bookNode.ownerId, userId, inArray(bookNode.id, ids)));
+      return { ok: true };
     },
     db,
   );

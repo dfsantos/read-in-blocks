@@ -36,7 +36,12 @@ const mocks = vi.hoisted(() => ({ requireUser: vi.fn() }));
 vi.mock("@/server/auth/session", () => ({ requireUser: mocks.requireUser }));
 vi.mock("@/db/client", () => ({ getDb: () => db }));
 
-import { addNodes, deleteNode, updateNode } from "@/server/actions/book-nodes";
+import {
+  addNodes,
+  deleteNode,
+  moveNode,
+  updateNode,
+} from "@/server/actions/book-nodes";
 
 afterAll(() => pool.end());
 
@@ -84,6 +89,7 @@ describe("book structure Server Actions", () => {
       () => addNodes(randomUUID(), null, { kind: "chapter", titles: "A" }),
       () => updateNode(randomUUID(), { title: "A" }),
       () => deleteNode(randomUUID()),
+      () => moveNode(randomUUID(), { parentId: null, index: 0 }),
     ]) {
       await expect(call()).rejects.toThrow("NEXT_REDIRECT /login");
     }
@@ -135,6 +141,8 @@ describe("book structure Server Actions", () => {
       await updateNode(randomUUID(), { title: "Taken" }),
       await deleteNode(owned.nodeId),
       await deleteNode(randomUUID()),
+      await moveNode(owned.nodeId, { parentId: null, index: 0 }),
+      await moveNode(randomUUID(), { parentId: null, index: 0 }),
     ];
 
     for (const answer of answers) {
@@ -174,6 +182,8 @@ describe("book structure Server Actions", () => {
         await addNodes(randomUUID(), id ?? "", { kind: "topic", titles: "A" }),
         await updateNode(id, { title: "A" }),
         await deleteNode(id),
+        await moveNode(id, { parentId: null, index: 0 }),
+        await moveNode(randomUUID(), { parentId: id ?? "", index: 0 }),
       ]) {
         expect(answer).toEqual({ ok: false, errorKey: "notFound" });
       }
@@ -290,6 +300,46 @@ describe("book structure Server Actions", () => {
     ]);
   });
 
+  it("moves the reader's chapter into a part", async () => {
+    const { owner } = await create();
+    const { bookId, nodeId } = await bookWithChapter(owner.id);
+    signIn(owner);
+    await addNodes(bookId, null, { kind: "part", titles: "Parte" });
+    const part = (await listNodes(owner.id, bookId, db)).find(
+      (node) => node.kind === "part",
+    );
+
+    expect(await moveNode(nodeId, { parentId: part?.id, index: 0 })).toEqual({
+      ok: true,
+    });
+    expect(await listNodes(owner.id, bookId, db)).toContainEqual(
+      expect.objectContaining({ id: nodeId, parentId: part?.id, position: 0 }),
+    );
+    expect(await moveNode(nodeId, { parentId: nodeId, index: 0 })).toEqual({
+      ok: false,
+      errorKey: "invalidPlacement",
+    });
+  });
+
+  it.each([
+    ["an index as text", { parentId: null, index: "0" }],
+    ["a negative index", { parentId: null, index: -1 }],
+    ["no destination", {}],
+    ["not an object", "up"],
+  ])(
+    "answers a move with %s like a missing destination",
+    async (_name, input) => {
+      const { owner } = await create();
+      const { nodeId } = await bookWithChapter(owner.id);
+      signIn(owner);
+
+      expect(await moveNode(nodeId, input)).toEqual({
+        ok: false,
+        errorKey: "notFound",
+      });
+    },
+  );
+
   it("deletes the reader's node and logs the event without its title", async () => {
     const { owner } = await create();
     const { bookId, nodeId } = await bookWithChapter(owner.id);
@@ -321,6 +371,12 @@ describe("book structure Server Actions", () => {
       (_bookId: string, nodeId: string) => updateNode(nodeId, { title: "R" }),
     ],
     ["deletions", 30, () => deleteNode(randomUUID())],
+    [
+      "moves",
+      60,
+      (_bookId: string, nodeId: string) =>
+        moveNode(nodeId, { parentId: null, index: 0 }),
+    ],
   ] as const)(
     "stops a reader past the quota of %s a minute",
     async (_name, limit, call) => {
@@ -365,10 +421,15 @@ describe("book structure Server Actions", () => {
       ok: false,
       errorKey: "failed",
     });
+    expect(await moveNode(randomUUID(), { parentId: null, index: 0 })).toEqual({
+      ok: false,
+      errorKey: "failed",
+    });
     expect(error.mock.calls.map((call) => call[0])).toEqual([
       "structure.create failed",
       "structure.update failed",
       "structure.delete failed",
+      "structure.move failed",
     ]);
     expect(JSON.stringify(error.mock.calls)).not.toContain("Secret Title");
   });
