@@ -10,6 +10,7 @@ import { MAX_NODES_PER_BOOK } from "@/domain/structure/node-input";
 import { buildTree } from "@/domain/structure/tree";
 import {
   addNodes,
+  completeAll,
   deleteNode,
   listNodes,
   moveNode,
@@ -102,6 +103,8 @@ const nodesSpec: IsolationSpec<Owned> = {
         "2026-10-20",
         db,
       ),
+    completeAll: (userId, target) =>
+      completeAll(userId, target.nodeId, "2026-10-20", db),
   },
 };
 
@@ -582,6 +585,129 @@ describe("book structure repository", () => {
     ).toEqual({ ok: false, reason: "notLeaf" });
   });
 
+  it("completes every leaf under a parent, at every depth, and never writes a parent (US-014)", async () => {
+    const { owner } = await create();
+    const bookId = await newBook(owner.id);
+    const part = await add(owner.id, bookId, null, "part", ["P"]);
+    if (!part.ok) throw new Error("unexpected refusal");
+    const chapters = await add(owner.id, bookId, part.ids[0], "chapter", [
+      "With topics",
+      "Leaf chapter",
+    ]);
+    if (!chapters.ok) throw new Error("unexpected refusal");
+    const topics = await add(owner.id, bookId, chapters.ids[0], "topic", [
+      "Done",
+      "Reading",
+      "Untouched",
+    ]);
+    if (!topics.ok) throw new Error("unexpected refusal");
+    const [done, reading, untouched] = topics.ids;
+    await setReadingStatus(owner.id, done, "completed", "2026-09-01", db);
+    await setReadingDates(
+      owner.id,
+      done,
+      { startedAt: "2026-08-20", completedAt: "2026-09-01" },
+      "2026-10-20",
+      db,
+    );
+    await setReadingStatus(owner.id, reading, "in_progress", "2026-10-02", db);
+    const other = await add(owner.id, bookId, null, "chapter", ["Elsewhere"]);
+    if (!other.ok) throw new Error("unexpected refusal");
+
+    expect(await completeAll(owner.id, part.ids[0], "2026-10-20", db)).toEqual({
+      ok: true,
+      completed: 3,
+    });
+
+    const rows = new Map(
+      (await listNodes(owner.id, bookId, db)).map((row) => [row.id, row]),
+    );
+    const stored = (id: string) => {
+      const { status, startedAt, completedAt } = rows.get(id)!;
+      return [status, startedAt, completedAt];
+    };
+    expect(stored(done)).toEqual(["completed", "2026-08-20", "2026-09-01"]);
+    expect(stored(reading)).toEqual(["completed", "2026-10-02", "2026-10-20"]);
+    expect(stored(untouched)).toEqual([
+      "completed",
+      "2026-10-20",
+      "2026-10-20",
+    ]);
+    expect(stored(chapters.ids[1])).toEqual([
+      "completed",
+      "2026-10-20",
+      "2026-10-20",
+    ]);
+    // Parents keep no state of their own, and nothing outside the part changes.
+    expect(stored(part.ids[0])).toEqual(["not_started", null, null]);
+    expect(stored(chapters.ids[0])).toEqual(["not_started", null, null]);
+    expect(stored(other.ids[0])).toEqual(["not_started", null, null]);
+    const [derivedPart] = buildTree([...rows.values()]).filter(
+      (node) => node.id === part.ids[0],
+    );
+    expect([
+      derivedPart.status,
+      derivedPart.startedAt,
+      derivedPart.completedAt,
+    ]).toEqual(["completed", "2026-08-20", "2026-10-20"]);
+
+    // Again: nothing left to complete.
+    expect(await completeAll(owner.id, part.ids[0], "2026-10-21", db)).toEqual({
+      ok: true,
+      completed: 0,
+    });
+  });
+
+  it('refuses "complete all" on a leaf', async () => {
+    const { owner } = await create();
+    const { nodeId } = await seedBookWithChapter(owner.id);
+
+    expect(await completeAll(owner.id, nodeId, "2026-10-20", db)).toEqual({
+      ok: false,
+      reason: "notParent",
+    });
+  });
+
+  it("clears the stored state of a node that gains children, by addition or by move (D-20)", async () => {
+    const { owner } = await create();
+    const bookId = await newBook(owner.id);
+    const chapters = await add(owner.id, bookId, null, "chapter", [
+      "Gains a topic",
+      "Receives a topic",
+      "Source",
+    ]);
+    if (!chapters.ok) throw new Error("unexpected refusal");
+    const [gains, receives, source] = chapters.ids;
+    await setReadingStatus(owner.id, gains, "completed", "2026-10-01", db);
+    await setReadingStatus(owner.id, receives, "in_progress", "2026-10-02", db);
+    const topic = await add(owner.id, bookId, source, "topic", ["T"]);
+    if (!topic.ok) throw new Error("unexpected refusal");
+
+    const added = await add(owner.id, bookId, gains, "topic", ["New"]);
+    if (!added.ok) throw new Error("unexpected refusal");
+    expect(
+      await moveNode(
+        owner.id,
+        topic.ids[0],
+        { parentId: receives, index: 0 },
+        db,
+      ),
+    ).toEqual({ ok: true });
+
+    const stored = async (id: string) => {
+      const row = (await listNodes(owner.id, bookId, db)).find(
+        (node) => node.id === id,
+      )!;
+      return [row.status, row.startedAt, row.completedAt];
+    };
+    expect(await stored(gains)).toEqual(["not_started", null, null]);
+    expect(await stored(receives)).toEqual(["not_started", null, null]);
+
+    // A leaf again: it starts over as not started, without the old state reappearing.
+    await deleteNode(owner.id, added.ids[0], db);
+    expect(await stored(gains)).toEqual(["not_started", null, null]);
+  });
+
   it("deletes a node with its whole subtree and nothing else", async () => {
     const { owner } = await create();
     const bookId = await newBook(owner.id);
@@ -732,6 +858,7 @@ describe("book structure repository", () => {
           "2026-10-20",
           db,
         ),
+      () => completeAll("", randomUUID(), "2026-10-20", db),
     ]) {
       await expect(call()).rejects.toThrow(
         "repository called without a userId",

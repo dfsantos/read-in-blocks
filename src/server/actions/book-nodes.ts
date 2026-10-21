@@ -17,6 +17,7 @@ import { APP_TIME_ZONE } from "@/i18n/time-zone";
 import { requireUser } from "@/server/auth/session";
 import {
   addNodes as insertNodes,
+  completeAll as completeLeaves,
   deleteNode as removeNode,
   moveNode as relocateNode,
   setReadingDates as writeReadingDates,
@@ -39,6 +40,7 @@ export type StructureErrorKey =
   | NodeInputError
   | ReadingDateError
   | "notLeaf"
+  | "notParent"
   | "dateInvalid"
   | "invalidPlacement"
   | "tooManyNodes"
@@ -73,6 +75,13 @@ export type ReadingResult =
       field?: "startedAt" | "completedAt";
     };
 
+export type CompleteAllResult =
+  | { ok: true; data: { completed: number } }
+  | {
+      ok: false;
+      errorKey: "notFound" | "notParent" | "rateLimited" | "failed";
+    };
+
 export type DeleteNodeResult =
   { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
 
@@ -103,6 +112,12 @@ const READING_STATUS_QUOTA = {
 const READING_DATES_QUOTA = {
   action: "reading.dates",
   limit: 60,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+// Each "complete all" needs a confirmation in the page.
+const COMPLETE_ALL_QUOTA = {
+  action: "reading.completeAll",
+  limit: 30,
   windowSeconds: 60,
 } satisfies WriteQuota;
 // Each deletion needs a confirmation in the page.
@@ -304,6 +319,26 @@ export async function setReadingDates(
       : { ok: false, errorKey: changed.reason };
   } catch (error) {
     logFailure(READING_DATES_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+// Completes every leaf under a node with children (US-014, D-07); its own state follows.
+export async function completeAll(nodeId: unknown): Promise<CompleteAllResult> {
+  const id = nodeIdSchema.safeParse(nodeId);
+  const user = await requireUser();
+  if (!id.success) return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, COMPLETE_ALL_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    const result = await completeLeaves(user.id, id.data, today());
+    return result.ok
+      ? { ok: true, data: { completed: result.completed } }
+      : { ok: false, errorKey: result.reason };
+  } catch (error) {
+    logFailure(COMPLETE_ALL_QUOTA.action, error);
     return { ok: false, errorKey: "failed" };
   }
 }
