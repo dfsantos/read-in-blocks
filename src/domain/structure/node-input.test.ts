@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   addNodesSchema,
+  moveNodeSchema,
   MAX_TITLES_PER_ADD,
   nodeIdSchema,
   nodeTitlesSchema,
@@ -157,5 +158,28 @@ describe("nodeDetailsSchema", () => {
 describe("nodeIdSchema", () => {
   it.each(["not-a-uuid", "1' or '1'='1", "", 42, null])("refuses %j", (id) => {
     expect(nodeIdSchema.safeParse(id).success).toBe(false);
+  });
+});
+
+describe("moveNodeSchema", () => {
+  const id = "0b6f8f5e-5c55-4f0a-9d8e-2f1f2b7f3c11";
+
+  it.each([
+    [{ parentId: null, index: 0 }],
+    [{ parentId: id, index: 3 }],
+    [{ parentId: id, index: 2000 }],
+  ])("accepts %j", (input) => {
+    expect(moveNodeSchema.parse(input)).toEqual(input);
+  });
+
+  it.each([
+    ["a malformed parent", { parentId: "nope", index: 0 }],
+    ["a missing parent", { index: 0 }],
+    ["a negative index", { parentId: null, index: -1 }],
+    ["a fractional index", { parentId: null, index: 1.5 }],
+    ["an index past any book", { parentId: null, index: 2001 }],
+    ["an index as text", { parentId: null, index: "1" }],
+  ])("refuses %s", (_name, input) => {
+    expect(moveNodeSchema.safeParse(input).success).toBe(false);
   });
 });
