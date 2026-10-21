@@ -1,7 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useFormatter, useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 
 import {
   AlertDialog,
@@ -15,26 +16,47 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
-import { NOTE_BODY_MAX, noteInputSchema } from "@/domain/notes/note-input";
+import type { NoteDoc } from "@/domain/notes/rich-text";
 import { useRouter } from "@/i18n/navigation";
 import type {
+  CreateNoteResult,
   DeleteNoteResult,
-  NoteErrorKey,
   NoteResult,
 } from "@/server/actions/notes";
 
+import { useAutosave, type AutosaveStatus } from "./use-autosave";
+
+// The editor (Tiptap, ProseMirror and the highlighter) is downloaded only when the reader starts
+// writing or editing (US-019): reading a notebook never pays for it.
+const NoteEditor = dynamic(() => import("./note-editor"), {
+  ssr: false,
+  loading: EditorLoading,
+});
+
+function EditorLoading() {
+  const t = useTranslations("notes.editor");
+  return (
+    <p className="text-muted-foreground min-h-32 rounded-lg border p-3 text-sm">
+      {t("loading")}
+    </p>
+  );
+}
+
 export type NotebookNote = Readonly<{
   id: string;
-  body: string;
+  // The stored document, to open in the editor.
+  content: NoteDoc;
+  // Its read-only view, rendered on the server (NoteContent).
+  view: ReactNode;
   createdAt: Date;
   updatedAt: Date;
 }>;
 
+export type NoteInputPayload = { content: unknown };
+
 export type NotebookActions = Readonly<{
-  create: (input: { body: string }) => Promise<NoteResult>;
-  update: (noteId: string, input: { body: string }) => Promise<NoteResult>;
+  create: (input: NoteInputPayload) => Promise<CreateNoteResult>;
+  update: (noteId: string, input: NoteInputPayload) => Promise<NoteResult>;
   remove: (noteId: string) => Promise<DeleteNoteResult>;
 }>;
 
@@ -47,14 +69,6 @@ type Props = Readonly<{
   actions: NotebookActions;
 }>;
 
-// The client check only spares a round trip: the Server Action parses again.
-function check(body: string): NoteErrorKey | undefined {
-  const parsed = noteInputSchema.safeParse({ body });
-  return parsed.success
-    ? undefined
-    : (parsed.error.issues[0].message as NoteErrorKey);
-}
-
 function useStamp() {
   const format = useFormatter();
   return (value: Date) =>
@@ -62,9 +76,9 @@ function useStamp() {
 }
 
 // A node's notebook (US-018, RF-005): its notes in chronological order, each with when it was
-// written and last edited, and forms to add, edit and delete (with confirmation) plain-text notes.
-// Notes are the reader's content: rendered as text, never as markup. The page refreshes its data
-// without reloading (router.refresh).
+// written and last edited, and the means to add, edit (rich text, saved on its own, US-019) and
+// delete (with confirmation) notes. Notes are the reader's content: shown through the read-only
+// view, never as markup. The page refreshes its data without reloading (router.refresh).
 export function Notebook({ title, notes, actions }: Props) {
   const t = useTranslations("notes");
   const headingId = useId();
@@ -100,67 +114,114 @@ export function Notebook({ title, notes, actions }: Props) {
           ))}
         </ol>
       )}
-      <AddNoteForm create={actions.create} announce={setAnnouncement} />
+      <AddNote actions={actions} announce={setAnnouncement} />
     </section>
   );
 }
 
-function AddNoteForm({
-  create,
+function AddNote({
+  actions,
   announce,
 }: Readonly<{
-  create: NotebookActions["create"];
+  actions: NotebookActions;
   announce: (message: string) => void;
+}>) {
+  const t = useTranslations("notes");
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        className="self-start"
+        onClick={() => setOpen(true)}
+      >
+        {t("add.open")}
+      </Button>
+    );
+  }
+  return (
+    <NewNote
+      actions={actions}
+      announce={announce}
+      close={() => setOpen(false)}
+    />
+  );
+}
+
+// A new note saves itself like an edit (useAutosave): the first save creates it, the next ones
+// update it. "Save" sends what is left and shows it in the list; "Discard" only exists while
+// nothing was saved.
+function NewNote({
+  actions,
+  announce,
+  close,
+}: Readonly<{
+  actions: NotebookActions;
+  announce: (message: string) => void;
+  close: () => void;
 }>) {
   const t = useTranslations("notes");
   const router = useRouter();
   const id = useId();
-  const [body, setBody] = useState("");
-  const [pending, setPending] = useState(false);
-  const [errorKey, setErrorKey] = useState<NoteErrorKey>();
+  const createdId = useRef<string | undefined>(undefined);
+  const [created, setCreated] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const autosave = useAutosave(async (input) => {
+    if (createdId.current) return actions.update(createdId.current, input);
+    const result = await actions.create(input);
+    if (!result.ok) return result;
+    createdId.current = result.id;
+    setCreated(true);
+    return { ok: true };
+  });
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const invalid = check(body);
-    if (invalid) {
-      setErrorKey(invalid);
-      return;
-    }
-    setPending(true);
-    setErrorKey(undefined);
-    const result = await create({ body });
-    setPending(false);
-    if (result.ok) {
-      setBody("");
+  async function save() {
+    setClosing(true);
+    const saved = await autosave.flush();
+    setClosing(false);
+    if (!saved) return;
+    if (createdId.current) {
       announce(t("add.saved"));
       router.refresh();
-      return;
     }
-    setErrorKey(result.errorKey);
+    close();
   }
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-2">
-      <Field data-invalid={errorKey ? true : undefined}>
-        <FieldLabel htmlFor={`${id}-body`}>{t("add.label")}</FieldLabel>
-        <Textarea
-          id={`${id}-body`}
-          value={body}
-          rows={4}
-          maxLength={NOTE_BODY_MAX}
-          placeholder={t("add.placeholder")}
-          aria-invalid={errorKey ? true : undefined}
-          aria-describedby={errorKey ? `${id}-error` : undefined}
-          onChange={(event) => setBody(event.target.value)}
-        />
-        {errorKey ? (
-          <FieldError id={`${id}-error`}>{t(`errors.${errorKey}`)}</FieldError>
-        ) : null}
-      </Field>
-      <Button type="submit" disabled={pending} className="self-start">
-        {pending ? t("add.saving") : t("add.submit")}
-      </Button>
-    </form>
+    <div className="flex flex-col gap-2">
+      <span aria-hidden="true" className="text-sm font-medium">
+        {t("add.label")}
+      </span>
+      <NoteEditor
+        label={t("add.label")}
+        autoFocus
+        invalid={autosave.status.kind === "failed"}
+        describedBy={`${id}-status`}
+        onUpdate={autosave.schedule}
+        onSubmit={() => void save()}
+      />
+      <AutosaveIndicator status={autosave.status} id={`${id}-status`} />
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" disabled={closing} onClick={() => void save()}>
+          {t("add.submit")}
+        </Button>
+        {created ? null : (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={closing || autosave.status.kind === "saving"}
+            onClick={() => {
+              autosave.discard();
+              close();
+            }}
+          >
+            {t("add.discard")}
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -195,7 +256,7 @@ function NoteItem({
         ) : null}
       </p>
       {editing ? (
-        <EditNoteForm
+        <EditNote
           note={note}
           update={actions.update}
           close={() => setEditing(false)}
@@ -203,7 +264,7 @@ function NoteItem({
         />
       ) : (
         <>
-          <p className="text-sm break-words whitespace-pre-wrap">{note.body}</p>
+          {note.view}
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
@@ -226,7 +287,37 @@ function NoteItem({
   );
 }
 
-function EditNoteForm({
+function AutosaveIndicator({
+  status,
+  id,
+}: Readonly<{ status: AutosaveStatus; id: string }>) {
+  const t = useTranslations("notes");
+  let text = "";
+  if (status.kind === "unsaved") text = t("autosave.unsaved");
+  if (status.kind === "saving") text = t("autosave.saving");
+  if (status.kind === "saved") text = t("autosave.saved");
+  if (status.kind === "failed") {
+    text = t("autosave.failed", { reason: t(`errors.${status.errorKey}`) });
+  }
+  return (
+    <p
+      id={id}
+      role="status"
+      aria-live="polite"
+      className={
+        status.kind === "failed"
+          ? "text-destructive text-sm"
+          : "text-muted-foreground text-sm"
+      }
+    >
+      {text}
+    </p>
+  );
+}
+
+// Edits a note in place; every change is saved on its own (useAutosave). "Done" saves what is left
+// and shows the note again.
+function EditNote({
   note,
   update,
   close,
@@ -240,65 +331,43 @@ function EditNoteForm({
   const t = useTranslations("notes");
   const router = useRouter();
   const id = useId();
-  const [body, setBody] = useState(note.body);
-  const [pending, setPending] = useState(false);
-  const [errorKey, setErrorKey] = useState<NoteErrorKey>();
+  const autosave = useAutosave((input) => update(note.id, input));
+  const [closing, setClosing] = useState(false);
+  const failed = autosave.status.kind === "failed";
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const invalid = check(body);
-    if (invalid) {
-      setErrorKey(invalid);
-      return;
-    }
-    setPending(true);
-    setErrorKey(undefined);
-    const result = await update(note.id, { body });
-    setPending(false);
-    if (result.ok) {
-      announce(t("edit.saved"));
-      close();
-      router.refresh();
-      return;
-    }
-    setErrorKey(result.errorKey);
+  async function done() {
+    const changed = autosave.status.kind !== "idle";
+    setClosing(true);
+    const saved = await autosave.flush();
+    setClosing(false);
+    if (!saved) return;
+    if (changed) announce(t("edit.saved"));
+    close();
+    router.refresh();
   }
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-2">
-      <Field data-invalid={errorKey ? true : undefined}>
-        <FieldLabel htmlFor={`${id}-body`} className="sr-only">
-          {t("edit.label")}
-        </FieldLabel>
-        <Textarea
-          id={`${id}-body`}
-          value={body}
-          rows={4}
-          maxLength={NOTE_BODY_MAX}
-          autoFocus
-          aria-invalid={errorKey ? true : undefined}
-          aria-describedby={errorKey ? `${id}-error` : undefined}
-          onChange={(event) => setBody(event.target.value)}
-        />
-        {errorKey ? (
-          <FieldError id={`${id}-error`}>{t(`errors.${errorKey}`)}</FieldError>
-        ) : null}
-      </Field>
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? t("edit.saving") : t("edit.save")}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={pending}
-          onClick={close}
-        >
-          {t("edit.cancel")}
-        </Button>
-      </div>
-    </form>
+    <div className="flex flex-col gap-2">
+      <NoteEditor
+        label={t("edit.label")}
+        initialContent={note.content}
+        autoFocus
+        invalid={failed}
+        describedBy={`${id}-status`}
+        onUpdate={autosave.schedule}
+        onSubmit={() => void done()}
+      />
+      <AutosaveIndicator status={autosave.status} id={`${id}-status`} />
+      <Button
+        type="button"
+        size="sm"
+        className="self-start"
+        disabled={closing}
+        onClick={() => void done()}
+      >
+        {t("edit.done")}
+      </Button>
+    </div>
   );
 }
 

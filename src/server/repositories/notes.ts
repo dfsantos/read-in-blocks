@@ -3,6 +3,7 @@ import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { getDb, type Database } from "@/db/client";
 import { bookNode, note } from "@/db/schema";
 import { MAX_NOTES_PER_NODE } from "@/domain/notes/note-input";
+import { storedNoteContent, type NoteDoc } from "@/domain/notes/rich-text";
 import {
   MAX_LIBRARY_NODES,
   MAX_NODES_PER_BOOK,
@@ -18,14 +19,22 @@ import { withOwner } from "./with-owner";
 
 export type Note = {
   id: string;
+  // The plain text (US-018's column), kept beside the rich content.
   body: string;
+  // Parsed again on the way out (storedNoteContent): a row that does not match the schema, or one
+  // still without content, is read as its plain text.
+  content: NoteDoc;
   createdAt: Date;
   updatedAt: Date;
 };
 
+// What a Server Action stores: a document rebuilt by parseNoteContent and its plain text.
+export type NoteWrite = { content: NoteDoc; text: string };
+
 const noteColumns = {
   id: note.id,
   body: note.body,
+  content: note.content,
   createdAt: note.createdAt,
   updatedAt: note.updatedAt,
 };
@@ -37,7 +46,7 @@ export async function listNotes(
   nodeId: string,
   db: Database = getDb(),
 ): Promise<Note[]> {
-  return withOwner(
+  const rows = await withOwner(
     userId,
     (tx) =>
       tx
@@ -49,6 +58,10 @@ export async function listNotes(
         .limit(MAX_NOTES_PER_NODE),
     db,
   );
+  return rows.map((row) => ({
+    ...row,
+    content: storedNoteContent(row.content, row.body),
+  }));
 }
 
 // How many notes each node of the reader's book has; nodes without notes are left out. Empty both
@@ -108,7 +121,7 @@ export type CreateNoteResult =
 export async function createNote(
   userId: string,
   nodeId: string,
-  body: string,
+  write: NoteWrite,
   db: Database = getDb(),
 ): Promise<CreateNoteResult> {
   return withOwner(
@@ -139,7 +152,13 @@ export async function createNote(
       // The owner is always the userId from the session; nothing the client sends can choose it.
       const [created] = await tx
         .insert(note)
-        .values({ ownerId: userId, bookId: node.book_id, nodeId, body })
+        .values({
+          ownerId: userId,
+          bookId: node.book_id,
+          nodeId,
+          body: write.text,
+          content: write.content,
+        })
         .returning({ id: note.id });
       return { ok: true, id: created.id };
     },
@@ -151,7 +170,7 @@ export async function createNote(
 export async function updateNote(
   userId: string,
   noteId: string,
-  body: string,
+  write: NoteWrite,
   db: Database = getDb(),
 ): Promise<boolean> {
   return withOwner(
@@ -159,7 +178,11 @@ export async function updateNote(
     async (tx) => {
       const updated = await tx
         .update(note)
-        .set({ body, updatedAt: sql`now()` })
+        .set({
+          body: write.text,
+          content: write.content,
+          updatedAt: sql`now()`,
+        })
         .where(ownedBy(note.ownerId, userId, eq(note.id, noteId)))
         .returning({ id: note.id });
       return updated.length > 0;

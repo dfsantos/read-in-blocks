@@ -1,0 +1,2 @@
+ALTER TABLE "note" ADD COLUMN "content" jsonb;--> statement-breakpoint
+ALTER TABLE "note" ADD CONSTRAINT "note_content_shape" CHECK ("note"."content" is null or (jsonb_typeof("note"."content") = 'object' and char_length("note"."content"::text) <= 400000));
