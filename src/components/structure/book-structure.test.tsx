@@ -26,7 +26,12 @@ const node = (
   kind: FlatNode["kind"],
   title: string,
   position: number,
-  details: Partial<Pick<FlatNode, "summary" | "goalPages">> = {},
+  details: Partial<
+    Pick<
+      FlatNode,
+      "summary" | "goalPages" | "status" | "startedAt" | "completedAt"
+    >
+  > = {},
 ): FlatNode => ({
   id,
   parentId,
@@ -35,6 +40,9 @@ const node = (
   position,
   summary: null,
   goalPages: null,
+  status: "not_started",
+  startedAt: null,
+  completedAt: null,
   ...details,
 });
 
@@ -57,11 +65,17 @@ function renderStructure(
     add: vi.fn().mockResolvedValue({ ok: true, data: { count: 2 } }),
     update: vi.fn().mockResolvedValue({ ok: true }),
     move: vi.fn().mockResolvedValue({ ok: true }),
+    setStatus: vi.fn().mockResolvedValue({ ok: true }),
+    setDates: vi.fn().mockResolvedValue({ ok: true }),
     remove: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
   };
   render(
-    <NextIntlClientProvider locale="pt-BR" messages={messages}>
+    <NextIntlClientProvider
+      locale="pt-BR"
+      messages={messages}
+      timeZone="America/Sao_Paulo"
+    >
       <BookStructure tree={buildTree(nodes)} actions={actions} />
     </NextIntlClientProvider>,
   );
@@ -432,6 +446,173 @@ describe("BookStructure", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
+    );
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("offers a reading state only on leaves", () => {
+    renderStructure();
+
+    expect(screen.getByLabelText("Estado de Prefácio")).toHaveValue(
+      "not_started",
+    );
+    expect(screen.getByLabelText("Estado de 1.1")).toBeInTheDocument();
+    // Parts and chapters with children derive their state (US-014).
+    expect(
+      screen.queryByLabelText("Estado de Parte I"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Estado de Um")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText("Estado de 1.1"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Não iniciado", "Em andamento", "Concluído"]);
+  });
+
+  it("marks a leaf as completed and refreshes the page without reloading it", async () => {
+    const { actions, user } = renderStructure();
+
+    await user.selectOptions(
+      screen.getByLabelText("Estado de 1.1"),
+      "completed",
+    );
+
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+    expect(actions.setStatus).toHaveBeenCalledWith("t1", {
+      status: "completed",
+    });
+    expect(
+      screen
+        .getAllByRole("status")
+        .some((status) => status.textContent?.includes("“1.1”: Concluído.")),
+    ).toBe(true);
+  });
+
+  it("shows the reading dates formatted in pt-BR", () => {
+    renderStructure([
+      node("c1", null, "chapter", "Um", 0, {
+        status: "completed",
+        startedAt: "2026-10-01",
+        completedAt: "2026-10-05",
+      }),
+    ]);
+
+    expect(screen.getByText("Início: 1 de out. de 2026")).toBeInTheDocument();
+    expect(
+      screen.getByText("Conclusão: 5 de out. de 2026"),
+    ).toBeInTheDocument();
+  });
+
+  it("edits the dates of a completed leaf to log a past reading", async () => {
+    const { actions, user } = renderStructure([
+      node("c1", null, "chapter", "Um", 0, {
+        status: "completed",
+        startedAt: "2026-10-01",
+        completedAt: "2026-10-05",
+      }),
+    ]);
+
+    await user.click(
+      screen.getByRole("button", { name: "Editar as datas de Um" }),
+    );
+    const form = screen.getByRole("form", { name: "Datas de Um" });
+    expect(within(form).getByLabelText("Início")).toHaveValue("2026-10-01");
+    fireEvent.change(within(form).getByLabelText("Início"), {
+      target: { value: "2025-01-10" },
+    });
+    fireEvent.change(within(form).getByLabelText("Conclusão"), {
+      target: { value: "2025-02-01" },
+    });
+    await user.click(
+      within(form).getByRole("button", { name: "Salvar datas" }),
+    );
+
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+    expect(actions.setDates).toHaveBeenCalledWith("c1", {
+      startedAt: "2025-01-10",
+      completedAt: "2025-02-01",
+    });
+  });
+
+  it("offers only the start date for a leaf in progress, and none for one not started", async () => {
+    const { actions, user } = renderStructure([
+      node("c1", null, "chapter", "Um", 0, {
+        status: "in_progress",
+        startedAt: "2026-10-01",
+      }),
+      node("c2", null, "chapter", "Dois", 1),
+    ]);
+
+    expect(
+      screen.queryByRole("button", { name: "Editar as datas de Dois" }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Editar as datas de Um" }),
+    );
+    const form = screen.getByRole("form", { name: "Datas de Um" });
+    expect(within(form).queryByLabelText("Conclusão")).not.toBeInTheDocument();
+    await user.click(
+      within(form).getByRole("button", { name: "Salvar datas" }),
+    );
+
+    await vi.waitFor(() =>
+      expect(actions.setDates).toHaveBeenCalledWith("c1", {
+        startedAt: "2026-10-01",
+        completedAt: "",
+      }),
+    );
+  });
+
+  it("shows a refused date on its field", async () => {
+    const { user } = renderStructure(
+      [
+        node("c1", null, "chapter", "Um", 0, {
+          status: "completed",
+          startedAt: "2026-10-01",
+          completedAt: "2026-10-05",
+        }),
+      ],
+      {
+        setDates: vi.fn().mockResolvedValue({
+          ok: false,
+          errorKey: "datesOutOfOrder",
+          field: "completedAt",
+        }),
+      },
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Editar as datas de Um" }),
+    );
+    const form = screen.getByRole("form", { name: "Datas de Um" });
+    await user.click(
+      within(form).getByRole("button", { name: "Salvar datas" }),
+    );
+
+    expect(
+      await within(form).findByText(
+        "A conclusão não pode ser antes do início.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(form).getByLabelText("Conclusão")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("shows a refused state change", async () => {
+    const { user } = renderStructure(NODES, {
+      setStatus: vi.fn().mockResolvedValue({ ok: false, errorKey: "notLeaf" }),
+    });
+
+    await user.selectOptions(
+      screen.getByLabelText("Estado de 1.1"),
+      "in_progress",
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Só itens sem subitens têm estado próprio; o dos demais vem dos subitens.",
     );
     expect(refresh).not.toHaveBeenCalled();
   });

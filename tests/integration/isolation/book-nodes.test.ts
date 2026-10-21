@@ -13,6 +13,8 @@ import {
   deleteNode,
   listNodes,
   moveNode,
+  setReadingDates,
+  setReadingStatus,
   updateNode,
 } from "@/server/repositories/book-nodes";
 import { createBook, deleteBook } from "@/server/repositories/books";
@@ -90,6 +92,16 @@ const nodesSpec: IsolationSpec<Owned> = {
     delete: (userId, target) => deleteNode(userId, target.nodeId, db),
     move: (userId, target) =>
       moveNode(userId, target.nodeId, { parentId: null, index: 0 }, db),
+    setStatus: (userId, target) =>
+      setReadingStatus(userId, target.nodeId, "completed", "2026-10-20", db),
+    setDates: (userId, target) =>
+      setReadingDates(
+        userId,
+        target.nodeId,
+        { startedAt: null, completedAt: null },
+        "2026-10-20",
+        db,
+      ),
   },
 };
 
@@ -468,6 +480,108 @@ describe("book structure repository", () => {
     }
   });
 
+  it("marks a leaf in progress, completed and back, filling and clearing its dates", async () => {
+    const { owner } = await create();
+    const { bookId, nodeId } = await seedBookWithChapter(owner.id);
+    const reading = async () =>
+      (await listNodes(owner.id, bookId, db)).map(
+        ({ status, startedAt, completedAt }) => ({
+          status,
+          startedAt,
+          completedAt,
+        }),
+      )[0];
+
+    expect(await reading()).toEqual({
+      status: "not_started",
+      startedAt: null,
+      completedAt: null,
+    });
+    expect(
+      await setReadingStatus(owner.id, nodeId, "in_progress", "2026-10-01", db),
+    ).toEqual({
+      ok: true,
+      state: {
+        status: "in_progress",
+        startedAt: "2026-10-01",
+        completedAt: null,
+      },
+    });
+    await setReadingStatus(owner.id, nodeId, "completed", "2026-10-05", db);
+    expect(await reading()).toEqual({
+      status: "completed",
+      startedAt: "2026-10-01",
+      completedAt: "2026-10-05",
+    });
+    await setReadingStatus(owner.id, nodeId, "in_progress", "2026-10-06", db);
+    expect(await reading()).toEqual({
+      status: "in_progress",
+      startedAt: "2026-10-01",
+      completedAt: null,
+    });
+    await setReadingStatus(owner.id, nodeId, "not_started", "2026-10-07", db);
+    expect(await reading()).toEqual({
+      status: "not_started",
+      startedAt: null,
+      completedAt: null,
+    });
+  });
+
+  it("edits the dates of a completed leaf and refuses dates that do not fit", async () => {
+    const { owner } = await create();
+    const { bookId, nodeId } = await seedBookWithChapter(owner.id);
+    await setReadingStatus(owner.id, nodeId, "completed", "2026-10-20", db);
+
+    expect(
+      await setReadingDates(
+        owner.id,
+        nodeId,
+        { startedAt: "2025-01-10", completedAt: "2025-02-01" },
+        "2026-10-20",
+        db,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      await setReadingDates(
+        owner.id,
+        nodeId,
+        { startedAt: "2025-03-01", completedAt: "2025-02-01" },
+        "2026-10-20",
+        db,
+      ),
+    ).toEqual({ ok: false, reason: "datesOutOfOrder", field: "completedAt" });
+    expect(await listNodes(owner.id, bookId, db)).toMatchObject([
+      { startedAt: "2025-01-10", completedAt: "2025-02-01" },
+    ]);
+  });
+
+  it("refuses a reading state on a node with children", async () => {
+    const { owner } = await create();
+    const bookId = await newBook(owner.id);
+    const part = await add(owner.id, bookId, null, "part", ["P"]);
+    if (!part.ok) throw new Error("unexpected refusal");
+    await add(owner.id, bookId, part.ids[0], "chapter", ["C"]);
+
+    expect(
+      await setReadingStatus(
+        owner.id,
+        part.ids[0],
+        "completed",
+        "2026-10-20",
+        db,
+      ),
+    ).toEqual({ ok: false, reason: "notLeaf" });
+    expect(
+      await setReadingDates(
+        owner.id,
+        part.ids[0],
+        { startedAt: null, completedAt: null },
+        "2026-10-20",
+        db,
+      ),
+    ).toEqual({ ok: false, reason: "notLeaf" });
+  });
+
   it("deletes a node with its whole subtree and nothing else", async () => {
     const { owner } = await create();
     const bookId = await newBook(owner.id);
@@ -534,6 +648,18 @@ describe("book structure repository", () => {
       [{ summary: "a".repeat(1001) }, "23514"],
       [{ goalPages: 0 }, "23514"],
       [{ goalPages: 10_001 }, "23514"],
+      [{ status: "done" }, "23514"],
+      [{ status: "in_progress" }, "23514"],
+      [{ status: "completed", startedAt: "2026-10-01" }, "23514"],
+      [{ status: "not_started", startedAt: "2026-10-01" }, "23514"],
+      [
+        {
+          status: "completed",
+          startedAt: "2026-10-05",
+          completedAt: "2026-10-01",
+        },
+        "23514",
+      ],
       [{ position: 0 }, "23505"],
       // A node in someone else's book, or under someone else's node.
       [{ bookId: foreign.bookId }, "23503"],
@@ -597,6 +723,15 @@ describe("book structure repository", () => {
         ),
       () => deleteNode("", randomUUID(), db),
       () => moveNode("", randomUUID(), { parentId: null, index: 0 }, db),
+      () => setReadingStatus("", randomUUID(), "completed", "2026-10-20", db),
+      () =>
+        setReadingDates(
+          "",
+          randomUUID(),
+          { startedAt: null, completedAt: null },
+          "2026-10-20",
+          db,
+        ),
     ]) {
       await expect(call()).rejects.toThrow(
         "repository called without a userId",

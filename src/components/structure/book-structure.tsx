@@ -25,6 +25,7 @@ import type {
 
 import { AddNodesForm } from "./add-nodes-form";
 import { MoveNodeForm } from "./move-node-form";
+import { ReadingControls, type ReadingActions } from "./reading-controls";
 import { DeleteNodeButton, EditNodeForm } from "./node-actions";
 
 // The Server Actions, injected so tests can replace them; add is already bound to the book.
@@ -39,7 +40,8 @@ export type StructureActions = Readonly<{
   ) => Promise<UpdateNodeResult>;
   move: (nodeId: string, input: MoveNodeInput) => Promise<MoveNodeResult>;
   remove: (nodeId: string) => Promise<DeleteNodeResult>;
-}>;
+}> &
+  ReadingActions;
 
 type Dragging = { id: string; parentId: string | null };
 
@@ -64,9 +66,10 @@ type Props = Readonly<{ tree: TreeNode[]; actions: StructureActions }>;
 
 // The book's structure as a simple nested list (US-010); the interactive table of contents arrives
 // in US-015. Each node can be edited (title, summary and goal, US-011), reordered among its
-// siblings by dragging or with Subir/Descer, moved to another parent (US-012), deleted with its
-// subtree, and receive children of the kinds the hierarchy allows. Titles are the reader's
-// content: rendered as text, never as markup.
+// siblings by dragging or with Subir/Descer, moved to another parent (US-012), marked as not
+// started, in progress or completed when it is a leaf (US-013), deleted with its subtree, and
+// receive children of the kinds the hierarchy allows. Titles are the reader's content: rendered
+// as text, never as markup.
 export function BookStructure({ tree, actions }: Props) {
   const t = useTranslations("structure");
   const [dragging, setDragging] = useState<Dragging | null>(null);
@@ -292,6 +295,14 @@ function NodeItem({
             <p className="text-muted-foreground text-sm break-words whitespace-pre-line">
               {node.summary}
             </p>
+          ) : null}
+          {/* Only leaves store a reading state; a parent derives its own (US-014). */}
+          {node.children.length === 0 ? (
+            <ReadingControls
+              node={node}
+              actions={actions}
+              announce={announce}
+            />
           ) : null}
         </div>
       )}

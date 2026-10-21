@@ -1,3 +1,5 @@
+import type { ReadingState } from "@/domain/reading/status";
+
 import type { NodeKind } from "./hierarchy";
 
 // The book's structure as stored (one row per node, ADR-0009) and as shown (a tree). Built in
@@ -12,7 +14,7 @@ export type FlatNode = {
   // US-011: plain text summary and goal in pages, both optional.
   summary: string | null;
   goalPages: number | null;
-};
+} & ReadingState;
 
 export type TreeNode = FlatNode & { children: TreeNode[] };
 

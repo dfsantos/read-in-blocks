@@ -8,11 +8,19 @@ import {
   nodeDetailsSchema,
   type NodeInputError,
 } from "@/domain/structure/node-input";
+import {
+  readingDatesSchema,
+  readingStatusSchema,
+} from "@/domain/reading/reading-input";
+import { calendarDay, type ReadingDateError } from "@/domain/reading/status";
+import { APP_TIME_ZONE } from "@/i18n/time-zone";
 import { requireUser } from "@/server/auth/session";
 import {
   addNodes as insertNodes,
   deleteNode as removeNode,
   moveNode as relocateNode,
+  setReadingDates as writeReadingDates,
+  setReadingStatus as writeReadingStatus,
   updateNode as changeNode,
 } from "@/server/repositories/book-nodes";
 import {
@@ -29,6 +37,9 @@ import {
 // Keys under `structure.errors` in messages/pt-BR.json.
 export type StructureErrorKey =
   | NodeInputError
+  | ReadingDateError
+  | "notLeaf"
+  | "dateInvalid"
   | "invalidPlacement"
   | "tooManyNodes"
   | "notFound"
@@ -54,6 +65,14 @@ export type MoveNodeResult =
       errorKey: "notFound" | "invalidPlacement" | "rateLimited" | "failed";
     };
 
+export type ReadingResult =
+  | { ok: true }
+  | {
+      ok: false;
+      errorKey: StructureErrorKey;
+      field?: "startedAt" | "completedAt";
+    };
+
 export type DeleteNodeResult =
   { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
 
@@ -72,6 +91,17 @@ const UPDATE_NODE_QUOTA = {
 // Moving a node a few places up or down is one call per click; 60 a minute still stops a script.
 const MOVE_NODE_QUOTA = {
   action: "structure.move",
+  limit: 60,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+// Marking where one is in the book: a click per chapter or topic.
+const READING_STATUS_QUOTA = {
+  action: "reading.status",
+  limit: 60,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+const READING_DATES_QUOTA = {
+  action: "reading.dates",
   limit: 60,
   windowSeconds: 60,
 } satisfies WriteQuota;
@@ -202,6 +232,78 @@ export async function moveNode(
     return moved.ok ? { ok: true } : { ok: false, errorKey: moved.reason };
   } catch (error) {
     logFailure(MOVE_NODE_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+// "Today" for reading dates: the calendar day in the app's time zone (D-19), never the client's.
+const today = () => calendarDay(new Date(), APP_TIME_ZONE);
+
+// Marks a leaf as not started, in progress or completed (US-013), filling or clearing its dates.
+export async function setReadingStatus(
+  nodeId: unknown,
+  input: unknown,
+): Promise<ReadingResult> {
+  const id = nodeIdSchema.safeParse(nodeId);
+  const parsed = readingStatusSchema.safeParse(input);
+
+  const user = await requireUser();
+  // A malformed node or state is answered like a missing node.
+  if (!id.success || !parsed.success)
+    return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, READING_STATUS_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    const changed = await writeReadingStatus(
+      user.id,
+      id.data,
+      parsed.data.status,
+      today(),
+    );
+    return changed.ok ? { ok: true } : { ok: false, errorKey: changed.reason };
+  } catch (error) {
+    logFailure(READING_STATUS_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+// Replaces a leaf's reading dates, to log a past reading (US-013).
+export async function setReadingDates(
+  nodeId: unknown,
+  input: unknown,
+): Promise<ReadingResult> {
+  const id = nodeIdSchema.safeParse(nodeId);
+  const parsed = readingDatesSchema.safeParse(input);
+  if (!parsed.success) {
+    const [issue] = parsed.error.issues;
+    return {
+      ok: false,
+      errorKey: "dateInvalid",
+      field: issue.path[0] === "completedAt" ? "completedAt" : "startedAt",
+    };
+  }
+
+  const user = await requireUser();
+  if (!id.success) return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, READING_DATES_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    const changed = await writeReadingDates(
+      user.id,
+      id.data,
+      parsed.data,
+      today(),
+    );
+    if (changed.ok) return { ok: true };
+    return "field" in changed
+      ? { ok: false, errorKey: changed.reason, field: changed.field }
+      : { ok: false, errorKey: changed.reason };
+  } catch (error) {
+    logFailure(READING_DATES_QUOTA.action, error);
     return { ok: false, errorKey: "failed" };
   }
 }

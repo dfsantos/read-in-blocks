@@ -151,6 +151,25 @@
       "submitting": "Movendo…",
       "moved": "“{title}” foi movido."
     },
+    "reading": {
+      "label": "Estado de {title}",
+      "statuses": {
+        "not_started": "Não iniciado",
+        "in_progress": "Em andamento",
+        "completed": "Concluído"
+      },
+      "startedAt": "Início: {date}",
+      "completedAt": "Conclusão: {date}",
+      "editDates": "Datas",
+      "editDatesFor": "Editar as datas de {title}",
+      "datesLegend": "Datas de {title}",
+      "start": "Início",
+      "completion": "Conclusão",
+      "save": "Salvar datas",
+      "saving": "Salvando…",
+      "cancel": "Cancelar",
+      "changed": "“{title}”: {status}."
+    },
     "delete": {
       "open": "Excluir {title}",
       "openShort": "Excluir",
@@ -173,7 +192,15 @@
       "rateLimited": "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
       "failed": "Não foi possível salvar. Tente de novo em instantes.",
       "summaryTooLong": "O resumo pode ter no máximo 1.000 caracteres.",
-      "goalInvalid": "A meta deve ser um número inteiro de páginas, de 1 a 10.000."
+      "goalInvalid": "A meta deve ser um número inteiro de páginas, de 1 a 10.000.",
+      "notLeaf": "Só itens sem subitens têm estado próprio; o dos demais vem dos subitens.",
+      "dateInvalid": "Use uma data válida.",
+      "datesNotAllowed": "Itens não iniciados não têm datas. Mude o estado primeiro.",
+      "startRequired": "Informe a data de início.",
+      "completionNotAllowed": "Itens em andamento ainda não têm data de conclusão.",
+      "completionRequired": "Informe a data de conclusão.",
+      "datesOutOfOrder": "A conclusão não pode ser antes do início.",
+      "dateInFuture": "A data não pode ser depois de hoje."
     }
   }
 }
