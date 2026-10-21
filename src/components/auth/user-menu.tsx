@@ -39,20 +39,20 @@ export function UserMenu({ name, image }: Props) {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button
-            variant="ghost"
-            size="icon-lg"
-            className="rounded-full"
-            aria-label={t("open", { name })}
-          />
+          <Button variant="ghost" size="icon-lg" className="rounded-full" />
         }
       >
-        <Avatar>
+        {/* The button's name, from this text, says whose menu it is; the avatar only illustrates it
+            (an aria-label would hide the visible initials from the name, WCAG 2.5.3). */}
+        <span className="sr-only">{t("open", { name })}</span>
+        <Avatar aria-hidden="true">
           {image ? (
             // No referrer: Google's image host learns nothing about the page.
             <AvatarImage src={image} alt="" referrerPolicy="no-referrer" />
           ) : null}
-          <AvatarFallback>{initials(name)}</AvatarFallback>
+          <AvatarFallback className="text-foreground">
+            {initials(name)}
+          </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto min-w-48">
