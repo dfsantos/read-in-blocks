@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: Props) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="bg-background border-b">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-2 px-4 sm:gap-4">
+        <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-2 px-4 sm:gap-4">
           <Link
             href={LIBRARY_PATH}
             className="focus-visible:ring-ring/50 shrink-0 rounded-md font-semibold outline-none focus-visible:ring-3"
