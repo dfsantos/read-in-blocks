@@ -50,7 +50,10 @@ describe("nodeTitlesSchema", () => {
     ["a huge text", "a\n".repeat(20_000), "tooManyTitles"],
     ["a line over the limit", `ok\n${"a".repeat(201)}`, "titleTooLong"],
     ["a NUL character", "Intro\u0000", "invalidCharacters"],
-    ["a bidirectional override", "Intro‮dcba", "invalidCharacters"],
+    ["a bidirectional override", "Intro\u202Edcba", "invalidCharacters"],
+    ["U+202A (embedding)", "Intro\u202A", "invalidCharacters"],
+    ["U+2066 (isolate)", "Intro\u2066", "invalidCharacters"],
+    ["U+2069 (pop isolate)", "Intro\u2069", "invalidCharacters"],
   ])("refuses %s", (_name, text, error) => {
     expect(errorOf(nodeTitlesSchema.safeParse(text))).toBe(error);
   });
