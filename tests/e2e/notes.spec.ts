@@ -9,12 +9,18 @@ import { closeTestAuth, E2E_ACCOUNTS, seedSession } from "./auth-helpers";
 // 404 page for that notebook. Deleting the book takes the notes with it (D-09).
 test.afterAll(closeTestAuth);
 test.describe.configure({ mode: "serial" });
+// A stuck action or navigation fails on its own step instead of the whole test's timeout, so a CI
+// failure names it.
+test.use({ actionTimeout: 15_000, navigationTimeout: 30_000 });
 
 test("a reader keeps notes in a chapter's notebook", async ({
   browser,
   context,
   page,
 }) => {
+  // The longest flow of the suite (rich text, pasting, automatic saving, kinds), with several
+  // waits for the automatic save: past the default 30 s on the slower CI runners.
+  test.slow();
   const seeded = await seedSession(E2E_ACCOUNTS.notes);
   const intruder = await seedSession(E2E_ACCOUNTS.notesIntruder);
   try {
