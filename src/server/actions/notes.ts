@@ -1,0 +1,154 @@
+"use server";
+
+import {
+  noteIdSchema,
+  noteInputErrors,
+  noteInputSchema,
+  type NoteInputError,
+} from "@/domain/notes/note-input";
+import { nodeIdSchema } from "@/domain/structure/node-input";
+import { requireUser } from "@/server/auth/session";
+import {
+  createNote as insertNote,
+  deleteNote as removeNote,
+  updateNote as changeNote,
+} from "@/server/repositories/notes";
+import {
+  consumeWriteQuota,
+  type WriteQuota,
+} from "@/server/repositories/write-quota";
+
+// Notebook Server Actions (US-018). Each one is a public endpoint (rule server-actions): Zod first,
+// then requireUser(), then the quota and the repository with the session's userId. The ids (node,
+// note) are arguments anyone can forge: a malformed id, a missing node or note and another reader's
+// all get the same "notFound", answered only once the session is checked.
+
+// Keys under `notes.errors` in messages/pt-BR.json.
+export type NoteErrorKey =
+  NoteInputError | "tooManyNotes" | "notFound" | "rateLimited" | "failed";
+
+export type NoteResult =
+  { ok: true } | { ok: false; errorKey: NoteErrorKey; field?: "body" };
+
+export type DeleteNoteResult =
+  { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
+
+// Writing about a chapter comes in bursts, but never 30 notes a minute.
+const CREATE_NOTE_QUOTA = {
+  action: "notes.create",
+  limit: 30,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+const UPDATE_NOTE_QUOTA = {
+  action: "notes.update",
+  limit: 60,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+// Each deletion needs a confirmation in the page.
+const DELETE_NOTE_QUOTA = {
+  action: "notes.delete",
+  limit: 30,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+
+// Only the Postgres error code: messages may echo the reader's notes (zero-trust.md, 3.3).
+function logFailure(action: string, error: unknown) {
+  console.error(`${action} failed`, {
+    code: (error as { code?: unknown } | null)?.code,
+  });
+}
+
+// Security events (zero-trust.md, 3.3): ids and a timestamp, never a note's text.
+function logNoteDeleted(userId: string, noteId: string) {
+  console.info(
+    JSON.stringify({
+      event: "notes.note_deleted",
+      userId,
+      noteId,
+      at: new Date().toISOString(),
+    }),
+  );
+}
+
+// Any other issue (the input is not an object at all) gets the "required" key: the message of a
+// Zod issue is only an i18n key when the schema set it.
+function inputError(issues: readonly { message: string }[]): NoteResult {
+  const message = issues[0].message;
+  return {
+    ok: false,
+    errorKey: Object.values<string>(noteInputErrors).includes(message)
+      ? (message as NoteInputError)
+      : noteInputErrors.bodyRequired,
+    field: "body",
+  };
+}
+
+// Adds a note to a node's notebook.
+export async function createNote(
+  nodeId: unknown,
+  input: unknown,
+): Promise<NoteResult> {
+  const id = nodeIdSchema.safeParse(nodeId);
+  const parsed = noteInputSchema.safeParse(input);
+  if (!parsed.success) return inputError(parsed.error.issues);
+
+  const user = await requireUser();
+  if (!id.success) return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, CREATE_NOTE_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    const created = await insertNote(user.id, id.data, parsed.data.body);
+    return created.ok ? { ok: true } : { ok: false, errorKey: created.reason };
+  } catch (error) {
+    logFailure(CREATE_NOTE_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+// Replaces a note's text.
+export async function updateNote(
+  noteId: unknown,
+  input: unknown,
+): Promise<NoteResult> {
+  const id = noteIdSchema.safeParse(noteId);
+  const parsed = noteInputSchema.safeParse(input);
+  if (!parsed.success) return inputError(parsed.error.issues);
+
+  const user = await requireUser();
+  if (!id.success) return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, UPDATE_NOTE_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    return (await changeNote(user.id, id.data, parsed.data.body))
+      ? { ok: true }
+      : { ok: false, errorKey: "notFound" };
+  } catch (error) {
+    logFailure(UPDATE_NOTE_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+// Deletes a note (the page asks for confirmation first).
+export async function deleteNote(noteId: unknown): Promise<DeleteNoteResult> {
+  const id = noteIdSchema.safeParse(noteId);
+  const user = await requireUser();
+  if (!id.success) return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, DELETE_NOTE_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    if (!(await removeNote(user.id, id.data))) {
+      return { ok: false, errorKey: "notFound" };
+    }
+    logNoteDeleted(user.id, id.data);
+    return { ok: true };
+  } catch (error) {
+    logFailure(DELETE_NOTE_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
