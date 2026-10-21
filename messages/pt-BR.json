@@ -314,7 +314,11 @@
       "failed": "Não foi possível salvar agora. Tente de novo.",
       "invalidContent": "A anotação tem uma formatação não permitida.",
       "invalidLink": "Use um link completo que comece com http://, https:// ou mailto:.",
-      "contentTooLarge": "A anotação ficou grande demais. Divida-a em mais de uma."
+      "contentTooLarge": "A anotação ficou grande demais. Divida-a em mais de uma.",
+      "invalidType": "Escolha o tipo da anotação.",
+      "referenceRequired": "Informe a página ou a posição da citação.",
+      "referenceTooLong": "A referência pode ter até 50 caracteres.",
+      "referenceInvalid": "A referência tem caracteres não permitidos."
     },
     "autosave": {
       "unsaved": "Alterações não salvas",
@@ -368,6 +372,33 @@
         "cancel": "Cancelar"
       },
       "codeLabel": "Código em {language}"
+    },
+    "types": {
+      "key_concept": "Conceito-chave",
+      "quote": "Citação",
+      "action_or_question": "Ação/dúvida"
+    },
+    "kind": {
+      "label": "Tipo da anotação",
+      "reference": "Página ou posição",
+      "referencePlaceholder": "p. 42"
+    },
+    "filter": {
+      "label": "Filtrar por tipo",
+      "all": "Todas ({count})",
+      "key_concept": "Conceitos-chave ({count})",
+      "quote": "Citações ({count})",
+      "action_or_question": "Ações/dúvidas ({count})",
+      "empty": "Nenhuma anotação deste tipo."
+    },
+    "resolve": {
+      "mark": "Marcar como resolvida",
+      "markFor": "Marcar como resolvida a anotação de {date}",
+      "reopen": "Reabrir",
+      "reopenFor": "Reabrir a anotação de {date}",
+      "resolved": "Resolvida",
+      "marked": "Anotação marcada como resolvida.",
+      "reopened": "Anotação reaberta."
     }
   },
   "blocks": {

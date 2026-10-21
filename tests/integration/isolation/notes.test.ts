@@ -16,6 +16,7 @@ import {
   createNote,
   deleteNote,
   listNotes,
+  setNoteResolved,
   updateNote,
 } from "@/server/repositories/notes";
 
@@ -59,10 +60,11 @@ type Owned = { bookId: string; nodeId: string; noteId: string };
 
 async function seedNote(ownerId: string): Promise<Owned> {
   const { bookId, nodeIds } = await seedChapter(ownerId);
+  // An action, so resolving it would succeed for its owner.
   const created = await createNote(
     ownerId,
     nodeIds[0],
-    plainNote("Owned note"),
+    { ...plainNote("Owned note"), type: "action_or_question" },
     db,
   );
   if (!created.ok) throw new Error(`seed failed: ${created.reason}`);
@@ -90,6 +92,8 @@ const notesSpec: IsolationSpec<Owned> = {
       createNote(userId, target.nodeId, plainNote("Intruder"), db),
     update: (userId, target) =>
       updateNote(userId, target.noteId, plainNote("Taken"), db),
+    resolve: (userId, target) =>
+      setNoteResolved(userId, target.noteId, true, db),
     delete: (userId, target) => deleteNote(userId, target.noteId, db),
   },
 };
@@ -132,6 +136,137 @@ describe("notebook repository", () => {
     expect(await countNotesByNode(owner.id, bookId, db)).toEqual({
       [nodeIds[0]]: 2,
       [nodeIds[2]]: 1,
+    });
+  });
+
+  it("stores a note's kind, resolves only actions and forgets the resolution when the kind changes", async () => {
+    const { owner } = await create();
+    const { nodeIds } = await seedChapter(owner.id);
+    const quote = await createNote(
+      owner.id,
+      nodeIds[0],
+      { ...plainNote("Frase"), type: "quote", reference: "p. 42" },
+      db,
+    );
+    const action = await createNote(
+      owner.id,
+      nodeIds[0],
+      { ...plainNote("Testar"), type: "action_or_question" },
+      db,
+    );
+    if (!quote.ok || !action.ok) throw new Error("unexpected refusal");
+
+    expect(await setNoteResolved(owner.id, quote.id, true, db)).toBe(false);
+    expect(await setNoteResolved(owner.id, action.id, true, db)).toBe(true);
+    let [storedQuote, storedAction] = await listNotes(owner.id, nodeIds[0], db);
+    expect(storedQuote).toMatchObject({
+      type: "quote",
+      reference: "p. 42",
+      resolvedAt: null,
+    });
+    expect(storedAction.resolvedAt).toBeInstanceOf(Date);
+    // Resolving is not an edit of the text.
+    expect(storedAction.updatedAt).toEqual(storedAction.createdAt);
+
+    // Editing an action keeps its resolution; turning it into another kind drops it.
+    await updateNote(
+      owner.id,
+      action.id,
+      { ...plainNote("Testado"), type: "action_or_question" },
+      db,
+    );
+    [, storedAction] = await listNotes(owner.id, nodeIds[0], db);
+    expect(storedAction.resolvedAt).toBeInstanceOf(Date);
+    await updateNote(owner.id, action.id, plainNote("Conceito"), db);
+    [, storedAction] = await listNotes(owner.id, nodeIds[0], db);
+    expect(storedAction).toMatchObject({
+      type: "key_concept",
+      reference: null,
+      resolvedAt: null,
+    });
+
+    expect(await setNoteResolved(owner.id, action.id, true, db)).toBe(false);
+    [storedQuote] = await listNotes(owner.id, nodeIds[0], db);
+    expect(storedQuote.type).toBe("quote");
+  });
+
+  it("keeps notes written by the previous build valid: default kind, and kinds untouched by its edits", async () => {
+    const { owner } = await create();
+    const { bookId, nodeIds } = await seedChapter(owner.id);
+    const quote = await createNote(
+      owner.id,
+      nodeIds[0],
+      { ...plainNote("Frase"), type: "quote", reference: "r".repeat(50) },
+      db,
+    );
+    if (!quote.ok) throw new Error("unexpected refusal");
+
+    // What US-018/US-019 code writes: no kind columns on insert, only text on update.
+    await migrator.query(
+      "INSERT INTO note (owner_id, book_id, node_id, body) VALUES ($1, $2, $3, 'Antiga')",
+      [owner.id, bookId, nodeIds[0]],
+    );
+    await migrator.query(
+      "UPDATE note SET body = 'Frase nova', content = NULL, updated_at = now() WHERE id = $1",
+      [quote.id],
+    );
+
+    const notes = await listNotes(owner.id, nodeIds[0], db);
+    expect(
+      notes.map(({ body, type, reference, resolvedAt }) => ({
+        body,
+        type,
+        reference,
+        resolvedAt,
+      })),
+    ).toEqual([
+      {
+        body: "Frase nova",
+        type: "quote",
+        reference: "r".repeat(50),
+        resolvedAt: null,
+      },
+      {
+        body: "Antiga",
+        type: "key_concept",
+        reference: null,
+        resolvedAt: null,
+      },
+    ]);
+  });
+
+  it.each([
+    [
+      "an unknown kind",
+      "UPDATE note SET type = 'summary' WHERE id = $1",
+      "note_type",
+    ],
+    [
+      "a quote without reference",
+      "UPDATE note SET type = 'quote' WHERE id = $1",
+      "note_reference",
+    ],
+    [
+      "a reference on another kind",
+      "UPDATE note SET reference = 'p. 1' WHERE id = $1",
+      "note_reference",
+    ],
+    [
+      "a reference over 50 characters",
+      `UPDATE note SET type = 'quote', reference = repeat('a', 51) WHERE id = $1`,
+      "note_reference",
+    ],
+    [
+      "a resolved key concept",
+      "UPDATE note SET type = 'key_concept', resolved_at = now() WHERE id = $1",
+      "note_resolved",
+    ],
+  ])("refuses %s in the database", async (_name, statement, constraint) => {
+    const { owner } = await create();
+    const { noteId } = await seedNote(owner.id);
+
+    await expect(migrator.query(statement, [noteId])).rejects.toMatchObject({
+      constraint,
     });
   });
 

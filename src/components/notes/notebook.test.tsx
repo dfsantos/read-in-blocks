@@ -51,10 +51,16 @@ const note = (
   body: string,
   createdAt: string,
   updatedAt = createdAt,
+  kind: Pick<NotebookNote, "type" | "reference" | "resolvedAt"> = {
+    type: "key_concept",
+    reference: null,
+    resolvedAt: null,
+  },
 ): NotebookNote => ({
   id,
   content: textToDoc(body),
   view: <p>{body}</p>,
+  ...kind,
   createdAt: new Date(createdAt),
   updatedAt: new Date(updatedAt),
 });
@@ -64,6 +70,25 @@ const NOTES: NotebookNote[] = [
   note("n2", "Ideia revisada", "2026-10-21T12:30:00Z", "2026-10-21T15:45:00Z"),
 ];
 
+const KINDS: NotebookNote[] = [
+  ...NOTES,
+  note("n3", "Uma frase marcante", "2026-10-21T13:00:00Z", undefined, {
+    type: "quote",
+    reference: "p. 42",
+    resolvedAt: null,
+  }),
+  note("n4", "Testar isso", "2026-10-21T14:00:00Z", undefined, {
+    type: "action_or_question",
+    reference: null,
+    resolvedAt: null,
+  }),
+  note("n5", "Por que assim?", "2026-10-21T14:30:00Z", undefined, {
+    type: "action_or_question",
+    reference: null,
+    resolvedAt: new Date("2026-10-21T16:00:00Z"),
+  }),
+];
+
 function renderNotebook(
   overrides: Partial<NotebookActions> = {},
   notes: NotebookNote[] = NOTES,
@@ -71,6 +96,7 @@ function renderNotebook(
   const actions = {
     create: vi.fn().mockResolvedValue({ ok: true, id: "created" }),
     update: vi.fn().mockResolvedValue({ ok: true }),
+    resolve: vi.fn().mockResolvedValue({ ok: true }),
     remove: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
   };
@@ -152,6 +178,7 @@ describe("Notebook", () => {
 
     expect(actions.create).toHaveBeenCalledWith({
       content: textToDoc("Uma ideia"),
+      type: "key_concept",
     });
     expect(screen.queryByLabelText("Nova anotação")).toBeNull();
     expect(refresh).toHaveBeenCalled();
@@ -170,6 +197,7 @@ describe("Notebook", () => {
     await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS));
     expect(actions.create).toHaveBeenCalledWith({
       content: textToDoc("Rascunho"),
+      type: "key_concept",
     });
     expect(screen.getByText("Salvo")).toBeInTheDocument();
     // Once saved, the draft can no longer be discarded (it is a note now).
@@ -180,6 +208,7 @@ describe("Notebook", () => {
     expect(actions.create).toHaveBeenCalledTimes(1);
     expect(actions.update).toHaveBeenCalledWith("new-note", {
       content: textToDoc("Rascunho final"),
+      type: "key_concept",
     });
   });
 
@@ -267,6 +296,7 @@ describe("Notebook", () => {
     expect(actions.update).toHaveBeenCalledTimes(1);
     expect(actions.update).toHaveBeenCalledWith("n2", {
       content: textToDoc("Ideia final"),
+      type: "key_concept",
     });
     expect(screen.getByText("Salvo")).toBeInTheDocument();
   });
@@ -281,6 +311,7 @@ describe("Notebook", () => {
 
     expect(actions.update).toHaveBeenLastCalledWith("n2", {
       content: textToDoc("Ideia final"),
+      type: "key_concept",
     });
     expect(screen.queryByLabelText("Texto da anotação")).toBeNull();
     expect(refresh).toHaveBeenCalled();
@@ -329,6 +360,146 @@ describe("Notebook", () => {
     expect(
       screen.getByText("Não salvo: Escreva a anotação."),
     ).toBeInTheDocument();
+  });
+
+  it("shows each note's kind with an icon and a label, a quote's reference and a resolution", () => {
+    renderNotebook({}, KINDS);
+
+    const items = within(list()).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Conceito-chave");
+    expect(items[2]).toHaveTextContent("Citação");
+    expect(items[2]).toHaveTextContent("p. 42");
+    expect(items[3]).toHaveTextContent("Ação/dúvida");
+    expect(items[3]).not.toHaveTextContent("Resolvida");
+    expect(items[4]).toHaveTextContent("Resolvida");
+    for (const item of items) {
+      expect(item.querySelector("svg[aria-hidden='true']")).not.toBeNull();
+    }
+  });
+
+  it("filters the notebook by kind, with how many each has", async () => {
+    const { user } = renderNotebook({}, KINDS);
+    const filter = screen.getByRole("group", { name: "Filtrar por tipo" });
+
+    expect(
+      within(filter).getByRole("button", { name: "Todas (5)" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await user.click(
+      within(filter).getByRole("button", { name: "Ações/dúvidas (2)" }),
+    );
+    expect(within(list()).getAllByRole("listitem")).toHaveLength(2);
+    await user.click(
+      within(filter).getByRole("button", { name: "Citações (1)" }),
+    );
+    expect(within(list()).getAllByRole("listitem")).toHaveLength(1);
+    expect(list()).toHaveTextContent("Uma frase marcante");
+  });
+
+  it("says when no note has the chosen kind", async () => {
+    const { user } = renderNotebook();
+
+    await user.click(screen.getByRole("button", { name: "Citações (0)" }));
+    expect(
+      screen.getByText("Nenhuma anotação deste tipo."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("writes a quote with its reference", async () => {
+    const { actions, user } = renderNotebook();
+
+    const field = await openComposer(user);
+    await user.selectOptions(
+      screen.getByLabelText("Tipo da anotação"),
+      "Citação",
+    );
+    await user.type(field, "Frase");
+    await user.click(screen.getByRole("button", { name: "Salvar anotação" }));
+    // A quote without its reference is not sent.
+    expect(actions.create).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Não salvo: Informe a página ou a posição da citação."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Página ou posição")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+
+    await user.type(screen.getByLabelText("Página ou posição"), "p. 42");
+    await user.click(screen.getByRole("button", { name: "Salvar anotação" }));
+    expect(actions.create).toHaveBeenCalledWith({
+      content: textToDoc("Frase"),
+      type: "quote",
+      reference: "p. 42",
+    });
+  });
+
+  it("changes a note's kind while editing", async () => {
+    const { actions, user } = renderNotebook({}, KINDS);
+
+    await openEditor(user, "21 de out. de 2026, 10:00");
+    expect(screen.getByLabelText("Tipo da anotação")).toHaveValue("quote");
+    expect(screen.getByLabelText("Página ou posição")).toHaveValue("p. 42");
+    await user.selectOptions(
+      screen.getByLabelText("Tipo da anotação"),
+      "Ação/dúvida",
+    );
+    expect(screen.queryByLabelText("Página ou posição")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Concluir edição" }));
+
+    expect(actions.update).toHaveBeenCalledWith("n3", {
+      content: textToDoc("Uma frase marcante"),
+      type: "action_or_question",
+    });
+  });
+
+  it("marks an action or question as resolved and opens it again", async () => {
+    const { actions, user } = renderNotebook({}, KINDS);
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Marcar como resolvida a anotação de 21 de out. de 2026, 11:00",
+      }),
+    );
+    expect(actions.resolve).toHaveBeenCalledWith("n4", true);
+    expect(refresh).toHaveBeenCalled();
+    expect(
+      screen.getByText("Anotação marcada como resolvida."),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Reabrir a anotação de 21 de out. de 2026, 11:30",
+      }),
+    );
+    expect(actions.resolve).toHaveBeenLastCalledWith("n5", false);
+    // Only actions and questions can be resolved.
+    expect(
+      screen.getAllByRole("button", {
+        name: /resolvida a anotação|Reabrir a anotação/,
+      }),
+    ).toHaveLength(2);
+  });
+
+  it("shows a refused resolution", async () => {
+    const { user } = renderNotebook(
+      {
+        resolve: vi
+          .fn()
+          .mockResolvedValue({ ok: false, errorKey: "rateLimited" }),
+      },
+      KINDS,
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Marcar como resolvida a anotação de 21 de out. de 2026, 11:00",
+      }),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Muitas alterações em pouco tempo.",
+    );
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("deletes a note only after confirmation", async () => {
