@@ -1,4 +1,6 @@
-import { common, createLowlight } from "lowlight";
+import { createLowlight } from "lowlight";
+
+import { noteGrammars } from "@/lib/note-grammars";
 import { Fragment, type ReactNode } from "react";
 
 import type {
@@ -14,7 +16,7 @@ import type {
 // the server: the page passes the result to the notebook, so reading a note downloads neither the
 // editor nor the highlighter.
 
-const lowlight = createLowlight(common);
+const lowlight = createLowlight(noteGrammars());
 
 type HastNode =
   | { type: "text"; value: string }

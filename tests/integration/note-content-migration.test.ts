@@ -113,6 +113,48 @@ describe("migration 0012: rich content for plain-text notes", () => {
       },
     ]);
     expect(notes.map((note) => note.body)).toEqual([...bodies, "rica"]);
-    expect(notes[0].updatedAt.toISOString()).toBe("2026-10-01T12:00:00.000Z");
+    expect(
+      notes.slice(0, bodies.length).map((note) => note.updatedAt.toISOString()),
+    ).toEqual(bodies.map(() => "2026-10-01T12:00:00.000Z"));
+  });
+
+  it("refuses content that is not a document object or is over the size limit", async () => {
+    const { owner } = await create();
+    const book = await createBook(owner.id, { title: "B", author: null }, db);
+    const added = await addNodes(
+      owner.id,
+      { bookId: book.id, parentId: null, kind: "chapter", titles: ["C"] },
+      db,
+    );
+    if (!added.ok) throw new Error("unexpected refusal");
+    const created = await createNote(
+      owner.id,
+      added.ids[0],
+      plainNote("a"),
+      db,
+    );
+    if (!created.ok) throw new Error("unexpected refusal");
+
+    const migrator = new Client({
+      connectionString: requireTestEnv("TEST_MIGRATOR_DATABASE_URL"),
+    });
+    await migrator.connect();
+    try {
+      for (const content of [
+        "[]",
+        '"text"',
+        "42",
+        JSON.stringify({ type: "doc", text: "x".repeat(400_000) }),
+      ]) {
+        await expect(
+          migrator.query("UPDATE note SET content = $1::jsonb WHERE id = $2", [
+            content,
+            created.id,
+          ]),
+        ).rejects.toMatchObject({ constraint: "note_content_shape" });
+      }
+    } finally {
+      await migrator.end();
+    }
   });
 });

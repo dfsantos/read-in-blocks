@@ -1,7 +1,9 @@
 import type { Extensions } from "@tiptap/core";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import StarterKit from "@tiptap/starter-kit";
-import { common, createLowlight } from "lowlight";
+import { createLowlight } from "lowlight";
+
+import { noteGrammars } from "@/lib/note-grammars";
 
 import { isSafeHref, NOTE_HEADING_LEVELS } from "@/domain/notes/rich-text";
 
@@ -10,7 +12,7 @@ import { isSafeHref, NOTE_HEADING_LEVELS } from "@/domain/notes/rich-text";
 // ProseMirror schema from them to check a document's structure before storing it.
 
 // Highlights code blocks in the editor; the read-only view highlights on the server with its own.
-export const noteLowlight = createLowlight(common);
+export const noteLowlight = createLowlight(noteGrammars());
 
 export function noteExtensions(): Extensions {
   return [

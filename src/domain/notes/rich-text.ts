@@ -199,21 +199,31 @@ const doc: z.ZodType<NoteDoc> = z.object({
   content: z.array(block).min(1).max(NOTE_CONTENT_MAX_NODES),
 });
 
-// Depth and node count of any JSON value, walked without recursion, so a hostile payload cannot
-// exhaust the stack before the limits apply. Stops as soon as a limit is passed.
+// Depth, node count and total string length of any JSON value, walked without recursion, so a
+// hostile payload cannot exhaust the stack or memory before the limits apply (a string referenced
+// by thousands of objects counts each time). Stops as soon as a limit is passed.
 function withinShapeLimits(value: unknown): boolean {
   const stack: Array<[unknown, number]> = [[value, 1]];
   let nodes = 0;
+  let chars = 0;
   while (stack.length > 0) {
     const [current, depth] = stack.pop()!;
+    if (typeof current === "string") {
+      chars += current.length;
+      if (chars > NOTE_CONTENT_MAX_CHARS) return false;
+      continue;
+    }
     if (current === null || typeof current !== "object") continue;
     nodes += 1;
     if (depth > NOTE_CONTENT_MAX_DEPTH || nodes > NOTE_CONTENT_MAX_NODES) {
       return false;
     }
-    for (const child of Object.values(current)) stack.push([child, depth + 1]);
+    for (const [key, child] of Object.entries(current)) {
+      chars += key.length;
+      stack.push([child, depth + 1]);
+    }
   }
-  return true;
+  return chars <= NOTE_CONTENT_MAX_CHARS;
 }
 
 function inlineText(content: readonly NoteInline[] | undefined): string {
@@ -305,13 +315,18 @@ export function parseNoteContent(value: unknown): ParsedNoteContent {
   return { ok: true, content: parsed.data, text };
 }
 
-// Whether a stored document still matches the schema (read path): rows are parsed again before
-// rendering, and one that does not match is shown as its plain text instead.
+// The document of a stored note (read path). Rows are parsed again before rendering; the plain text
+// wins whenever the document does not match the schema or no longer says the same thing: the
+// application always writes both together, so a mismatch means `body` was changed alone (US-018
+// code still running during a deploy) and its text is the newer one.
 export function storedNoteContent(content: unknown, body: string): NoteDoc {
   if (content === null || content === undefined) return textToDoc(body);
   if (!withinShapeLimits(content)) return textToDoc(body);
   const parsed = doc.safeParse(content);
-  return parsed.success ? parsed.data : textToDoc(body);
+  if (!parsed.success) return textToDoc(body);
+  return plainText(parsed.data) === body.replaceAll("\r", "")
+    ? parsed.data
+    : textToDoc(body);
 }
 
 // A plain-text note ready to store (tests and seeds): its document and its text.

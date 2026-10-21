@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   isSafeHref,
@@ -245,6 +245,21 @@ describe("parseNoteContent", () => {
     expect(errorOf(docOf(node))).toBe("contentTooLarge");
   });
 
+  it("refuses a long text repeated across many nodes before serializing it", () => {
+    const shared = "a".repeat(9_000);
+    const content = Array.from({ length: 1_000 }, () => ({
+      type: "paragraph",
+      content: [{ type: "text", text: shared }],
+    }));
+    const stringify = vi.spyOn(JSON, "stringify");
+    try {
+      expect(errorOf(docOf(...content))).toBe("contentTooLarge");
+      expect(stringify).not.toHaveBeenCalled();
+    } finally {
+      stringify.mockRestore();
+    }
+  });
+
   it("accepts lists nested within the depth limit", () => {
     let node: unknown = paragraph("fundo");
     // Ten levels: 2 (doc) + 10 × 4 (list, items, item, content) + 3 (paragraph) JSON levels.
@@ -334,8 +349,20 @@ describe("storedNoteContent", () => {
   const stored = docOf(paragraph("guardado")) as NoteDoc;
 
   it.each([
-    ["a valid document", stored, "corpo", stored],
+    ["a valid document", stored, "guardado", stored],
     ["no document (a US-018 row)", null, "corpo", docOf(paragraph("corpo"))],
+    [
+      "a document whose text was changed alone (old code during a deploy)",
+      docOf(paragraph("antigo")),
+      "novo",
+      docOf(paragraph("novo")),
+    ],
+    [
+      "a converted note with Windows line breaks",
+      textToDoc("a\r\nb"),
+      "a\r\nb",
+      textToDoc("a\r\nb"),
+    ],
     [
       "a document outside the schema",
       docOf({ type: "html" }),
