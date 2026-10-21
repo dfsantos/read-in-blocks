@@ -17,42 +17,56 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
-  renameNodeSchema,
-  type RenameNodeFormValues,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  nodeDetailsSchema,
+  type NodeDetails,
+  type NodeDetailsFormValues,
 } from "@/domain/structure/node-input";
+import type { TreeNode } from "@/domain/structure/tree";
 import { useRouter } from "@/i18n/navigation";
 import type {
   DeleteNodeResult,
-  RenameNodeResult,
   StructureErrorKey,
+  UpdateNodeResult,
 } from "@/server/actions/book-nodes";
 
-type RenameProps = Readonly<{
-  nodeId: string;
-  title: string;
+type EditProps = Readonly<{
+  node: Pick<TreeNode, "id" | "title" | "summary" | "goalPages">;
   // The Server Action; injected so tests can replace it.
   action: (
     nodeId: string,
-    input: RenameNodeFormValues,
-  ) => Promise<RenameNodeResult>;
+    input: NodeDetailsFormValues,
+  ) => Promise<UpdateNodeResult>;
   onDone: () => void;
 }>;
 
-// Renames a node in place (US-010). Escape or "Cancelar" leaves the title as it was.
-export function RenameNodeForm({ nodeId, title, action, onDone }: RenameProps) {
+// Edits a node's title, summary and goal in pages in place (US-010, US-011). Escape or "Cancelar"
+// leaves it as it was. The schema here is only for quick feedback: the Server Action parses again.
+export function EditNodeForm({ node, action, onDone }: EditProps) {
   const t = useTranslations("structure");
   const router = useRouter();
   const id = useId();
-  const form = useForm<RenameNodeFormValues>({
-    resolver: zodResolver(renameNodeSchema),
-    defaultValues: { title },
+  const form = useForm<NodeDetailsFormValues, unknown, NodeDetails>({
+    resolver: zodResolver(nodeDetailsSchema),
+    defaultValues: {
+      title: node.title,
+      summary: node.summary ?? "",
+      goalPages: node.goalPages === null ? "" : String(node.goalPages),
+    },
   });
 
   async function onSubmit() {
-    const result = await action(nodeId, form.getValues());
+    // The values as typed: the server trims and checks them again.
+    const result = await action(node.id, form.getValues());
     if (result.ok) {
       router.refresh();
       onDone();
@@ -65,42 +79,114 @@ export function RenameNodeForm({ nodeId, title, action, onDone }: RenameProps) {
     );
   }
 
-  const error =
-    form.formState.errors.title?.message ?? form.formState.errors.root?.message;
+  const message = (key: string | undefined) =>
+    key ? t(`errors.${key as StructureErrorKey}`) : undefined;
+  const { errors } = form.formState;
+  const rootError = message(errors.root?.message);
+  const described = (field: string, hint: boolean, invalid: boolean) =>
+    [
+      hint ? `${id}-${field}-hint` : null,
+      invalid ? `${id}-${field}-error` : null,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   return (
     <form
       noValidate
+      aria-label={t("edit.legend", { title: node.title })}
       onSubmit={form.handleSubmit(onSubmit)}
       onKeyDown={(event) => {
         if (event.key === "Escape") onDone();
       }}
-      className="flex flex-1 flex-wrap items-start gap-2"
+      className="flex w-full flex-col gap-3 rounded-xl border p-3"
     >
-      <Field data-invalid={error !== undefined} className="min-w-48 flex-1">
-        <FieldLabel htmlFor={`${id}-title`} className="sr-only">
-          {t("rename.label", { title })}
-        </FieldLabel>
-        <Input
-          {...form.register("title")}
-          id={`${id}-title`}
-          autoFocus
-          autoComplete="off"
-          aria-invalid={error !== undefined}
-          aria-describedby={error ? `${id}-error` : undefined}
-        />
-        {error ? (
-          <FieldError id={`${id}-error`}>
-            {t(`errors.${error as StructureErrorKey}`)}
-          </FieldError>
+      <FieldGroup>
+        <Field data-invalid={errors.title !== undefined}>
+          <FieldLabel htmlFor={`${id}-title`}>{t("edit.title")}</FieldLabel>
+          <Input
+            {...form.register("title")}
+            id={`${id}-title`}
+            required
+            autoFocus
+            autoComplete="off"
+            aria-invalid={errors.title !== undefined}
+            aria-describedby={described(
+              "title",
+              false,
+              errors.title !== undefined,
+            )}
+          />
+          {errors.title ? (
+            <FieldError id={`${id}-title-error`}>
+              {message(errors.title.message)}
+            </FieldError>
+          ) : null}
+        </Field>
+        <Field data-invalid={errors.summary !== undefined}>
+          <FieldLabel htmlFor={`${id}-summary`}>{t("edit.summary")}</FieldLabel>
+          <Textarea
+            {...form.register("summary")}
+            id={`${id}-summary`}
+            rows={3}
+            aria-invalid={errors.summary !== undefined}
+            aria-describedby={described(
+              "summary",
+              true,
+              errors.summary !== undefined,
+            )}
+          />
+          <FieldDescription id={`${id}-summary-hint`}>
+            {t("edit.summaryHint")}
+          </FieldDescription>
+          {errors.summary ? (
+            <FieldError id={`${id}-summary-error`}>
+              {message(errors.summary.message)}
+            </FieldError>
+          ) : null}
+        </Field>
+        <Field data-invalid={errors.goalPages !== undefined}>
+          <FieldLabel htmlFor={`${id}-goal`}>{t("edit.goal")}</FieldLabel>
+          <Input
+            {...form.register("goalPages")}
+            id={`${id}-goal`}
+            inputMode="numeric"
+            autoComplete="off"
+            className="max-w-32"
+            aria-invalid={errors.goalPages !== undefined}
+            aria-describedby={described(
+              "goal",
+              true,
+              errors.goalPages !== undefined,
+            )}
+          />
+          <FieldDescription id={`${id}-goal-hint`}>
+            {t("edit.goalHint")}
+          </FieldDescription>
+          {errors.goalPages ? (
+            <FieldError id={`${id}-goal-error`}>
+              {message(errors.goalPages.message)}
+            </FieldError>
+          ) : null}
+        </Field>
+        {rootError ? (
+          <p role="alert" className="text-destructive text-sm">
+            {rootError}
+          </p>
         ) : null}
-      </Field>
-      <Button type="submit" size="sm" disabled={form.formState.isSubmitting}>
-        {form.formState.isSubmitting ? t("rename.saving") : t("rename.save")}
-      </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={onDone}>
-        {t("rename.cancel")}
-      </Button>
+        <Field orientation="horizontal">
+          <Button
+            type="submit"
+            size="sm"
+            disabled={form.formState.isSubmitting}
+          >
+            {form.formState.isSubmitting ? t("edit.saving") : t("edit.save")}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+            {t("edit.cancel")}
+          </Button>
+        </Field>
+      </FieldGroup>
     </form>
   );
 }

@@ -4,14 +4,14 @@ import { bookIdSchema } from "@/domain/books/book-input";
 import {
   addNodesSchema,
   nodeIdSchema,
-  renameNodeSchema,
+  nodeDetailsSchema,
   type NodeInputError,
 } from "@/domain/structure/node-input";
 import { requireUser } from "@/server/auth/session";
 import {
   addNodes as insertNodes,
   deleteNode as removeNode,
-  renameNode as changeNode,
+  updateNode as changeNode,
 } from "@/server/repositories/book-nodes";
 import {
   consumeWriteQuota,
@@ -37,8 +37,13 @@ export type AddNodesResult =
   | { ok: true; data: { count: number } }
   | { ok: false; errorKey: StructureErrorKey; field?: "titles" | "kind" };
 
-export type RenameNodeResult =
-  { ok: true } | { ok: false; errorKey: StructureErrorKey; field?: "title" };
+export type UpdateNodeResult =
+  | { ok: true }
+  | {
+      ok: false;
+      errorKey: StructureErrorKey;
+      field?: "title" | "summary" | "goalPages";
+    };
 
 export type DeleteNodeResult =
   { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
@@ -49,9 +54,9 @@ const ADD_NODES_QUOTA = {
   limit: 30,
   windowSeconds: 60,
 } satisfies WriteQuota;
-// Fixing several titles in a row is normal; 60 a minute still stops a script.
-const RENAME_NODE_QUOTA = {
-  action: "structure.rename",
+// Fixing several titles, summaries or goals in a row is normal; 60 a minute still stops a script.
+const UPDATE_NODE_QUOTA = {
+  action: "structure.update",
   limit: 60,
   windowSeconds: 60,
 } satisfies WriteQuota;
@@ -130,36 +135,33 @@ export async function addNodes(
   }
 }
 
-export async function renameNode(
+// Edits a node's title, summary and goal (US-011).
+export async function updateNode(
   nodeId: unknown,
   input: unknown,
-): Promise<RenameNodeResult> {
+): Promise<UpdateNodeResult> {
   const id = nodeIdSchema.safeParse(nodeId);
-  const parsed = renameNodeSchema.safeParse(input);
+  const parsed = nodeDetailsSchema.safeParse(input);
   if (!parsed.success) {
     const [issue] = parsed.error.issues;
-    return {
-      ok: false,
-      errorKey:
-        issue.path[0] === "title"
-          ? (issue.message as NodeInputError)
-          : "titleRequired",
-      field: "title",
-    };
+    const field = issue.path[0];
+    return field === "title" || field === "summary" || field === "goalPages"
+      ? { ok: false, errorKey: issue.message as NodeInputError, field }
+      : { ok: false, errorKey: "titleRequired", field: "title" };
   }
 
   const user = await requireUser();
   if (!id.success) return { ok: false, errorKey: "notFound" };
 
   try {
-    if (!(await consumeWriteQuota(user.id, RENAME_NODE_QUOTA))) {
+    if (!(await consumeWriteQuota(user.id, UPDATE_NODE_QUOTA))) {
       return { ok: false, errorKey: "rateLimited" };
     }
-    return (await changeNode(user.id, id.data, parsed.data.title))
+    return (await changeNode(user.id, id.data, parsed.data))
       ? { ok: true }
       : { ok: false, errorKey: "notFound" };
   } catch (error) {
-    logFailure(RENAME_NODE_QUOTA.action, error);
+    logFailure(UPDATE_NODE_QUOTA.action, error);
     return { ok: false, errorKey: "failed" };
   }
 }

@@ -36,7 +36,7 @@ const mocks = vi.hoisted(() => ({ requireUser: vi.fn() }));
 vi.mock("@/server/auth/session", () => ({ requireUser: mocks.requireUser }));
 vi.mock("@/db/client", () => ({ getDb: () => db }));
 
-import { addNodes, deleteNode, renameNode } from "@/server/actions/book-nodes";
+import { addNodes, deleteNode, updateNode } from "@/server/actions/book-nodes";
 
 afterAll(() => pool.end());
 
@@ -82,7 +82,7 @@ describe("book structure Server Actions", () => {
 
     for (const call of [
       () => addNodes(randomUUID(), null, { kind: "chapter", titles: "A" }),
-      () => renameNode(randomUUID(), { title: "A" }),
+      () => updateNode(randomUUID(), { title: "A" }),
       () => deleteNode(randomUUID()),
     ]) {
       await expect(call()).rejects.toThrow("NEXT_REDIRECT /login");
@@ -131,8 +131,8 @@ describe("book structure Server Actions", () => {
         kind: "topic",
         titles: "X",
       }),
-      await renameNode(owned.nodeId, { title: "Taken" }),
-      await renameNode(randomUUID(), { title: "Taken" }),
+      await updateNode(owned.nodeId, { title: "Taken" }),
+      await updateNode(randomUUID(), { title: "Taken" }),
       await deleteNode(owned.nodeId),
       await deleteNode(randomUUID()),
     ];
@@ -172,7 +172,7 @@ describe("book structure Server Actions", () => {
       for (const answer of [
         await addNodes(id, null, { kind: "chapter", titles: "A" }),
         await addNodes(randomUUID(), id ?? "", { kind: "topic", titles: "A" }),
-        await renameNode(id, { title: "A" }),
+        await updateNode(id, { title: "A" }),
         await deleteNode(id),
       ]) {
         expect(answer).toEqual({ ok: false, errorKey: "notFound" });
@@ -220,32 +220,73 @@ describe("book structure Server Actions", () => {
   );
 
   it.each([
-    ["a blank title", { title: " " }, "titleRequired"],
-    ["a long title", { title: "a".repeat(201) }, "titleTooLong"],
-    ["a line break", { title: "a\nb" }, "invalidCharacters"],
-    ["not an object", null, "titleRequired"],
+    ["a blank title", { title: " " }, "titleRequired", "title"],
+    ["a long title", { title: "a".repeat(201) }, "titleTooLong", "title"],
+    [
+      "a line break in the title",
+      { title: "a\nb" },
+      "invalidCharacters",
+      "title",
+    ],
+    [
+      "a long summary",
+      { title: "t", summary: "a".repeat(1001) },
+      "summaryTooLong",
+      "summary",
+    ],
+    ["a zero goal", { title: "t", goalPages: 0 }, "goalInvalid", "goalPages"],
+    [
+      "a fractional goal",
+      { title: "t", goalPages: "1.5" },
+      "goalInvalid",
+      "goalPages",
+    ],
+    ["a huge goal", { title: "t", goalPages: 1e9 }, "goalInvalid", "goalPages"],
+    ["not an object", null, "titleRequired", "title"],
   ])(
-    "answers a rename with %s before reading the session",
-    async (_name, input, errorKey) => {
-      expect(await renameNode(randomUUID(), input)).toEqual({
+    "answers an update with %s before reading the session",
+    async (_name, input, errorKey, field) => {
+      expect(await updateNode(randomUUID(), input)).toEqual({
         ok: false,
         errorKey,
-        field: "title",
+        field,
       });
       expect(mocks.requireUser).not.toHaveBeenCalled();
     },
   );
 
-  it("renames the reader's node", async () => {
+  it("updates the reader's node, its summary and goal included", async () => {
     const { owner } = await create();
     const { bookId, nodeId } = await bookWithChapter(owner.id);
     signIn(owner);
 
-    expect(await renameNode(nodeId, { title: "  Renamed " })).toEqual({
-      ok: true,
-    });
+    expect(
+      await updateNode(nodeId, {
+        title: "  Renamed ",
+        summary: " Sobre o capítulo ",
+        goalPages: "42",
+        ownerId: "someone-else",
+      }),
+    ).toEqual({ ok: true });
     expect(await listNodes(owner.id, bookId, db)).toMatchObject([
-      { id: nodeId, title: "Renamed" },
+      {
+        id: nodeId,
+        title: "Renamed",
+        summary: "Sobre o capítulo",
+        goalPages: 42,
+      },
+    ]);
+
+    // Clearing the form fields clears the summary and the goal.
+    expect(
+      await updateNode(nodeId, {
+        title: "Renamed",
+        summary: "",
+        goalPages: "",
+      }),
+    ).toEqual({ ok: true });
+    expect(await listNodes(owner.id, bookId, db)).toMatchObject([
+      { id: nodeId, summary: null, goalPages: null },
     ]);
   });
 
@@ -275,9 +316,9 @@ describe("book structure Server Actions", () => {
         addNodes(bookId, null, { kind: "chapter", titles: "C" }),
     ],
     [
-      "renames",
+      "updates",
       60,
-      (_bookId: string, nodeId: string) => renameNode(nodeId, { title: "R" }),
+      (_bookId: string, nodeId: string) => updateNode(nodeId, { title: "R" }),
     ],
     ["deletions", 30, () => deleteNode(randomUUID())],
   ] as const)(
@@ -316,7 +357,7 @@ describe("book structure Server Actions", () => {
         titles: "Secret Title",
       }),
     ).toEqual({ ok: false, errorKey: "failed" });
-    expect(await renameNode(randomUUID(), { title: "Secret Title" })).toEqual({
+    expect(await updateNode(randomUUID(), { title: "Secret Title" })).toEqual({
       ok: false,
       errorKey: "failed",
     });
@@ -326,7 +367,7 @@ describe("book structure Server Actions", () => {
     });
     expect(error.mock.calls.map((call) => call[0])).toEqual([
       "structure.create failed",
-      "structure.rename failed",
+      "structure.update failed",
       "structure.delete failed",
     ]);
     expect(JSON.stringify(error.mock.calls)).not.toContain("Secret Title");

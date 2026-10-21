@@ -9,6 +9,9 @@ export type FlatNode = {
   kind: NodeKind;
   title: string;
   position: number;
+  // US-011: plain text summary and goal in pages, both optional.
+  summary: string | null;
+  goalPages: number | null;
 };
 
 export type TreeNode = FlatNode & { children: TreeNode[] };

@@ -50,6 +50,13 @@
       "when": 1792541390782,
       "tag": "0006_create_book_node",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792543911407,
+      "tag": "0007_add_book_node_details",
+      "breakpoints": true
     }
   ]
 }

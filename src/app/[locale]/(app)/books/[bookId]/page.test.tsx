@@ -35,7 +35,7 @@ vi.mock("@/server/repositories/book-nodes", () => ({
 }));
 vi.mock("@/server/actions/book-nodes", () => ({
   addNodes: vi.fn(),
-  renameNode: vi.fn(),
+  updateNode: vi.fn(),
   deleteNode: vi.fn(),
 }));
 

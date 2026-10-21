@@ -118,13 +118,22 @@
       "submitting": "Adicionando…",
       "added": "{count, plural, one {# item adicionado.} other {# itens adicionados.}}"
     },
-    "rename": {
-      "open": "Renomear {title}",
-      "openShort": "Renomear",
-      "label": "Novo título de {title}",
+    "edit": {
+      "open": "Editar {title}",
+      "openShort": "Editar",
+      "legend": "Editar {title}",
+      "title": "Título",
+      "summary": "Resumo",
+      "summaryHint": "Opcional. Texto simples, sobre a proposta deste trecho.",
+      "goal": "Meta (páginas)",
+      "goalHint": "Opcional. Sem meta, o item usa o peso padrão: a média das metas dos itens ao lado.",
       "save": "Salvar",
       "saving": "Salvando…",
       "cancel": "Cancelar"
+    },
+    "details": {
+      "goal": "{count, plural, one {# página} other {# páginas}}",
+      "defaultWeight": "Peso padrão"
     },
     "delete": {
       "open": "Excluir {title}",
@@ -146,7 +155,9 @@
       "tooManyNodes": "Um livro pode ter no máximo 2.000 itens na estrutura.",
       "notFound": "Este item não existe mais. Recarregue a página.",
       "rateLimited": "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
-      "failed": "Não foi possível salvar. Tente de novo em instantes."
+      "failed": "Não foi possível salvar. Tente de novo em instantes.",
+      "summaryTooLong": "O resumo pode ter no máximo 1.000 caracteres.",
+      "goalInvalid": "A meta deve ser um número inteiro de páginas, de 1 a 10.000."
     }
   }
 }

@@ -78,6 +78,10 @@ export const bookNode = pgTable(
     title: text("title").notNull(),
     // Order among siblings, from 0; reordering arrives in US-012.
     position: integer("position").notNull(),
+    // Plain text summary and goal in pages (US-011, D-02); both optional. A node without a goal
+    // takes the default weight (src/domain/progress/weight.ts).
+    summary: text("summary"),
+    goalPages: integer("goal_pages"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -121,6 +125,14 @@ export const bookNode = pgTable(
       sql`char_length(${table.title}) between 1 and 200`,
     ),
     check("book_node_position", sql`${table.position} >= 0`),
+    check(
+      "book_node_summary_length",
+      sql`${table.summary} is null or char_length(${table.summary}) between 1 and 1000`,
+    ),
+    check(
+      "book_node_goal_pages",
+      sql`${table.goalPages} is null or ${table.goalPages} between 1 and 10000`,
+    ),
     ownerPolicy(),
   ],
 );

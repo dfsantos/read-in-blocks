@@ -9,7 +9,7 @@ import { bookIdSchema } from "@/domain/books/book-input";
 import { buildTree } from "@/domain/structure/tree";
 import { Link } from "@/i18n/navigation";
 import { editBookPath, LIBRARY_PATH } from "@/lib/routes";
-import { addNodes, deleteNode, renameNode } from "@/server/actions/book-nodes";
+import { addNodes, deleteNode, updateNode } from "@/server/actions/book-nodes";
 import { deleteBook } from "@/server/actions/books";
 import { requireUser } from "@/server/auth/session";
 import { foundOrNotFound } from "@/server/not-found";
@@ -78,7 +78,7 @@ export default async function BookPage({ params }: Props) {
         tree={tree}
         actions={{
           add: addNodes.bind(null, book.id),
-          rename: renameNode,
+          update: updateNode,
           remove: deleteNode,
         }}
       />
