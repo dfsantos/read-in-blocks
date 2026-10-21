@@ -14,6 +14,10 @@ export type NoteType = (typeof NOTE_TYPES)[number];
 export const isNoteType = (value: unknown): value is NoteType =>
   (NOTE_TYPES as readonly unknown[]).includes(value);
 
+// Format characters (zero-width spaces and joiners, direction marks, BOM): a reference made of
+// them would look blank or reorder "p. 12–40" (security review, US-020).
+const INVISIBLE_FORMAT = /\p{Cf}/u;
+
 // Room for "p. 1234–1240", "posição 12345" or "cap. 3, §2".
 export const NOTE_REFERENCE_MAX = 50;
 
@@ -58,7 +62,7 @@ export function parseNoteKind(
   if (trimmed.length > NOTE_REFERENCE_MAX) {
     return { ok: false, error: noteTypeErrors.referenceTooLong };
   }
-  if (!visibleText(trimmed)) {
+  if (!visibleText(trimmed) || INVISIBLE_FORMAT.test(trimmed)) {
     return { ok: false, error: noteTypeErrors.referenceInvalid };
   }
   return { ok: true, kind: { type, reference: trimmed } };

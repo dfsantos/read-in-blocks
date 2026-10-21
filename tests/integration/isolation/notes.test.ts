@@ -190,6 +190,51 @@ describe("notebook repository", () => {
     expect(storedQuote.type).toBe("quote");
   });
 
+  it("keeps notes written by the previous build valid: default kind, and kinds untouched by its edits", async () => {
+    const { owner } = await create();
+    const { bookId, nodeIds } = await seedChapter(owner.id);
+    const quote = await createNote(
+      owner.id,
+      nodeIds[0],
+      { ...plainNote("Frase"), type: "quote", reference: "r".repeat(50) },
+      db,
+    );
+    if (!quote.ok) throw new Error("unexpected refusal");
+
+    // What US-018/US-019 code writes: no kind columns on insert, only text on update.
+    await migrator.query(
+      "INSERT INTO note (owner_id, book_id, node_id, body) VALUES ($1, $2, $3, 'Antiga')",
+      [owner.id, bookId, nodeIds[0]],
+    );
+    await migrator.query(
+      "UPDATE note SET body = 'Frase nova', content = NULL, updated_at = now() WHERE id = $1",
+      [quote.id],
+    );
+
+    const notes = await listNotes(owner.id, nodeIds[0], db);
+    expect(
+      notes.map(({ body, type, reference, resolvedAt }) => ({
+        body,
+        type,
+        reference,
+        resolvedAt,
+      })),
+    ).toEqual([
+      {
+        body: "Frase nova",
+        type: "quote",
+        reference: "r".repeat(50),
+        resolvedAt: null,
+      },
+      {
+        body: "Antiga",
+        type: "key_concept",
+        reference: null,
+        resolvedAt: null,
+      },
+    ]);
+  });
+
   it.each([
     [
       "an unknown kind",
