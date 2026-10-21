@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { DeleteBookButton } from "@/components/books/delete-book-button";
 import { BookStructure } from "@/components/structure/book-structure";
+import { TableOfContents } from "@/components/toc/table-of-contents";
 import { buttonVariants } from "@/components/ui/button";
 import { bookIdSchema } from "@/domain/books/book-input";
 import { buildTree } from "@/domain/structure/tree";
@@ -42,12 +43,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: t("metadataTitle", { title: book.title }) };
 }
 
-// The book page (US-007), with its edit and delete actions (US-009) and its structure of parts,
-// chapters and topics (US-010).
+// The book page (US-007), with its edit and delete actions (US-009), its interactive table of
+// contents (US-015) and its structure of parts, chapters and topics (US-010).
 export default async function BookPage({ params }: Props) {
   const book = await loadBook((await params).bookId);
   const user = await requireUser();
-  const tree = buildTree(await listNodes(user.id, book.id));
+  const nodes = await listNodes(user.id, book.id);
   const t = await getTranslations("books.detail");
 
   return (
@@ -81,9 +82,18 @@ export default async function BookPage({ params }: Props) {
           action={deleteBook.bind(null, book.id)}
         />
       </div>
+      <TableOfContents
+        bookId={book.id}
+        nodes={nodes}
+        actions={{
+          setStatus: setReadingStatus,
+          setDates: setReadingDates,
+          completeAll,
+        }}
+      />
       {/* The bound ids are still arguments the client sends: the actions parse them again. */}
       <BookStructure
-        tree={tree}
+        tree={buildTree(nodes)}
         actions={{
           add: addNodes.bind(null, book.id),
           update: updateNode,

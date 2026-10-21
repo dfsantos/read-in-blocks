@@ -214,5 +214,21 @@
       "dateInFuture": "A data não pode ser depois de hoje.",
       "notParent": "Este item não tem subitens; marque o estado dele diretamente."
     }
+  },
+  "toc": {
+    "title": "Sumário",
+    "treeLabel": "Sumário do livro",
+    "hint": "Use as setas para percorrer e abrir ou fechar seções; Enter mostra os detalhes.",
+    "empty": "O sumário aparece aqui assim que a estrutura abaixo tiver partes ou capítulos.",
+    "expandAll": "Expandir tudo",
+    "collapseAll": "Recolher tudo",
+    "progress": "{completed} de {total} {total, plural, one {concluído} other {concluídos}}",
+    "details": {
+      "empty": "Escolha um item do sumário para ver o resumo, a meta e o estado.",
+      "summary": "Resumo",
+      "noSummary": "Sem resumo.",
+      "goal": "Meta",
+      "state": "Estado"
+    }
   }
 }

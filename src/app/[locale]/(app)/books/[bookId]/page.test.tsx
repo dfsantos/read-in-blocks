@@ -131,8 +131,24 @@ describe("BookPage", () => {
         kind: "chapter",
         title: "<i>One</i>",
         position: 0,
+        summary: null,
+        goalPages: null,
+        status: "not_started",
+        startedAt: null,
+        completedAt: null,
       },
-      { id: "p1", parentId: null, kind: "part", title: "Part I", position: 0 },
+      {
+        id: "p1",
+        parentId: null,
+        kind: "part",
+        title: "Part I",
+        position: 0,
+        summary: null,
+        goalPages: null,
+        status: "not_started",
+        startedAt: null,
+        completedAt: null,
+      },
     ]);
 
     render(
@@ -144,8 +160,12 @@ describe("BookPage", () => {
     expect(mocks.listNodes).toHaveBeenCalledWith(READER.id, BOOK_ID);
     const structure = screen.getByRole("list", { name: "Estrutura do livro" });
     expect(structure).toHaveTextContent("Part I");
-    // User content is text, never markup.
-    expect(screen.getByText("<i>One</i>")).toBeInTheDocument();
+    // The table of contents (US-015) shows the same structure.
+    expect(
+      screen.getByRole("tree", { name: "Sumário do livro" }),
+    ).toHaveTextContent("Part I");
+    // User content is text, never markup, in both.
+    expect(screen.getAllByText("<i>One</i>")).toHaveLength(2);
   });
 
   it("says when the author is unknown", async () => {

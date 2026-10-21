@@ -8,6 +8,7 @@ export const E2E_ACCOUNTS = {
   books: "e2e-books@example.test",
   booksIntruder: "e2e-books-intruder@example.test",
   structure: "e2e-structure@example.test",
+  toc: "e2e-toc@example.test",
 } as const;
 
 export const E2E_ALLOWLIST = Object.values(E2E_ACCOUNTS).join(",");
