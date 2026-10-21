@@ -14,7 +14,23 @@
       "description": "Cadastre o primeiro livro para começar a acompanhar sua leitura.",
       "cta": "Cadastrar o primeiro livro"
     },
-    "truncated": "Mostrando os {count, number} livros mais recentes."
+    "truncated": "Mostrando os {count, number} livros mais recentes.",
+    "book": {
+      "progressBar": "Progresso de {title}",
+      "progress": "{percent} lido",
+      "noStructure": "Sem estrutura ainda: abra o livro para montar as partes e os capítulos e acompanhar a leitura.",
+      "completed": "Livro concluído",
+      "current": "Em andamento: {title}",
+      "next": "Próximo: {title}",
+      "resume": "Retomar",
+      "resumeLabel": "Retomar {book} em {title}",
+      "start": "Começar",
+      "startLabel": "Começar {book} por {title}",
+      "revisit": "Revisitar anotações",
+      "revisitLabel": "Anotações de {title} por capítulo",
+      "revisitItem": "{title} ({count, plural, one {# anotação} other {# anotações}})",
+      "noNotes": "Nenhuma anotação neste livro."
+    }
   },
   "login": {
     "metadataTitle": "Entrar — Read in Blocks",
