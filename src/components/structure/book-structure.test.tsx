@@ -176,7 +176,7 @@ describe("BookStructure", () => {
       "rateLimited",
       "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
     ],
-    ["notFound", "Este item não existe mais. Recarregue a página."],
+    ["notFound", "Este item não existe mais. Atualize a página."],
   ] as const)("shows the server's %s answer", async (errorKey, text) => {
     const { user } = renderStructure([], {
       add: vi.fn().mockResolvedValue({ ok: false, errorKey }),
@@ -703,7 +703,7 @@ describe("BookStructure", () => {
     await user.click(within(dialog).getByRole("button", { name: "Excluir" }));
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-      "Este item não existe mais. Recarregue a página.",
+      "Este item não existe mais. Atualize a página.",
     );
     expect(refresh).not.toHaveBeenCalled();
   });

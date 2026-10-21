@@ -303,7 +303,7 @@ describe("TableOfContents", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Este item não existe mais. Recarregue a página.",
+      "Este item não existe mais. Atualize a página.",
     );
     expect(item("Um")).toHaveAccessibleName(
       "Um Em andamento · 1 de 2 concluídos",
