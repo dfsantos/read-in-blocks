@@ -13,6 +13,7 @@ export const E2E_ACCOUNTS = {
   notes: "e2e-notes@example.test",
   notesIntruder: "e2e-notes-intruder@example.test",
   resume: "e2e-resume@example.test",
+  blocks: "e2e-blocks@example.test",
 } as const;
 
 export const E2E_ALLOWLIST = Object.values(E2E_ACCOUNTS).join(",");

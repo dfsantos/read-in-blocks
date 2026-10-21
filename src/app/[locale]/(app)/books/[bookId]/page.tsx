@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { cache } from "react";
 
+import { BlocksView } from "@/components/blocks/blocks-view";
+import { ContentsViews } from "@/components/blocks/contents-views";
 import { DeleteBookButton } from "@/components/books/delete-book-button";
 import { ProgressPanel } from "@/components/progress/progress-panel";
 import { BookStructure } from "@/components/structure/book-structure";
@@ -46,7 +48,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 // The book page (US-007), with its edit and delete actions (US-009), its weighted progress
-// (US-016), its interactive table of contents (US-015) with each node's notebook (US-018) and its structure of parts, chapters and
+// (US-016), its interactive table of contents (US-015) or blocks view (US-017) with each node's notebook (US-018) and its structure of parts, chapters and
 // topics (US-010).
 export default async function BookPage({ params }: Props) {
   const book = await loadBook((await params).bookId);
@@ -90,15 +92,22 @@ export default async function BookPage({ params }: Props) {
         />
       </div>
       <ProgressPanel tree={tree} />
-      <TableOfContents
-        bookId={book.id}
-        nodes={nodes}
-        noteCounts={noteCounts}
-        actions={{
-          setStatus: setReadingStatus,
-          setDates: setReadingDates,
-          completeAll,
-        }}
+      <ContentsViews
+        toc={
+          <TableOfContents
+            bookId={book.id}
+            nodes={nodes}
+            noteCounts={noteCounts}
+            actions={{
+              setStatus: setReadingStatus,
+              setDates: setReadingDates,
+              completeAll,
+            }}
+          />
+        }
+        blocks={
+          <BlocksView bookId={book.id} tree={tree} noteCounts={noteCounts} />
+        }
       />
       {/* The bound ids are still arguments the client sends: the actions parse them again. */}
       <BookStructure

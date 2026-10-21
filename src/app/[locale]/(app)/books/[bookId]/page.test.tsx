@@ -174,8 +174,12 @@ describe("BookPage", () => {
     expect(
       screen.getByRole("progressbar", { name: "Progresso do livro" }),
     ).toHaveAttribute("aria-valuenow", "0");
-    // User content is text, never markup, in all three.
-    expect(screen.getAllByText("<i>One</i>")).toHaveLength(3);
+    // And the blocks view (US-017), hidden until the reader chooses it.
+    expect(
+      screen.getByRole("link", { name: "<i>One</i>", hidden: true }),
+    ).toHaveAttribute("href", `/books/${BOOK_ID}/nodes/c1`);
+    // User content is text, never markup, in all four.
+    expect(screen.getAllByText("<i>One</i>")).toHaveLength(4);
   });
 
   it("says when the author is unknown", async () => {

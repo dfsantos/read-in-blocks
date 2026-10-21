@@ -306,5 +306,19 @@
       "rateLimited": "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
       "failed": "Não foi possível salvar agora. Tente de novo."
     }
+  },
+  "blocks": {
+    "empty": "Os blocos aparecem aqui assim que a estrutura abaixo tiver partes ou capítulos.",
+    "noPart": "Fora das partes",
+    "emptyPart": "Nenhum capítulo nesta parte ainda.",
+    "progressBar": "Progresso de {title}",
+    "notes": "{count, plural, one {# anotação} other {# anotações}}",
+    "views": {
+      "label": "Ver a estrutura como",
+      "toc": "Sumário",
+      "blocks": "Blocos"
+    },
+    "title": "Blocos",
+    "goal": "Meta: {goal}"
   }
 }
