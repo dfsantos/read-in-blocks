@@ -90,10 +90,63 @@
       "metadataTitle": "{title} — Read in Blocks",
       "byAuthor": "de {author}",
       "noAuthor": "Autor não informado",
-      "structurePending": "A estrutura do livro (partes, capítulos e tópicos) chega nas próximas versões.",
       "backToLibrary": "Voltar para a biblioteca",
       "edit": "Editar",
       "actionsLabel": "Ações do livro"
+    }
+  },
+  "structure": {
+    "title": "Estrutura",
+    "listLabel": "Estrutura do livro",
+    "empty": "Nenhuma parte ou capítulo ainda. Cole a lista do sumário abaixo para começar.",
+    "kinds": {
+      "part": "Parte",
+      "chapter": "Capítulo",
+      "topic": "Tópico"
+    },
+    "add": {
+      "rootTitle": "Adicionar ao livro",
+      "open": "Adicionar em {title}",
+      "openShort": "Adicionar",
+      "close": "Fechar",
+      "closeFor": "Fechar a adição em {title}",
+      "kind": "Tipo",
+      "titles": "Títulos",
+      "titlesOf": "{kind, select, part {Partes} chapter {Capítulos} topic {Tópicos} other {Títulos}}",
+      "titlesHint": "Um por linha. Cole a lista do sumário para cadastrar vários de uma vez (até 100).",
+      "submit": "Adicionar",
+      "submitting": "Adicionando…",
+      "added": "{count, plural, one {# item adicionado.} other {# itens adicionados.}}"
+    },
+    "rename": {
+      "open": "Renomear {title}",
+      "openShort": "Renomear",
+      "label": "Novo título de {title}",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "cancel": "Cancelar"
+    },
+    "delete": {
+      "open": "Excluir {title}",
+      "openShort": "Excluir",
+      "title": "Excluir “{title}”?",
+      "leaf": "Não é possível desfazer.",
+      "withChildren": "{count, plural, one {O item dentro dele também será excluído.} other {Os # itens dentro dele também serão excluídos.}} Não é possível desfazer.",
+      "cancel": "Cancelar",
+      "confirm": "Excluir",
+      "deleting": "Excluindo…"
+    },
+    "errors": {
+      "titleRequired": "Informe o título.",
+      "titleTooLong": "Cada título pode ter no máximo 200 caracteres.",
+      "invalidCharacters": "Use só texto comum, sem caracteres de controle.",
+      "titlesRequired": "Informe ao menos um título.",
+      "tooManyTitles": "Envie no máximo 100 títulos por vez.",
+      "invalidPlacement": "Esse tipo de item não pode ficar aqui.",
+      "tooManyNodes": "Um livro pode ter no máximo 2.000 itens na estrutura.",
+      "notFound": "Este item não existe mais. Recarregue a página.",
+      "rateLimited": "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
+      "failed": "Não foi possível salvar. Tente de novo em instantes."
     }
   }
 }

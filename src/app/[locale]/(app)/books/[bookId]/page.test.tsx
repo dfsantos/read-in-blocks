@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
   findBook: vi.fn(),
   deleteBook: vi.fn(),
+  listNodes: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NEXT_HTTP_ERROR_FALLBACK;404");
   }),
@@ -26,9 +27,17 @@ vi.mock("next-intl/server", async () => {
 // next-intl's navigation does not load outside Next.js.
 vi.mock("@/i18n/navigation", () => ({
   Link: (props: React.ComponentProps<"a">) => <a {...props} />,
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
 vi.mock("@/server/actions/books", () => ({ deleteBook: mocks.deleteBook }));
+vi.mock("@/server/repositories/book-nodes", () => ({
+  listNodes: mocks.listNodes,
+}));
+vi.mock("@/server/actions/book-nodes", () => ({
+  addNodes: vi.fn(),
+  renameNode: vi.fn(),
+  deleteNode: vi.fn(),
+}));
 
 import BookPage, { generateMetadata } from "./page";
 
@@ -46,6 +55,7 @@ describe("BookPage", () => {
   beforeEach(() => {
     mocks.requireUser.mockReset().mockResolvedValue(READER);
     mocks.findBook.mockReset();
+    mocks.listNodes.mockReset().mockResolvedValue([]);
     mocks.notFound.mockClear();
   });
   afterEach(cleanup);
@@ -101,6 +111,37 @@ describe("BookPage", () => {
     expect(actions).toContainElement(
       screen.getByRole("button", { name: "Excluir livro" }),
     );
+  });
+
+  it("shows the book's structure, read with the session's id", async () => {
+    mocks.findBook.mockResolvedValue({
+      id: BOOK_ID,
+      title: "SICP",
+      author: null,
+      createdAt: new Date(),
+    });
+    mocks.listNodes.mockResolvedValue([
+      {
+        id: "c1",
+        parentId: "p1",
+        kind: "chapter",
+        title: "<i>One</i>",
+        position: 0,
+      },
+      { id: "p1", parentId: null, kind: "part", title: "Part I", position: 0 },
+    ]);
+
+    render(
+      <NextIntlClientProvider locale="pt-BR" messages={messages}>
+        {await BookPage(props(BOOK_ID))}
+      </NextIntlClientProvider>,
+    );
+
+    expect(mocks.listNodes).toHaveBeenCalledWith(READER.id, BOOK_ID);
+    const structure = screen.getByRole("list", { name: "Estrutura do livro" });
+    expect(structure).toHaveTextContent("Part I");
+    // User content is text, never markup.
+    expect(screen.getByText("<i>One</i>")).toBeInTheDocument();
   });
 
   it("says when the author is unknown", async () => {
