@@ -5,7 +5,7 @@ import {
   MAX_TITLES_PER_ADD,
   nodeIdSchema,
   nodeTitlesSchema,
-  renameNodeSchema,
+  nodeDetailsSchema,
 } from "./node-input";
 
 const errorOf = (result: {
@@ -72,20 +72,80 @@ describe("addNodesSchema", () => {
   });
 });
 
-describe("renameNodeSchema", () => {
+describe("nodeDetailsSchema", () => {
+  const valid = { title: "Um", summary: "", goalPages: "" };
+
   it.each([
-    ["a blank title", "  ", "titleRequired"],
-    ["a long title", "a".repeat(201), "titleTooLong"],
-    ["a line break", "a\nb", "invalidCharacters"],
-    ["not a string", 1, "titleRequired"],
-  ])("refuses %s", (_name, title, error) => {
-    expect(errorOf(renameNodeSchema.safeParse({ title }))).toBe(error);
+    [
+      "a title alone",
+      { title: "  Um  " },
+      { title: "Um", summary: null, goalPages: null },
+    ],
+    [
+      "a multi-line summary and a goal typed in the form",
+      { title: "Um", summary: "  Linha 1\n\tLinha 2 ", goalPages: " 30 " },
+      { title: "Um", summary: "Linha 1\n\tLinha 2", goalPages: 30 },
+    ],
+    [
+      "a goal sent as a number",
+      { ...valid, goalPages: 10_000 },
+      { title: "Um", summary: null, goalPages: 10_000 },
+    ],
+    [
+      "blank fields as nothing",
+      { ...valid, summary: "   ", goalPages: "  " },
+      { title: "Um", summary: null, goalPages: null },
+    ],
+    [
+      "a null goal",
+      { ...valid, goalPages: null },
+      { title: "Um", summary: null, goalPages: null },
+    ],
+  ])("accepts %s", (_name, input, expected) => {
+    expect(nodeDetailsSchema.parse(input)).toEqual(expected);
   });
 
-  it("trims the title", () => {
-    expect(renameNodeSchema.parse({ title: "  Novo  " })).toEqual({
-      title: "Novo",
-    });
+  it.each([
+    ["a blank title", { ...valid, title: " " }, "titleRequired"],
+    ["a long title", { ...valid, title: "a".repeat(201) }, "titleTooLong"],
+    [
+      "a line break in the title",
+      { ...valid, title: "a\nb" },
+      "invalidCharacters",
+    ],
+    [
+      "a long summary",
+      { ...valid, summary: "a".repeat(1001) },
+      "summaryTooLong",
+    ],
+    [
+      "a NUL in the summary",
+      { ...valid, summary: "a\u0000b" },
+      "invalidCharacters",
+    ],
+    [
+      "a bidi override in the summary",
+      { ...valid, summary: "a\u202Eb" },
+      "invalidCharacters",
+    ],
+    ["a zero goal", { ...valid, goalPages: "0" }, "goalInvalid"],
+    ["a negative goal", { ...valid, goalPages: -5 }, "goalInvalid"],
+    ["a fractional goal", { ...valid, goalPages: "2.5" }, "goalInvalid"],
+    ["a goal over the limit", { ...valid, goalPages: "10001" }, "goalInvalid"],
+    [
+      "a goal that is not a number",
+      { ...valid, goalPages: "trinta" },
+      "goalInvalid",
+    ],
+    [
+      "a goal in exponent notation",
+      { ...valid, goalPages: "1e3" },
+      "goalInvalid",
+    ],
+    ["an infinite goal", { ...valid, goalPages: Infinity }, "goalInvalid"],
+    ["a goal of the wrong type", { ...valid, goalPages: true }, "goalInvalid"],
+  ])("refuses %s", (_name, input, error) => {
+    expect(errorOf(nodeDetailsSchema.safeParse(input))).toBe(error);
   });
 });
 

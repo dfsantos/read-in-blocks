@@ -7,7 +7,15 @@ const node = (
   parentId: string | null,
   kind: FlatNode["kind"],
   position: number,
-): FlatNode => ({ id, parentId, kind, title: id, position });
+): FlatNode => ({
+  id,
+  parentId,
+  kind,
+  title: id,
+  position,
+  summary: null,
+  goalPages: null,
+});
 
 describe("buildTree", () => {
   it("builds nothing from no nodes", () => {
