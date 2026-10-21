@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -119,6 +125,18 @@ describe("NoteEditor", () => {
         '"language":"python"',
       ),
     );
+  });
+
+  it("keeps the focus in the editor when a toolbar button is clicked", async () => {
+    renderEditor();
+    await screen.findByRole("toolbar", { name: "Formatação" });
+
+    // A prevented mousedown is what stops the button from taking the focus.
+    expect(
+      fireEvent.mouseDown(
+        screen.getByRole("button", { name: "Bloco de código (Ctrl+Alt+C)" }),
+      ),
+    ).toBe(false);
   });
 
   it("links the selection to an http(s) address and refuses others", async () => {

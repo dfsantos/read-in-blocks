@@ -21,7 +21,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+} from "react";
 
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -203,6 +210,11 @@ const TOOLS: readonly Tool[] = [
   },
 ];
 
+// A click on a toolbar button keeps the focus (and the selection) in the editor. Otherwise the
+// button holds it until the editor takes it back on the next frame, and keys typed in between land
+// on the button (a space would press it again).
+const keepEditorFocus = (event: MouseEvent) => event.preventDefault();
+
 function Toolbar({ editor }: Readonly<{ editor: Editor }>) {
   const t = useTranslations("notes.editor");
   const [linkOpen, setLinkOpen] = useState(false);
@@ -237,6 +249,7 @@ function Toolbar({ editor }: Readonly<{ editor: Editor }>) {
             aria-label={t(tool.key)}
             aria-pressed={state.active[tool.key]}
             title={t(tool.key)}
+            onMouseDown={keepEditorFocus}
             onClick={() => tool.run(editor)}
           >
             <tool.icon aria-hidden="true" />
