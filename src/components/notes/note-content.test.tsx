@@ -175,7 +175,10 @@ describe("NoteContent", () => {
     expect(
       await screen.findByText(/Não foi possível desenhar este diagrama/),
     ).toBeInTheDocument();
-    expect(renderDiagram).toHaveBeenCalledWith("flowchart LR\n  A -->");
+    expect(renderDiagram).toHaveBeenCalledWith(
+      "flowchart LR\n  A -->",
+      expect.any(AbortSignal),
+    );
     expect(container).toHaveTextContent("Antes");
     expect(container).toHaveTextContent("Depois");
     expect(container.querySelector(".hljs-keyword")).toBeNull();

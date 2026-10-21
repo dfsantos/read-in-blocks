@@ -39,7 +39,10 @@ describe("NoteDiagram", () => {
     expect(image).toHaveAttribute("src", "data:image/svg+xml,x");
     expect(image).toHaveAttribute("width", "200");
     expect(screen.getByText("Ver o texto do diagrama")).toBeInTheDocument();
-    expect(renderDiagram).toHaveBeenCalledWith("flowchart LR\n  A --> B");
+    expect(renderDiagram).toHaveBeenCalledWith(
+      "flowchart LR\n  A --> B",
+      expect.any(AbortSignal),
+    );
   });
 
   it("explains a text it cannot draw and still shows it", async () => {

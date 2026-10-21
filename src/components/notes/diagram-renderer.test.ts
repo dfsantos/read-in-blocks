@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { svgToImage } from "./diagram-renderer";
+import { renderDiagram, svgToImage } from "./diagram-renderer";
 
 // What Mermaid returns becomes an image's source: the size comes from the viewBox, and anything able
 // to run or fetch is removed, even though an image runs nothing (US-022).
@@ -50,5 +50,15 @@ describe("svgToImage", () => {
     ["an empty viewBox", svg("<g/>", 'viewBox="0 0 0 10"')],
   ])("refuses %s", (_name, markup) => {
     expect(svgToImage(markup)).toBeNull();
+  });
+});
+
+describe("renderDiagram", () => {
+  it("skips a drawing nobody wants anymore, without loading Mermaid", async () => {
+    const cancelled = new AbortController();
+    cancelled.abort();
+    await expect(
+      renderDiagram("flowchart LR\n  A --> B", cancelled.signal),
+    ).resolves.toBeNull();
   });
 });

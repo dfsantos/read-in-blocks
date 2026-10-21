@@ -173,6 +173,7 @@ describe("NoteEditor", () => {
     ).toHaveAttribute("src", "data:image/svg+xml,x");
     expect(renderDiagram).toHaveBeenCalledWith(
       "flowchart LR\n  A[Ideia] --> B[Conceito]",
+      expect.any(AbortSignal),
     );
     expect(
       screen.getByRole("combobox", { name: "Linguagem do bloco de código" }),

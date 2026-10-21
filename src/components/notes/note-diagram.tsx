@@ -30,14 +30,14 @@ export function NoteDiagram({
 
   // While the editor waits to redraw, the last drawing stays (no flicker between keystrokes).
   useEffect(() => {
-    let current = true;
+    const cancelled = new AbortController();
     const timer = setTimeout(() => {
-      void renderDiagram(source).then((drawn) => {
-        if (current) setResult(drawn);
+      void renderDiagram(source, cancelled.signal).then((drawn) => {
+        if (drawn && !cancelled.signal.aborted) setResult(drawn);
       });
     }, delay);
     return () => {
-      current = false;
+      cancelled.abort();
       clearTimeout(timer);
     };
   }, [source, delay]);

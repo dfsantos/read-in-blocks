@@ -3,10 +3,12 @@ import type { Mermaid, MermaidConfig } from "mermaid";
 import { NOTE_TEXT_MAX } from "@/domain/notes/rich-text";
 
 // Draws a note's diagram (US-022, RF-012, ADR-0007) in the browser. Mermaid is only downloaded the
-// first time a diagram is drawn. The SVG it produces is never inserted into the page: it becomes the
-// source of an <img>, a separate document where no script runs, no event handler fires and nothing
-// is fetched, whatever the diagram's text managed to put in it. That also keeps the page's CSP
-// intact (US-028): the diagram's own <style> applies inside the image, not to the page.
+// first time a diagram is drawn. While it draws, Mermaid builds the diagram in an invisible box of
+// the page: there, Mermaid's strict mode (labels sanitized, no links or click handlers) and the
+// page's CSP (US-028: no inline script or style) are what protect the page. The finished SVG is
+// then taken out and shown only as the source of an <img>, a separate document where no script
+// runs, no event handler fires and nothing is fetched; its own <style> applies inside the image,
+// not to the page.
 
 export type DiagramImage = Readonly<{
   src: string;
@@ -57,6 +59,12 @@ const CONFIG: MermaidConfig = {
     "fontFamily",
     "darkMode",
     "logLevel",
+    "dompurifyConfig",
+    "altFontFamily",
+    "arrowMarkerAbsolute",
+    // Layouts and the hand-drawn look cost the most to compute.
+    "look",
+    "layout",
   ],
 };
 
@@ -196,8 +204,13 @@ async function draw(source: string): Promise<DiagramResult> {
 // Mermaid keeps global state while it draws: diagrams are drawn one at a time, in order.
 let queue: Promise<unknown> = Promise.resolve();
 
-export function renderDiagram(source: string): Promise<DiagramResult> {
-  const result = queue.then(() => draw(source));
+// A drawing still waiting in the queue is skipped once nobody wants it (the reader kept typing, or
+// the note was closed).
+export function renderDiagram(
+  source: string,
+  signal?: AbortSignal,
+): Promise<DiagramResult | null> {
+  const result = queue.then(() => (signal?.aborted ? null : draw(source)));
   queue = result.catch(() => undefined);
   return result;
 }
