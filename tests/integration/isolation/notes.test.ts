@@ -10,6 +10,7 @@ import { MAX_NOTES_PER_NODE } from "@/domain/notes/note-input";
 import { addNodes, deleteNode } from "@/server/repositories/book-nodes";
 import { createBook, deleteBook } from "@/server/repositories/books";
 import {
+  countLibraryNotes,
   countNotesByNode,
   createNote,
   deleteNote,
@@ -76,6 +77,8 @@ const notesSpec: IsolationSpec<Owned> = {
   operations: {
     list: (userId, target) => listNotes(userId, target.nodeId, db),
     count: (userId, target) => countNotesByNode(userId, target.bookId, db),
+    // Every note of the session's reader: the target is never asked for.
+    countLibrary: (userId) => countLibraryNotes(userId, db),
     // Into another reader's node's notebook.
     create: (userId, target) =>
       createNote(userId, target.nodeId, "Intruder", db),
@@ -264,5 +267,22 @@ describe("notebook repository", () => {
     expect(
       await db.select().from(schema.note).where(eq(schema.note.id, noteId)),
     ).toEqual([]);
+  });
+});
+
+describe("library notes", () => {
+  const { create } = useReaders(db, "notes-library.test");
+
+  it("counts the notes of every node of the reader, across books", async () => {
+    const { owner, intruder } = await create();
+    const first = await seedNote(owner.id);
+    const second = await seedNote(owner.id);
+    await createNote(owner.id, second.nodeId, "another", db);
+    await seedNote(intruder.id);
+
+    expect(await countLibraryNotes(owner.id, db)).toEqual({
+      [first.nodeId]: 1,
+      [second.nodeId]: 2,
+    });
   });
 });

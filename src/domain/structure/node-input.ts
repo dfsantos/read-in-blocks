@@ -18,6 +18,9 @@ export const NODE_GOAL_MAX = 10_000;
 export const MAX_TITLES_PER_ADD = 100;
 // Far beyond any real book (hundreds of nodes, ADR-0009), and a bound on what one page renders.
 export const MAX_NODES_PER_BOOK = 2000;
+// Bound on the nodes the library reads at once (US-021): far beyond a personal library (hundreds of
+// nodes per book); past it, some books show without their progress.
+export const MAX_LIBRARY_NODES = 50_000;
 // Every line at its longest plus its line break, with room for \r\n.
 const TITLES_TEXT_MAX = MAX_TITLES_PER_ADD * (NODE_TITLE_MAX + 2);
 

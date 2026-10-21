@@ -3,7 +3,10 @@ import { and, asc, count, eq, sql } from "drizzle-orm";
 import { getDb, type Database } from "@/db/client";
 import { bookNode, note } from "@/db/schema";
 import { MAX_NOTES_PER_NODE } from "@/domain/notes/note-input";
-import { MAX_NODES_PER_BOOK } from "@/domain/structure/node-input";
+import {
+  MAX_LIBRARY_NODES,
+  MAX_NODES_PER_BOOK,
+} from "@/domain/structure/node-input";
 
 import { ownedBy } from "./owner-scope";
 import { withOwner } from "./with-owner";
@@ -64,6 +67,27 @@ export async function countNotesByNode(
         .where(ownedBy(note.ownerId, userId, eq(note.bookId, bookId)))
         .groupBy(note.nodeId)
         .limit(MAX_NODES_PER_BOOK);
+      return Object.fromEntries(rows.map((row) => [row.nodeId, row.total]));
+    },
+    db,
+  );
+}
+
+// How many notes each node of any of the reader's books has (US-021: revisiting a finished book's
+// notes from the library); nodes without notes are left out.
+export async function countLibraryNotes(
+  userId: string,
+  db: Database = getDb(),
+): Promise<Record<string, number>> {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const rows = await tx
+        .select({ nodeId: note.nodeId, total: count() })
+        .from(note)
+        .where(ownedBy(note.ownerId, userId))
+        .groupBy(note.nodeId)
+        .limit(MAX_LIBRARY_NODES);
       return Object.fromEntries(rows.map((row) => [row.nodeId, row.total]));
     },
     db,

@@ -24,6 +24,7 @@ import {
 } from "@/domain/reading/status";
 import { planMove } from "@/domain/structure/move";
 import {
+  MAX_LIBRARY_NODES,
   MAX_NODES_PER_BOOK,
   type MoveNodeInput,
   type NodeDetails,
@@ -107,6 +108,33 @@ export async function listNodes(
         // Never more than a book may hold (addNodes); kept as a bound on one page.
         .limit(MAX_NODES_PER_BOOK);
       return rows.map(asFlatNode);
+    },
+    db,
+  );
+}
+
+// Every node of every book of the reader, grouped by book (US-021: the library's progress and resume
+// point). A book without structure is left out.
+export async function listLibraryNodes(
+  userId: string,
+  db: Database = getDb(),
+): Promise<Map<string, FlatNode[]>> {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const rows = await tx
+        .select({ bookId: bookNode.bookId, ...nodeColumns })
+        .from(bookNode)
+        .where(ownedBy(bookNode.ownerId, userId))
+        .orderBy(asc(bookNode.bookId))
+        .limit(MAX_LIBRARY_NODES);
+      const byBook = new Map<string, FlatNode[]>();
+      for (const { bookId, ...node } of rows) {
+        const list = byBook.get(bookId);
+        if (list) list.push(asFlatNode(node));
+        else byBook.set(bookId, [asFlatNode(node)]);
+      }
+      return byBook;
     },
     db,
   );
