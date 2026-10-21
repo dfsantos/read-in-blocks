@@ -59,15 +59,14 @@ function logFailure(action: string, error: unknown) {
 }
 
 // Security events (zero-trust.md, 3.3): ids and a timestamp, never a note's text.
-function logNoteDeleted(userId: string, noteId: string) {
-  console.info(
-    JSON.stringify({
-      event: "notes.note_deleted",
-      userId,
-      noteId,
-      at: new Date().toISOString(),
-    }),
-  );
+type NoteEvent = {
+  event: "notes.deleted" | "notes.delete_rate_limited";
+  userId: string;
+  noteId: string;
+};
+
+function logNoteEvent(entry: NoteEvent) {
+  console.info(JSON.stringify({ ...entry, at: new Date().toISOString() }));
 }
 
 // Any other issue (the input is not an object at all) gets the "required" key: the message of a
@@ -140,12 +139,17 @@ export async function deleteNote(noteId: unknown): Promise<DeleteNoteResult> {
 
   try {
     if (!(await consumeWriteQuota(user.id, DELETE_NOTE_QUOTA))) {
+      logNoteEvent({
+        event: "notes.delete_rate_limited",
+        userId: user.id,
+        noteId: id.data,
+      });
       return { ok: false, errorKey: "rateLimited" };
     }
     if (!(await removeNote(user.id, id.data))) {
       return { ok: false, errorKey: "notFound" };
     }
-    logNoteDeleted(user.id, id.data);
+    logNoteEvent({ event: "notes.deleted", userId: user.id, noteId: id.data });
     return { ok: true };
   } catch (error) {
     logFailure(DELETE_NOTE_QUOTA.action, error);

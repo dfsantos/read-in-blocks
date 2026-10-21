@@ -112,7 +112,7 @@ describe("notebook Server Actions", () => {
     ).toEqual(["Segunda\nlinha"]);
     // A security event with ids only, never the note's text.
     expect(JSON.parse(info.mock.calls[0][0] as string)).toEqual({
-      event: "notes.note_deleted",
+      event: "notes.deleted",
       userId: owner.id,
       noteId,
       at: expect.any(String),
@@ -194,10 +194,18 @@ describe("notebook Server Actions", () => {
           errorKey: "rateLimited",
         });
       }
+      const info = vi.spyOn(console, "info").mockImplementation(() => {});
       expect(await call(nodeId, noteId)).toEqual({
         ok: false,
         errorKey: "rateLimited",
       });
+      // A blocked deletion is a security event too (ids only).
+      const events = info.mock.calls.map(
+        (args) => JSON.parse(args[0] as string).event,
+      );
+      expect(events.includes("notes.delete_rate_limited")).toBe(
+        _name === "deletions",
+      );
     },
   );
 
