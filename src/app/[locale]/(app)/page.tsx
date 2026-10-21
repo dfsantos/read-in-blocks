@@ -31,12 +31,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function LibraryPage() {
   const user = await requireUser();
   // One more than shown, to know whether there are more.
-  const [found, nodesByBook, noteCounts] = await Promise.all([
-    listBooks(user.id, { limit: LIBRARY_LIMIT + 1 }),
-    listLibraryNodes(user.id),
-    countLibraryNotes(user.id),
-  ]);
+  const found = await listBooks(user.id, { limit: LIBRARY_LIMIT + 1 });
   const books = found.slice(0, LIBRARY_LIMIT);
+  const ids = books.map((book) => book.id);
+  const [nodesByBook, noteCounts] = await Promise.all([
+    listLibraryNodes(user.id, ids),
+    countLibraryNotes(user.id, ids),
+  ]);
   const t = await getTranslations("library");
 
   return (

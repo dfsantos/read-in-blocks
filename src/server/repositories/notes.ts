@@ -1,4 +1,4 @@
-import { and, asc, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, type Database } from "@/db/client";
 import { bookNode, note } from "@/db/schema";
@@ -73,20 +73,25 @@ export async function countNotesByNode(
   );
 }
 
-// How many notes each node of any of the reader's books has (US-021: revisiting a finished book's
-// notes from the library); nodes without notes are left out.
+// How many notes each node of the reader's `bookIds` has (US-021: revisiting a finished book's notes
+// from the library); nodes without notes are left out.
 export async function countLibraryNotes(
   userId: string,
+  bookIds: readonly string[],
   db: Database = getDb(),
 ): Promise<Record<string, number>> {
+  if (bookIds.length === 0) return {};
   return withOwner(
     userId,
     async (tx) => {
       const rows = await tx
         .select({ nodeId: note.nodeId, total: count() })
         .from(note)
-        .where(ownedBy(note.ownerId, userId))
+        .where(
+          ownedBy(note.ownerId, userId, inArray(note.bookId, [...bookIds])),
+        )
         .groupBy(note.nodeId)
+        .orderBy(asc(note.nodeId))
         .limit(MAX_LIBRARY_NODES);
       return Object.fromEntries(rows.map((row) => [row.nodeId, row.total]));
     },

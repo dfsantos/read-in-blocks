@@ -60,9 +60,8 @@ const nodesSpec: IsolationSpec<Owned> = {
     JSON.stringify(result ?? null).includes(owned.nodeId),
   operations: {
     list: (userId, target) => listNodes(userId, target.bookId, db),
-    // The library reads every book of the session's reader: the target is never asked for.
-    listLibrary: async (userId) =>
-      Object.fromEntries(await listLibraryNodes(userId, db)),
+    listLibrary: async (userId, target) =>
+      Object.fromEntries(await listLibraryNodes(userId, [target.bookId], db)),
     // Into another reader's book, at its root.
     addToBook: (userId, target) =>
       addNodes(
@@ -878,10 +877,20 @@ describe("library nodes", () => {
     const { owner, intruder } = await create();
     const first = await seedBookWithChapter(owner.id);
     const second = await seedBookWithChapter(owner.id);
-    await createBook(owner.id, { title: "Empty", author: null }, db);
-    await seedBookWithChapter(intruder.id);
+    const empty = await createBook(
+      owner.id,
+      { title: "Empty", author: null },
+      db,
+    );
+    const unlisted = await seedBookWithChapter(owner.id);
+    const foreign = await seedBookWithChapter(intruder.id);
 
-    const library = await listLibraryNodes(owner.id, db);
+    const library = await listLibraryNodes(
+      owner.id,
+      [first.bookId, second.bookId, empty.id, foreign.bookId],
+      db,
+    );
+    expect(library.has(unlisted.bookId)).toBe(false);
 
     expect([...library.keys()].sort()).toEqual(
       [first.bookId, second.bookId].sort(),
@@ -893,7 +902,10 @@ describe("library nodes", () => {
         kind: "chapter",
         title: "Chapter",
         status: "not_started",
+        // Never read for the library.
+        summary: null,
       }),
     ]);
+    expect(await listLibraryNodes(owner.id, [], db)).toEqual(new Map());
   });
 });

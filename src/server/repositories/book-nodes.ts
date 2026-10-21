@@ -113,27 +113,51 @@ export async function listNodes(
   );
 }
 
-// Every node of every book of the reader, grouped by book (US-021: the library's progress and resume
-// point). A book without structure is left out.
+// Every node of the reader's `bookIds` (the books the library shows), grouped by book (US-021: the
+// library's progress and resume point). A book without structure, someone else's or a missing one is
+// left out. Summaries are not read: the library never shows them. Past MAX_LIBRARY_NODES the last
+// book read may be cut short; it is left out too, so no book shows a partial (wrong) progress.
 export async function listLibraryNodes(
   userId: string,
+  bookIds: readonly string[],
   db: Database = getDb(),
 ): Promise<Map<string, FlatNode[]>> {
+  if (bookIds.length === 0) return new Map();
   return withOwner(
     userId,
     async (tx) => {
       const rows = await tx
-        .select({ bookId: bookNode.bookId, ...nodeColumns })
+        .select({
+          bookId: bookNode.bookId,
+          id: bookNode.id,
+          parentId: bookNode.parentId,
+          kind: bookNode.kind,
+          title: bookNode.title,
+          position: bookNode.position,
+          goalPages: bookNode.goalPages,
+          status: bookNode.status,
+          startedAt: bookNode.startedAt,
+          completedAt: bookNode.completedAt,
+        })
         .from(bookNode)
-        .where(ownedBy(bookNode.ownerId, userId))
+        .where(
+          ownedBy(
+            bookNode.ownerId,
+            userId,
+            inArray(bookNode.bookId, [...bookIds]),
+          ),
+        )
         .orderBy(asc(bookNode.bookId))
         .limit(MAX_LIBRARY_NODES);
       const byBook = new Map<string, FlatNode[]>();
       for (const { bookId, ...node } of rows) {
+        const flat = asFlatNode({ ...node, summary: null });
         const list = byBook.get(bookId);
-        if (list) list.push(asFlatNode(node));
-        else byBook.set(bookId, [asFlatNode(node)]);
+        if (list) list.push(flat);
+        else byBook.set(bookId, [flat]);
       }
+      if (rows.length === MAX_LIBRARY_NODES)
+        byBook.delete(rows[rows.length - 1].bookId);
       return byBook;
     },
     db,

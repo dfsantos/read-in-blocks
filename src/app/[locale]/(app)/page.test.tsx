@@ -148,7 +148,8 @@ describe("LibraryPage", () => {
 
     await renderPage();
 
-    expect(mocks.listLibraryNodes).toHaveBeenCalledWith(READER.id);
+    expect(mocks.listLibraryNodes).toHaveBeenCalledWith(READER.id, ["b-1"]);
+    expect(mocks.countLibraryNotes).toHaveBeenCalledWith(READER.id, ["b-1"]);
     expect(
       screen.getByRole("progressbar", { name: "Progresso de DDD" }),
     ).toHaveAttribute("aria-valuenow", "30");

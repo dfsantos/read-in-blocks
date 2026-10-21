@@ -77,8 +77,8 @@ const notesSpec: IsolationSpec<Owned> = {
   operations: {
     list: (userId, target) => listNotes(userId, target.nodeId, db),
     count: (userId, target) => countNotesByNode(userId, target.bookId, db),
-    // Every note of the session's reader: the target is never asked for.
-    countLibrary: (userId) => countLibraryNotes(userId, db),
+    countLibrary: (userId, target) =>
+      countLibraryNotes(userId, [target.bookId], db),
     // Into another reader's node's notebook.
     create: (userId, target) =>
       createNote(userId, target.nodeId, "Intruder", db),
@@ -278,11 +278,16 @@ describe("library notes", () => {
     const first = await seedNote(owner.id);
     const second = await seedNote(owner.id);
     await createNote(owner.id, second.nodeId, "another", db);
-    await seedNote(intruder.id);
+    const unlisted = await seedNote(owner.id);
+    const foreign = await seedNote(intruder.id);
 
-    expect(await countLibraryNotes(owner.id, db)).toEqual({
-      [first.nodeId]: 1,
-      [second.nodeId]: 2,
-    });
+    const counts = await countLibraryNotes(
+      owner.id,
+      [first.bookId, second.bookId, foreign.bookId],
+      db,
+    );
+    expect(counts).toEqual({ [first.nodeId]: 1, [second.nodeId]: 2 });
+    expect(counts[unlisted.nodeId]).toBeUndefined();
+    expect(await countLibraryNotes(owner.id, [], db)).toEqual({});
   });
 });
