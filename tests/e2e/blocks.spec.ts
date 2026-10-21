@@ -24,9 +24,11 @@ test("a reader sees the book as blocks grouped by part", async ({
     await page
       .getByRole("button", { name: "Adicionar em Fundamentos", exact: true })
       .click();
-    await page.getByLabel("Capítulos").fill("Confiabilidade\nEscalabilidade");
     await page
-      .getByLabel("Capítulos")
+      .getByLabel("Capítulos", { exact: true })
+      .fill("Confiabilidade\nEscalabilidade");
+    await page
+      .getByLabel("Capítulos", { exact: true })
       .locator("xpath=ancestor::form")
       .getByRole("button", { name: "Adicionar", exact: true })
       .click();

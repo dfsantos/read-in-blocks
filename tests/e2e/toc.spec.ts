@@ -28,9 +28,11 @@ test("a reader navigates the table of contents and marks a topic from it", async
     await page
       .getByRole("button", { name: "Adicionar em Parte I", exact: true })
       .click();
-    await page.getByLabel("Capítulos").fill("Linguagem ubíqua");
     await page
-      .getByLabel("Capítulos")
+      .getByLabel("Capítulos", { exact: true })
+      .fill("Linguagem ubíqua");
+    await page
+      .getByLabel("Capítulos", { exact: true })
       .locator("xpath=ancestor::form")
       .getByRole("button", { name: "Adicionar", exact: true })
       .click();

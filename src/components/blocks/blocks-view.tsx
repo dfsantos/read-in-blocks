@@ -1,5 +1,6 @@
 import { useFormatter, useTranslations } from "next-intl";
 
+import { DensityMeter } from "@/components/notes/density-meter";
 import { ProgressBar } from "@/components/progress/progress-bar";
 import {
   Card,
@@ -8,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { chapterDensity } from "@/domain/notes/density";
 import { computeProgress, wholePercent } from "@/domain/progress/compute";
 import type { TreeNode } from "@/domain/structure/tree";
 import { Link } from "@/i18n/navigation";
@@ -40,13 +42,17 @@ function groups(tree: readonly TreeNode[]): Group[] {
 }
 
 // The blocks view (US-017, RF-011): the structure as cards grouped by part, each chapter a card with
-// its state, weighted progress, goal and notes, leading to its page and notebook. A Server Component;
+// its state, weighted progress, goal and note density (US-024), leading to its page and notebook. A Server Component;
 // titles are the reader's content, rendered as text.
 export function BlocksView({ bookId, tree, noteCounts }: Props) {
   const t = useTranslations("blocks");
   const tStructure = useTranslations("structure");
   const format = useFormatter();
   const progress = computeProgress(tree);
+  // Each chapter's notes, its topics' included, and how dense they are (US-024).
+  const density = new Map(
+    chapterDensity(tree, noteCounts).map((entry) => [entry.chapter.id, entry]),
+  );
 
   return (
     <section aria-labelledby="blocks-title" className="flex flex-col gap-4">
@@ -88,7 +94,10 @@ export function BlocksView({ bookId, tree, noteCounts }: Props) {
                     style: "percent",
                     maximumFractionDigits: 0,
                   });
-                  const notes = noteCounts[chapter.id] ?? 0;
+                  const notes = density.get(chapter.id) ?? {
+                    notes: 0,
+                    level: 0 as const,
+                  };
                   return (
                     <li key={chapter.id}>
                       <Card size="sm" className="relative h-full">
@@ -126,10 +135,12 @@ export function BlocksView({ bookId, tree, noteCounts }: Props) {
                                     count: chapter.goalPages,
                                   }),
                                 })}
-                            {notes > 0
-                              ? ` · ${t("notes", { count: notes })}`
-                              : null}
                           </p>
+                          <DensityMeter
+                            level={notes.level}
+                            notes={notes.notes}
+                            className="text-muted-foreground"
+                          />
                         </CardContent>
                       </Card>
                     </li>

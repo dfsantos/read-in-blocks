@@ -23,6 +23,7 @@ test("a reader keeps notes in a chapter's notebook", async ({
     await expect(
       page.getByRole("heading", { level: 1, name: "Clean Architecture" }),
     ).toBeVisible();
+    await page.getByLabel("Tipo").selectOption("chapter");
     await page
       .getByLabel("Títulos", { exact: true })
       .fill("Prefácio\nFronteiras");
@@ -93,6 +94,14 @@ test("a reader keeps notes in a chapter's notebook", async ({
     await expect(item("Fronteiras")).toHaveAccessibleName(
       "Fronteiras Não iniciado · 1 anotação",
     );
+    // And the chapter heads the most noted ones (US-024).
+    await expect(
+      page
+        .getByRole("list", {
+          name: "Capítulos com mais anotações, do mais anotado ao menos",
+        })
+        .getByRole("listitem"),
+    ).toHaveText(["FronteirasMuitas anotações: 1 anotação"]);
 
     // Another reader gets the 404 page for that notebook.
     const other = await browser.newContext();
