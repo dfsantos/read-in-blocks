@@ -1,0 +1,5 @@
+ALTER TABLE "book_node" ADD COLUMN "status" text DEFAULT 'not_started' NOT NULL;--> statement-breakpoint
+ALTER TABLE "book_node" ADD COLUMN "started_at" date;--> statement-breakpoint
+ALTER TABLE "book_node" ADD COLUMN "completed_at" date;--> statement-breakpoint
+ALTER TABLE "book_node" ADD CONSTRAINT "book_node_status" CHECK ("book_node"."status" in ('not_started', 'in_progress', 'completed'));--> statement-breakpoint
+ALTER TABLE "book_node" ADD CONSTRAINT "book_node_reading_dates" CHECK (("book_node"."status" = 'not_started' and "book_node"."started_at" is null and "book_node"."completed_at" is null) or ("book_node"."status" = 'in_progress' and "book_node"."started_at" is not null and "book_node"."completed_at" is null) or ("book_node"."status" = 'completed' and "book_node"."started_at" is not null and "book_node"."completed_at" is not null and "book_node"."started_at" <= "book_node"."completed_at"));
