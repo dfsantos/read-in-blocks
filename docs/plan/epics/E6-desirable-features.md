@@ -21,7 +21,7 @@ Cobre RF-012, RF-013 e RF-014 (classificação **Desejável**). Podem ser descar
 
 | Pacote | Versão | Status | Fonte Context7 |
 |---|---|---|---|
-| `mermaid` | **11.x (a fechar na US-022)** | 🟡 Linha (patch a fechar) | `/mermaid-js/mermaid` |
+| `mermaid` | **11.17.2** | ✅ Fixada (US-022, 2026-10-21) | `/mermaid-js/mermaid` |
 
 - [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. **Somente versões estáveis:** nada de `rc`, `beta`, `alpha`, `canary`, `next`, `nightly` ou versões com sufixo `-x.y` (o hook bloqueia).
 

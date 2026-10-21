@@ -50,6 +50,7 @@
     "drizzle-orm": "0.45.4",
     "lowlight": "3.3.0",
     "lucide-react": "1.57.0",
+    "mermaid": "11.17.2",
     "next": "16.4.2",
     "next-intl": "4.14.9",
     "pg": "8.23.1",

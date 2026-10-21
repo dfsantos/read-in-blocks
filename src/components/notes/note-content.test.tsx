@@ -1,9 +1,14 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { NextIntlClientProvider } from "next-intl";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NoteDoc } from "@/domain/notes/rich-text";
 
+import messages from "../../../messages/pt-BR.json";
 import { NoteContent } from "./note-content";
+
+const renderDiagram = vi.hoisted(() => vi.fn());
+vi.mock("./diagram-renderer", () => ({ renderDiagram }));
 
 const doc = (...content: NoteDoc["content"]): NoteDoc => ({
   type: "doc",
@@ -147,5 +152,35 @@ describe("NoteContent", () => {
 
     expect(container).toHaveTextContent("<script>alert(1)</script>");
     expect(container.querySelector("script")).toBeNull();
+  });
+
+  it("draws a diagram block in the browser and leaves the rest of the note alone", async () => {
+    renderDiagram.mockResolvedValue({ ok: false, reason: "syntax" });
+    const { container } = render(
+      <NextIntlClientProvider locale="pt-BR" messages={messages}>
+        <NoteContent
+          content={doc(
+            { type: "paragraph", content: [{ type: "text", text: "Antes" }] },
+            {
+              type: "codeBlock",
+              attrs: { language: "mermaid" },
+              content: [{ type: "text", text: "flowchart LR\n  A -->" }],
+            },
+            { type: "paragraph", content: [{ type: "text", text: "Depois" }] },
+          )}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(
+      await screen.findByText(/Não foi possível desenhar este diagrama/),
+    ).toBeInTheDocument();
+    expect(renderDiagram).toHaveBeenCalledWith(
+      "flowchart LR\n  A -->",
+      expect.any(AbortSignal),
+    );
+    expect(container).toHaveTextContent("Antes");
+    expect(container).toHaveTextContent("Depois");
+    expect(container.querySelector(".hljs-keyword")).toBeNull();
   });
 });

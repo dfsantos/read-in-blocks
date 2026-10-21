@@ -42,6 +42,7 @@ upgrade-insecure-requests        (só em https)
 - `'strict-dynamic'` deixa os scripts com nonce carregarem os próprios *chunks*; nenhum outro script roda.
 - Sem `'unsafe-eval'` e sem `'unsafe-inline'`. A exceção é o `next dev`, que precisa de `eval` e injeta estilos sem nonce. O build de produção (`next start`, Preview, produção) nunca recebe as duas.
 - **Toda página precisa ser renderizada dinamicamente**, porque o nonce só existe por requisição. Hoje todas são (leem a sessão). Página estática ou ISR não recebe o nonce e fica sem JavaScript.
+- Diagramas das anotações (US-022) não exigem nada novo: o Mermaid roda num *chunk* carregado sob demanda e, enquanto desenha, monta o diagrama numa caixa invisível da própria página; ali, quem protege a página é o modo `strict` do Mermaid **e esta CSP** (os `<style>` que ele cria não têm nonce e são bloqueados, com aviso esperado no console, sem afetar o resultado). Por isso esta política não pode ser afrouxada por causa dos diagramas. O SVG pronto é retirado da página e exibido só como imagem `data:image/svg+xml` (coberta por `img-src data:`), onde nada roda nem é buscado; os estilos do diagrama valem dentro da imagem, sem `'unsafe-inline'` em `style-src`.
 - Fotos de perfil do Google (`lh3.googleusercontent.com`) são a única origem externa. Só esse host: o resto de `googleusercontent.com` serve conteúdo de terceiros, o que daria a um XSS um canal de saída. Foto de outra origem não carrega e o menu mostra as iniciais.
 
 ### Como liberar uma nova origem

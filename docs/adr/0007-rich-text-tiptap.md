@@ -14,7 +14,7 @@ RF-006/RF-007 exigem anotações com formatação rica **incluindo blocos de có
 - Cada anotação é um registro com `type` (`key_concept | quote | action_or_question`), `content` (JSON) e, para citações, `reference` (página ou posição). O editor é o mesmo para os três tipos.
 - Salvamento automático com debounce, executado por Server Action.
 - Editor carregado de forma lazy (Client Component) para não pesar nas telas de leitura.
-- **Diagramas (RF-012, desejável):** **Mermaid** em bloco de código especial renderizado no cliente; confirmado só quando a história US-022 for aprovada.
+- **Diagramas (RF-012, desejável):** **Mermaid** em bloco de código especial renderizado no cliente; confirmado na US-022 (2026-10-21). O diagrama é um `codeBlock` com `language: "mermaid"` (o texto continua sendo o conteúdo guardado e contado); o Mermaid 11 é carregado sob demanda, com `securityLevel: 'strict'`, rótulos em SVG (sem `foreignObject`) e as opções de segurança travadas em `secure` contra diretivas do próprio diagrama. Durante o desenho o Mermaid monta o diagrama numa caixa invisível da página (protegida pelo modo `strict` e pela CSP); o SVG pronto é retirado dali e vira a origem de um `<img>` (`data:image/svg+xml`), documento isolado em que nenhum script ou handler roda e nada externo é buscado, o que mantém a CSP da US-028 sem `unsafe-inline`. Erro de sintaxe mostra mensagem do catálogo e o texto do diagrama, sem afetar o resto da anotação.
 - Barra de ferramentas e menus do editor usam componentes shadcn e textos via i18n.
 
 ## Alternativas consideradas
