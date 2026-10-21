@@ -40,8 +40,8 @@ Cobre RF-005, RF-006, RF-007 e RF-009 (retomada). Persona: **Leitor**.
 
 | Pacote | Versão | Status | Fonte Context7 |
 |---|---|---|---|
-| `@tiptap/react, @tiptap/pm, @tiptap/starter-kit, @tiptap/extension-code-block-lowlight` | **3.x (a fechar na US-019)** | 🟡 Linha (patch a fechar) | `/ueberdosis/tiptap-docs` |
-| `lowlight` | **a fechar na US-019** | 🟡 Linha (patch a fechar) | `/wooorm/lowlight` |
+| `@tiptap/react, @tiptap/pm, @tiptap/core, @tiptap/starter-kit, @tiptap/extension-code-block-lowlight` | **3.32.0** | ✅ Fixada (US-019, 2026-10-21) | `/ueberdosis/tiptap-docs` |
+| `lowlight` | **3.3.0** | ✅ Fixada (US-019, 2026-10-21) | `/wooorm/lowlight` |
 
 - [ ] **Versões idênticas à tabela:** `package.json` com versões exatas (sem `^`/`~`) e lockfile coerentes com esta tabela. Para itens "Linha", o patch é fechado consultando o Context7 e **registrado aqui** antes de instalar; se o Context7 não informar, parar e perguntar ao responsável. **Somente versões estáveis:** nada de `rc`, `beta`, `alpha`, `canary`, `next`, `nightly` ou versões com sufixo `-x.y` (o hook bloqueia).
 
