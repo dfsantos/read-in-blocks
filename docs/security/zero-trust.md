@@ -29,7 +29,7 @@ Decisão: [ADR-0011](../adr/0011-zero-trust-security.md). Princípio: **nunca co
 3. **Identidade só do servidor.** `userId`, `ownerId`, papéis e preços/pesos nunca vêm de parâmetros, cookies não assinados ou campos de formulário.
 4. **Recurso alheio = inexistente.** Resposta 404 idêntica à de recurso que não existe (sem diferença de mensagem nem de tempo perceptível).
 5. **Entrada nunca é confiável.** Validar tipo, formato, tamanho e enum de tudo (IDs como UUID, textos com limite, JSON do editor com schema e limite de tamanho).
-6. **Reautenticação em ações destrutivas** (excluir livro): confirmação explícita; reavaliar exigir sessão recente (US-009).
+6. **Reautenticação em ações destrutivas** (excluir livro): confirmação explícita no diálogo e evento de segurança no log (`books.deleted`). Sessão recente **não** é exigida no MVP: vale a sessão de 12 h (D-15, US-009); reavaliar se o produto deixar de ser de uso pessoal com allowlist.
 7. **Login: acesso negado por padrão.** Somente contas Google na allowlist (D-10) criam conta; `email_verified` obrigatório; OAuth com `state` e PKCE; redirect URIs mínimos.
 
 ### 2. Menor privilégio
