@@ -370,8 +370,7 @@
         "apply": "Aplicar link",
         "remove": "Remover link",
         "cancel": "Cancelar"
-      },
-      "codeLabel": "Código em {language}"
+      }
     },
     "types": {
       "key_concept": "Conceito-chave",
@@ -427,6 +426,21 @@
       "empty": "Nenhuma anotação ainda. Os capítulos em que você mais anotar aparecem aqui.",
       "listLabel": "Capítulos com mais anotações, do mais anotado ao menos",
       "rule": "Cada capítulo conta as anotações dele e as dos seus tópicos."
+    }
+  },
+  "states": {
+    "loading": "Carregando…",
+    "notFound": {
+      "metadataTitle": "Página não encontrada — Read in Blocks",
+      "title": "Página não encontrada",
+      "description": "O endereço não existe ou não está disponível para você.",
+      "back": "Voltar para a biblioteca"
+    },
+    "error": {
+      "title": "Algo deu errado",
+      "description": "Não foi possível carregar esta página. Tente de novo em instantes.",
+      "retry": "Tentar de novo",
+      "back": "Voltar para a biblioteca"
     }
   }
 }
