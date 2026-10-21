@@ -1,46 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_BODY_MAX, noteIdSchema, noteInputSchema } from "./note-input";
+import { noteIdSchema, noteInputSchema } from "./note-input";
+import { textToDoc } from "./rich-text";
 
 const errorOf = (result: {
   success: boolean;
   error?: { issues: { message: string }[] };
 }) => (result.success ? undefined : result.error?.issues[0].message);
 
+// The detailed cases of the content live in rich-text.test.ts; these check the form's wrapper.
 describe("noteInputSchema", () => {
-  it.each([
-    ["one line", "Ideia central", "Ideia central"],
-    ["trimmed at both ends", "  Ideia \n", "Ideia"],
-    [
-      "inner line breaks and tabs",
-      "Primeira linha\r\n\n\tSegunda",
-      "Primeira linha\r\n\n\tSegunda",
-    ],
-    [
-      "a body at the length limit",
-      "a".repeat(NOTE_BODY_MAX),
-      "a".repeat(NOTE_BODY_MAX),
-    ],
-    [
-      "markup, kept as plain text",
-      "<script>alert(1)</script>",
-      "<script>alert(1)</script>",
-    ],
-  ])("accepts %s", (_name, body, expected) => {
-    expect(noteInputSchema.parse({ body })).toEqual({ body: expected });
+  it("gives the rebuilt document and its plain text", () => {
+    const content = textToDoc("Ideia\ncentral");
+    expect(noteInputSchema.parse({ content, extra: "x" })).toEqual({
+      content,
+      text: "Ideia\ncentral",
+    });
   });
 
   it.each([
-    ["nothing", "", "bodyRequired"],
-    ["only blanks", " \n\t ", "bodyRequired"],
-    ["not a string", 42, "bodyRequired"],
-    ["a missing body", undefined, "bodyRequired"],
-    ["a body over the limit", "a".repeat(NOTE_BODY_MAX + 1), "bodyTooLong"],
-    ["a NUL character", "Nota\u0000", "invalidCharacters"],
-    ["a bidirectional override", "Nota‮dcba", "invalidCharacters"],
-    ["U+2066 (isolate)", "Nota⁦", "invalidCharacters"],
-  ])("refuses %s", (_name, body, error) => {
-    expect(errorOf(noteInputSchema.safeParse({ body }))).toBe(error);
+    ["no content", {}, "bodyRequired"],
+    ["not an object", "text", "bodyRequired"],
+    ["a US-018 body instead of content", { body: "Ideia" }, "bodyRequired"],
+    ["HTML as content", { content: "<p>Ideia</p>" }, "invalidContent"],
+  ])("refuses %s", (_name, input, error) => {
+    expect(errorOf(noteInputSchema.safeParse(input))).toBe(error);
   });
 });
 

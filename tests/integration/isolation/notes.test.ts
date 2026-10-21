@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 
 import * as schema from "@/db/schema";
+import { plainNote } from "@/domain/notes/rich-text";
 import { MAX_NOTES_PER_NODE } from "@/domain/notes/note-input";
 import { addNodes, deleteNode } from "@/server/repositories/book-nodes";
 import { createBook, deleteBook } from "@/server/repositories/books";
@@ -58,7 +59,12 @@ type Owned = { bookId: string; nodeId: string; noteId: string };
 
 async function seedNote(ownerId: string): Promise<Owned> {
   const { bookId, nodeIds } = await seedChapter(ownerId);
-  const created = await createNote(ownerId, nodeIds[0], "Owned note", db);
+  const created = await createNote(
+    ownerId,
+    nodeIds[0],
+    plainNote("Owned note"),
+    db,
+  );
   if (!created.ok) throw new Error(`seed failed: ${created.reason}`);
   return { bookId, nodeId: nodeIds[0], noteId: created.id };
 }
@@ -81,8 +87,9 @@ const notesSpec: IsolationSpec<Owned> = {
       countLibraryNotes(userId, [target.bookId], db),
     // Into another reader's node's notebook.
     create: (userId, target) =>
-      createNote(userId, target.nodeId, "Intruder", db),
-    update: (userId, target) => updateNote(userId, target.noteId, "Taken", db),
+      createNote(userId, target.nodeId, plainNote("Intruder"), db),
+    update: (userId, target) =>
+      updateNote(userId, target.noteId, plainNote("Taken"), db),
     delete: (userId, target) => deleteNote(userId, target.noteId, db),
   },
 };
@@ -96,9 +103,9 @@ describe("notebook repository", () => {
     const { owner } = await create();
     const { nodeIds } = await seedChapter(owner.id, ["One", "Two"]);
     for (const body of ["first", "second", "third"]) {
-      await createNote(owner.id, nodeIds[0], body, db);
+      await createNote(owner.id, nodeIds[0], plainNote(body), db);
     }
-    await createNote(owner.id, nodeIds[1], "elsewhere", db);
+    await createNote(owner.id, nodeIds[1], plainNote("elsewhere"), db);
 
     const notes = await listNotes(owner.id, nodeIds[0], db);
     expect(notes.map((note) => note.body)).toEqual([
@@ -115,12 +122,12 @@ describe("notebook repository", () => {
   it("counts each node's notes in the book, leaving out nodes without notes", async () => {
     const { owner } = await create();
     const { bookId, nodeIds } = await seedChapter(owner.id, ["A", "B", "C"]);
-    await createNote(owner.id, nodeIds[0], "a1", db);
-    await createNote(owner.id, nodeIds[0], "a2", db);
-    await createNote(owner.id, nodeIds[2], "c1", db);
+    await createNote(owner.id, nodeIds[0], plainNote("a1"), db);
+    await createNote(owner.id, nodeIds[0], plainNote("a2"), db);
+    await createNote(owner.id, nodeIds[2], plainNote("c1"), db);
     // Another book of the same reader does not count.
     const other = await seedChapter(owner.id);
-    await createNote(owner.id, other.nodeIds[0], "x", db);
+    await createNote(owner.id, other.nodeIds[0], plainNote("x"), db);
 
     expect(await countNotesByNode(owner.id, bookId, db)).toEqual({
       [nodeIds[0]]: 2,
@@ -133,7 +140,9 @@ describe("notebook repository", () => {
     const { nodeId, noteId } = await seedNote(owner.id);
     const [before] = await listNotes(owner.id, nodeId, db);
 
-    expect(await updateNote(owner.id, noteId, "Changed", db)).toBe(true);
+    expect(await updateNote(owner.id, noteId, plainNote("Changed"), db)).toBe(
+      true,
+    );
 
     const [after] = await listNotes(owner.id, nodeId, db);
     expect(after.body).toBe("Changed");
@@ -155,7 +164,9 @@ describe("notebook repository", () => {
   it("answers a missing node as not found", async () => {
     const { owner } = await create();
 
-    expect(await createNote(owner.id, randomUUID(), "x", db)).toEqual({
+    expect(
+      await createNote(owner.id, randomUUID(), plainNote("x"), db),
+    ).toEqual({
       ok: false,
       reason: "notFound",
     });
@@ -171,7 +182,9 @@ describe("notebook repository", () => {
       [owner.id, bookId, nodeIds[0], MAX_NOTES_PER_NODE],
     );
 
-    expect(await createNote(owner.id, nodeIds[0], "one more", db)).toEqual({
+    expect(
+      await createNote(owner.id, nodeIds[0], plainNote("one more"), db),
+    ).toEqual({
       ok: false,
       reason: "tooManyNotes",
     });
@@ -197,8 +210,8 @@ describe("notebook repository", () => {
       db,
     );
     if (!chapter.ok) throw new Error("seed failed");
-    await createNote(owner.id, part.ids[0], "on the part", db);
-    await createNote(owner.id, chapter.ids[0], "on the chapter", db);
+    await createNote(owner.id, part.ids[0], plainNote("on the part"), db);
+    await createNote(owner.id, chapter.ids[0], plainNote("on the chapter"), db);
 
     expect(await deleteNode(owner.id, part.ids[0], db)).toBe(true);
 
@@ -252,7 +265,7 @@ describe("notebook repository", () => {
     const { nodeIds } = await seedChapter(owner.id);
 
     await expect(
-      createNote(owner.id, nodeIds[0], body, db),
+      createNote(owner.id, nodeIds[0], plainNote(body), db),
     ).rejects.toMatchObject({ cause: { code: "23514" } });
   });
 
@@ -277,7 +290,7 @@ describe("library notes", () => {
     const { owner, intruder } = await create();
     const first = await seedNote(owner.id);
     const second = await seedNote(owner.id);
-    await createNote(owner.id, second.nodeId, "another", db);
+    await createNote(owner.id, second.nodeId, plainNote("another"), db);
     const unlisted = await seedNote(owner.id);
     const foreign = await seedNote(intruder.id);
 

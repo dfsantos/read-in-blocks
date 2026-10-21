@@ -8,6 +8,7 @@ import {
 } from "@/domain/notes/note-input";
 import { nodeIdSchema } from "@/domain/structure/node-input";
 import { requireUser } from "@/server/auth/session";
+import { fitsEditorSchema } from "@/server/notes/content-structure";
 import {
   createNote as insertNote,
   deleteNote as removeNote,
@@ -19,7 +20,9 @@ import {
 } from "@/server/repositories/write-quota";
 
 // Notebook Server Actions (US-018). Each one is a public endpoint (rule server-actions): Zod first,
-// then requireUser(), then the quota and the repository with the session's userId. The ids (node,
+// then requireUser(), then the quota and the repository with the session's userId. Content is rich
+// since US-019: the client's JSON is rebuilt from the allowed schema (links only http(s)/mailto,
+// size and depth bounded) and checked against the editor's own structure before it is stored. The ids (node,
 // note) are arguments anyone can forge: a malformed id, a missing node or note and another reader's
 // all get the same "notFound", answered only once the session is checked.
 
@@ -82,14 +85,30 @@ function inputError(issues: readonly { message: string }[]): NoteResult {
   };
 }
 
+// The rebuilt note, or the error the form shows. Never echoes what the client sent.
+function parseNote(input: unknown) {
+  const parsed = noteInputSchema.safeParse(input);
+  if (!parsed.success) return { error: inputError(parsed.error.issues) };
+  if (!fitsEditorSchema(parsed.data.content)) {
+    return {
+      error: {
+        ok: false,
+        errorKey: noteInputErrors.invalidContent,
+        field: "body",
+      } satisfies NoteResult,
+    };
+  }
+  return { note: parsed.data };
+}
+
 // Adds a note to a node's notebook.
 export async function createNote(
   nodeId: unknown,
   input: unknown,
 ): Promise<NoteResult> {
   const id = nodeIdSchema.safeParse(nodeId);
-  const parsed = noteInputSchema.safeParse(input);
-  if (!parsed.success) return inputError(parsed.error.issues);
+  const parsed = parseNote(input);
+  if (parsed.error) return parsed.error;
 
   const user = await requireUser();
   if (!id.success) return { ok: false, errorKey: "notFound" };
@@ -98,7 +117,7 @@ export async function createNote(
     if (!(await consumeWriteQuota(user.id, CREATE_NOTE_QUOTA))) {
       return { ok: false, errorKey: "rateLimited" };
     }
-    const created = await insertNote(user.id, id.data, parsed.data.body);
+    const created = await insertNote(user.id, id.data, parsed.note);
     return created.ok ? { ok: true } : { ok: false, errorKey: created.reason };
   } catch (error) {
     logFailure(CREATE_NOTE_QUOTA.action, error);
@@ -106,14 +125,14 @@ export async function createNote(
   }
 }
 
-// Replaces a note's text.
+// Replaces a note's content (the editor saves on its own while the reader writes).
 export async function updateNote(
   noteId: unknown,
   input: unknown,
 ): Promise<NoteResult> {
   const id = noteIdSchema.safeParse(noteId);
-  const parsed = noteInputSchema.safeParse(input);
-  if (!parsed.success) return inputError(parsed.error.issues);
+  const parsed = parseNote(input);
+  if (parsed.error) return parsed.error;
 
   const user = await requireUser();
   if (!id.success) return { ok: false, errorKey: "notFound" };
@@ -122,7 +141,7 @@ export async function updateNote(
     if (!(await consumeWriteQuota(user.id, UPDATE_NOTE_QUOTA))) {
       return { ok: false, errorKey: "rateLimited" };
     }
-    return (await changeNote(user.id, id.data, parsed.data.body))
+    return (await changeNote(user.id, id.data, parsed.note))
       ? { ok: true }
       : { ok: false, errorKey: "notFound" };
   } catch (error) {

@@ -281,19 +281,19 @@
     "createdAt": "Criada em {date}",
     "updatedAt": "editada em {date}",
     "add": {
+      "open": "Escrever anotação",
       "label": "Nova anotação",
-      "placeholder": "O que você quer guardar deste trecho?",
       "submit": "Salvar anotação",
       "saving": "Salvando…",
-      "saved": "Anotação salva."
+      "saved": "Anotação salva.",
+      "discard": "Descartar",
+      "leaveConfirm": "A nova anotação ainda não foi salva. Sair e perdê-la?"
     },
     "edit": {
       "open": "Editar",
       "openFor": "Editar a anotação de {date}",
       "label": "Texto da anotação",
-      "save": "Salvar",
-      "saving": "Salvando…",
-      "cancel": "Cancelar",
+      "done": "Concluir edição",
       "saved": "Anotação atualizada."
     },
     "delete": {
@@ -313,7 +313,63 @@
       "tooManyNotes": "Este caderno chegou ao limite de 500 anotações.",
       "notFound": "Não encontramos este item. Atualize a página.",
       "rateLimited": "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
-      "failed": "Não foi possível salvar agora. Tente de novo."
+      "failed": "Não foi possível salvar agora. Tente de novo.",
+      "invalidContent": "A anotação tem uma formatação não permitida.",
+      "invalidLink": "Use um link completo que comece com http://, https:// ou mailto:.",
+      "contentTooLarge": "A anotação ficou grande demais. Divida-a em mais de uma."
+    },
+    "autosave": {
+      "unsaved": "Alterações não salvas",
+      "saving": "Salvando…",
+      "saved": "Salvo",
+      "failed": "Não salvo: {reason}"
+    },
+    "editor": {
+      "loading": "Carregando o editor…",
+      "toolbar": "Formatação",
+      "bold": "Negrito (Ctrl+B)",
+      "italic": "Itálico (Ctrl+I)",
+      "heading": "Título (Ctrl+Alt+3)",
+      "subheading": "Subtítulo (Ctrl+Alt+4)",
+      "bulletList": "Lista com marcadores (Ctrl+Shift+8)",
+      "orderedList": "Lista numerada (Ctrl+Shift+7)",
+      "blockquote": "Citação (Ctrl+Shift+B)",
+      "code": "Código no texto (Ctrl+E)",
+      "codeBlock": "Bloco de código (Ctrl+Alt+C)",
+      "link": "Link",
+      "language": "Linguagem do bloco de código",
+      "languages": {
+        "plaintext": "Texto simples",
+        "bash": "Bash",
+        "c": "C",
+        "cpp": "C++",
+        "csharp": "C#",
+        "css": "CSS",
+        "diff": "Diff",
+        "go": "Go",
+        "java": "Java",
+        "javascript": "JavaScript",
+        "json": "JSON",
+        "kotlin": "Kotlin",
+        "markdown": "Markdown",
+        "php": "PHP",
+        "python": "Python",
+        "ruby": "Ruby",
+        "rust": "Rust",
+        "sql": "SQL",
+        "swift": "Swift",
+        "typescript": "TypeScript",
+        "xml": "XML/HTML",
+        "yaml": "YAML"
+      },
+      "linkForm": {
+        "label": "Endereço do link",
+        "placeholder": "https://exemplo.com",
+        "apply": "Aplicar link",
+        "remove": "Remover link",
+        "cancel": "Cancelar"
+      },
+      "codeLabel": "Código em {language}"
     }
   },
   "blocks": {

@@ -2,8 +2,9 @@ import { expect, test } from "@playwright/test";
 
 import { closeTestAuth, E2E_ACCOUNTS, seedSession } from "./auth-helpers";
 
-// US-018: the reader opens a chapter's notebook from the table of contents, writes, edits and
-// deletes plain-text notes, sees the count in the table of contents, and another reader gets the
+// US-018 and US-019: the reader opens a chapter's notebook from the table of contents, writes
+// formatted notes (toolbar, shortcuts, highlighted code), sees pasted and typed markup neutralized,
+// edits with automatic saving, deletes notes, sees the count in the table of contents, and another reader gets the
 // 404 page for that notebook. Deleting the book takes the notes with it (D-09).
 test.afterAll(closeTestAuth);
 test.describe.configure({ mode: "serial" });
@@ -46,32 +47,92 @@ test("a reader keeps notes in a chapter's notebook", async ({
     ).toBeVisible();
     const notebookUrl = page.url();
 
-    // Write two notes; markup stays text.
-    const field = page.getByLabel("Nova anotação");
-    await field.fill("Regra da dependência\naponta para dentro");
+    // Write two notes: one formatted with the toolbar and shortcuts, one with markup typed as
+    // text. The editor is only downloaded when the reader starts writing.
+    await page.getByRole("button", { name: "Escrever anotação" }).click();
+    const editor = page.getByRole("textbox", { name: "Nova anotação" });
+    await editor.click();
+    await page.keyboard.type("Regra da dependência");
+    await page.keyboard.press("Control+Alt+3");
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("aponta ");
+    await page.keyboard.press("Control+B");
+    await page.keyboard.type("para dentro");
+    await page.keyboard.press("Control+B");
+    await page.keyboard.press("Enter");
+    await page
+      .getByRole("button", { name: "Bloco de código (Ctrl+Alt+C)" })
+      .click();
+    await expect(editor.locator("pre")).toBeVisible();
+    await page.keyboard.type("const core = () => {}");
+    await page
+      .getByRole("combobox", { name: "Linguagem do bloco de código" })
+      .selectOption({ label: "TypeScript" });
     await page.getByRole("button", { name: "Salvar anotação" }).click();
     await expect(page.getByText("1 anotação")).toBeVisible();
-    await field.fill("<b>Plugins</b>");
+
+    await page.getByRole("button", { name: "Escrever anotação" }).click();
+    await page
+      .getByRole("textbox", { name: "Nova anotação" })
+      .fill("<b>Plugins</b><script>window.pwned = 1</script>");
     await page.getByRole("button", { name: "Salvar anotação" }).click();
     const list = page.getByRole("list", { name: "Anotações de Fronteiras" });
     await expect(list.getByRole("listitem")).toHaveCount(2);
-    await expect(list.getByRole("listitem").nth(0)).toContainText(
-      "Regra da dependência",
-    );
-    await expect(list.getByRole("listitem").nth(1)).toContainText(
-      "<b>Plugins</b>",
-    );
 
-    // Edit the first one: it shows when it was edited.
-    await list
-      .getByRole("listitem")
-      .nth(0)
-      .getByRole("button", { name: /^Editar a anotação de / })
+    // The read-only view: same formatting, highlighted code, markup as text.
+    const first = list.getByRole("listitem").nth(0);
+    await expect(
+      first.getByRole("heading", { level: 3, name: "Regra da dependência" }),
+    ).toBeVisible();
+    await expect(first.locator("strong")).toHaveText("para dentro");
+    await expect(
+      first.locator("pre code.language-typescript .hljs-keyword"),
+    ).toHaveText("const");
+    await expect(list.getByRole("listitem").nth(1)).toContainText(
+      "<b>Plugins</b><script>window.pwned = 1</script>",
+    );
+    expect(await page.evaluate(() => "pwned" in window)).toBe(false);
+
+    // Pasted HTML keeps the formatting the notebook offers and drops the rest.
+    await page.getByRole("button", { name: "Escrever anotação" }).click();
+    await page.getByRole("textbox", { name: "Nova anotação" }).click();
+    await page.evaluate(() => {
+      const data = new DataTransfer();
+      data.setData(
+        "text/html",
+        '<p><em>colado</em><img src="x" onerror="window.pwned = 1"> <a href="javascript:window.pwned = 1">mau</a></p>',
+      );
+      document.activeElement?.dispatchEvent(
+        new ClipboardEvent("paste", { clipboardData: data, bubbles: true }),
+      );
+    });
+    await page.getByRole("button", { name: "Salvar anotação" }).click();
+    await expect(list.getByRole("listitem")).toHaveCount(3);
+    const pasted = list.getByRole("listitem").nth(2);
+    await expect(pasted.locator("em")).toHaveText("colado");
+    await expect(pasted.locator("img")).toHaveCount(0);
+    await expect(pasted.getByRole("link")).toHaveCount(0);
+    expect(await page.evaluate(() => "pwned" in window)).toBe(false);
+    await pasted
+      .getByRole("button", { name: /^Excluir a anotação de / })
       .click();
-    await page.getByLabel("Texto da anotação").fill("Dependências para dentro");
-    await page.getByRole("button", { name: "Salvar", exact: true }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Excluir anotação" })
+      .click();
+    await expect(list.getByRole("listitem")).toHaveCount(2);
+
+    // Edit the first one: saved on its own, and it shows when it was edited.
+    await first.getByRole("button", { name: /^Editar a anotação de / }).click();
+    const editing = page.getByRole("textbox", { name: "Texto da anotação" });
+    await editing.getByText("para dentro").click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" sempre");
+    await expect(page.getByText("Salvo", { exact: true })).toBeVisible();
+    await page.reload();
     await expect(list.getByRole("listitem").nth(0)).toContainText(
-      "Dependências para dentro",
+      "aponta para dentro sempre",
     );
     await expect(list.getByRole("listitem").nth(0)).toContainText("editada em");
 
@@ -110,7 +171,7 @@ test("a reader keeps notes in a chapter's notebook", async ({
       const otherPage = await other.newPage();
       const response = await otherPage.goto(notebookUrl);
       expect(response?.status()).toBe(404);
-      await expect(otherPage.getByText("Dependências")).toHaveCount(0);
+      await expect(otherPage.getByText("Regra da dependência")).toHaveCount(0);
     } finally {
       await other.close();
     }

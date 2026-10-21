@@ -1,38 +1,37 @@
 import { z } from "zod";
 
-import { visibleMultilineText } from "@/domain/text";
+import {
+  noteContentErrors,
+  parseNoteContent,
+  type NoteContentError,
+} from "@/domain/notes/rich-text";
 
-// What a reader writes in a node's notebook (US-018, RF-005): plain text, line breaks allowed. Rich
-// formatting arrives in US-019. Shared by the forms (client) and the Server Actions (server): the
-// server always parses again, the client check is only UX.
+// What a reader writes in a node's notebook: rich content since US-019 (ProseMirror JSON from the
+// editor, see rich-text.ts), whose plain text keeps US-018's limits. Shared by the editor (client)
+// and the Server Actions (server): the server always parses again, the client check is only UX.
 //
 // Error messages are i18n keys under `notes.errors`, never UI text (rule i18n).
 
-export const NOTE_BODY_MAX = 10_000;
 // Far beyond what a reader writes about one chapter, and a bound on what one notebook renders.
 export const MAX_NOTES_PER_NODE = 500;
 
-export const noteInputErrors = {
-  bodyRequired: "bodyRequired",
-  bodyTooLong: "bodyTooLong",
-  invalidCharacters: "invalidCharacters",
-} as const;
+export const noteInputErrors = noteContentErrors;
+export type NoteInputError = NoteContentError;
 
-export type NoteInputError =
-  (typeof noteInputErrors)[keyof typeof noteInputErrors];
-
-// Trimmed at both ends; inner line breaks and tabs are kept. Other control characters and
-// bidirectional overrides are refused, like in a node's summary.
-export const noteInputSchema = z.object({
-  body: z
-    .string({ error: noteInputErrors.bodyRequired })
-    .trim()
-    .min(1, { error: noteInputErrors.bodyRequired })
-    .max(NOTE_BODY_MAX, { error: noteInputErrors.bodyTooLong })
-    .refine(visibleMultilineText, {
-      error: noteInputErrors.invalidCharacters,
-    }),
-});
+// The output is the rebuilt document and its plain text, never what the client sent.
+export const noteInputSchema = z
+  .object(
+    { content: z.unknown().optional() },
+    { error: noteInputErrors.bodyRequired },
+  )
+  .transform((input, ctx) => {
+    const parsed = parseNoteContent(input.content);
+    if (!parsed.ok) {
+      ctx.addIssue({ code: "custom", message: parsed.error });
+      return z.NEVER;
+    }
+    return { content: parsed.content, text: parsed.text };
+  });
 
 // Note ids are UUIDs; anything else is answered like a missing note, without a query.
 export const noteIdSchema = z.uuid();

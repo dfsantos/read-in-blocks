@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { cache } from "react";
 
+import { NoteContent } from "@/components/notes/note-content";
 import { Notebook } from "@/components/notes/notebook";
 import { NodeReading } from "@/components/structure/node-reading";
 import { bookIdSchema } from "@/domain/books/book-input";
@@ -129,7 +130,14 @@ export default async function NodePage({ params }: Props) {
       {/* The bound id is still an argument the client sends: the action parses it again. */}
       <Notebook
         title={node.title}
-        notes={notes}
+        notes={notes.map((note) => ({
+          id: note.id,
+          content: note.content,
+          // Rendered here, on the server: the notebook never ships the highlighter.
+          view: <NoteContent content={note.content} />,
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+        }))}
         actions={{
           create: createNote.bind(null, node.id),
           update: updateNote,

@@ -5,6 +5,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -153,8 +154,10 @@ export const bookNode = pgTable(
   ],
 );
 
-// A note in a node's notebook (US-018, RF-005, ADR-0007): plain text for now; rich content arrives
-// in US-019. Content table with its own owner_id and the owner RLS policy. Both foreign keys are
+// A note in a node's notebook (US-018, RF-005, ADR-0007). Since US-019 its content is ProseMirror
+// JSON (`content`, rebuilt from the allowed schema by src/domain/notes/rich-text.ts), and `body`
+// keeps its plain text, with US-018's limit. `content` is null only for rows written by US-018 code
+// (converted by migration 0012, and read as plain text if one appears during a deploy). Content table with its own owner_id and the owner RLS policy. Both foreign keys are
 // composite with the owner (an FK ignores RLS): a note can only hang from its owner's book and from
 // a node of that same owner and book. Deleting the book or the node deletes its notes (D-09).
 export const note = pgTable(
@@ -167,6 +170,7 @@ export const note = pgTable(
     bookId: uuid("book_id").notNull(),
     nodeId: uuid("node_id").notNull(),
     body: text("body").notNull(),
+    content: jsonb("content").$type<unknown>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -197,6 +201,12 @@ export const note = pgTable(
     check(
       "note_body_length",
       sql`char_length(${table.body}) between 1 and 10000`,
+    ),
+    // Last line of the size the Server Action already checks (NOTE_CONTENT_MAX_CHARS, with room
+    // for jsonb's own spacing).
+    check(
+      "note_content_shape",
+      sql`${table.content} is null or (jsonb_typeof(${table.content}) = 'object' and char_length(${table.content}::text) <= 400000)`,
     ),
     ownerPolicy(),
   ],

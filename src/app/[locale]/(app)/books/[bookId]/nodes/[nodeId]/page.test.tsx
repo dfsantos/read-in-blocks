@@ -90,6 +90,21 @@ describe("NodePage", () => {
       {
         id: "n1",
         body: "<i>nota</i>",
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: "text",
+                  text: "<i>nota</i>",
+                  marks: [{ type: "bold" }],
+                },
+              ],
+            },
+          ],
+        },
         createdAt: new Date("2026-10-20T13:00:00Z"),
         updatedAt: new Date("2026-10-20T13:00:00Z"),
       },
@@ -139,6 +154,9 @@ describe("NodePage", () => {
     expect(
       screen.getByRole("list", { name: "Anotações de <b>Um</b>" }),
     ).toHaveTextContent("<i>nota</i>");
+    // Rendered from the stored document (bold), with no element made from the text.
+    expect(screen.getByText("<i>nota</i>").tagName).toBe("STRONG");
+    expect(document.querySelector("li i")).toBeNull();
   });
 
   it("titles the page with the node", async () => {

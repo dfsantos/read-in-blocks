@@ -51,7 +51,10 @@ test("a reader resumes a book from the library, takes a note and completes the c
     await expect(
       page.getByRole("heading", { level: 1, name: "Princípios" }),
     ).toBeVisible();
-    await page.getByLabel("Nova anotação").fill("Refatorar em passos pequenos");
+    await page.getByRole("button", { name: "Escrever anotação" }).click();
+    await page
+      .getByRole("textbox", { name: "Nova anotação" })
+      .fill("Refatorar em passos pequenos");
     await page.getByRole("button", { name: "Salvar anotação" }).click();
     await expect(page.getByText("1 anotação")).toBeVisible();
     await page.getByLabel("Estado de Princípios").selectOption("completed");

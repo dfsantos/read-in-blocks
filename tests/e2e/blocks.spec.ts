@@ -66,7 +66,9 @@ test("a reader sees the book as blocks grouped by part", async ({
     await expect(
       page.getByRole("heading", { level: 1, name: "Escalabilidade" }),
     ).toBeVisible();
-    await expect(page.getByLabel("Nova anotação")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Escrever anotação" }),
+    ).toBeVisible();
   } finally {
     await seeded.cleanUp();
   }

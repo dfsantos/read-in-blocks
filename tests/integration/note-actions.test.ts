@@ -13,6 +13,7 @@ import {
 } from "vitest";
 
 import * as schema from "@/db/schema";
+import { plainNote, textToDoc } from "@/domain/notes/rich-text";
 import { addNodes } from "@/server/repositories/book-nodes";
 import { createBook } from "@/server/repositories/books";
 import { createNote as seedNote, listNotes } from "@/server/repositories/notes";
@@ -55,10 +56,23 @@ async function chapterWithNote(ownerId: string) {
     db,
   );
   if (!added.ok) throw new Error(`seed failed: ${added.reason}`);
-  const note = await seedNote(ownerId, added.ids[0], "Owned note", db);
+  const note = await seedNote(
+    ownerId,
+    added.ids[0],
+    plainNote("Owned note"),
+    db,
+  );
   if (!note.ok) throw new Error(`seed failed: ${note.reason}`);
   return { nodeId: added.ids[0], noteId: note.id };
 }
+
+// What the editor sends for a plain-text note.
+const typed = (body: string) => ({ content: textToDoc(body) });
+const doc = (...content: unknown[]) => ({ content: { type: "doc", content } });
+const paragraph = (text: string, marks?: unknown[]) => ({
+  type: "paragraph",
+  content: [{ type: "text", text, ...(marks ? { marks } : {}) }],
+});
 
 const MALFORMED_IDS = [
   ["not a uuid", "not-a-uuid"],
@@ -81,8 +95,8 @@ describe("notebook Server Actions", () => {
     const transaction = vi.spyOn(db, "transaction");
 
     for (const call of [
-      () => createNote(randomUUID(), { body: "A" }),
-      () => updateNote(randomUUID(), { body: "A" }),
+      () => createNote(randomUUID(), typed("A")),
+      () => updateNote(randomUUID(), typed("A")),
       () => deleteNote(randomUUID()),
     ]) {
       await expect(call()).rejects.toThrow("NEXT_REDIRECT /login");
@@ -95,15 +109,18 @@ describe("notebook Server Actions", () => {
     const { nodeId, noteId } = await chapterWithNote(owner.id);
     signIn(owner);
 
-    expect(await createNote(nodeId, { body: "  Segunda\nlinha  " })).toEqual({
+    expect(await createNote(nodeId, typed("Segunda\nlinha"))).toEqual({
       ok: true,
     });
-    expect(await updateNote(noteId, { body: "Primeira, revista" })).toEqual({
+    expect(await updateNote(noteId, typed("Primeira, revista"))).toEqual({
       ok: true,
     });
     expect(
       (await listNotes(owner.id, nodeId, db)).map((note) => note.body),
     ).toEqual(["Primeira, revista", "Segunda\nlinha"]);
+    expect((await listNotes(owner.id, nodeId, db))[1].content).toEqual(
+      textToDoc("Segunda\nlinha"),
+    );
 
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     expect(await deleteNote(noteId)).toEqual({ ok: true });
@@ -126,12 +143,10 @@ describe("notebook Server Actions", () => {
     signIn(intruder);
 
     const notFound = { ok: false, errorKey: "notFound" };
-    expect(await createNote(nodeId, { body: "Intruder" })).toEqual(notFound);
-    expect(await createNote(randomUUID(), { body: "Intruder" })).toEqual(
-      notFound,
-    );
-    expect(await updateNote(noteId, { body: "Taken" })).toEqual(notFound);
-    expect(await updateNote(randomUUID(), { body: "Taken" })).toEqual(notFound);
+    expect(await createNote(nodeId, typed("Intruder"))).toEqual(notFound);
+    expect(await createNote(randomUUID(), typed("Intruder"))).toEqual(notFound);
+    expect(await updateNote(noteId, typed("Taken"))).toEqual(notFound);
+    expect(await updateNote(randomUUID(), typed("Taken"))).toEqual(notFound);
     expect(await deleteNote(noteId)).toEqual(notFound);
     expect(await deleteNote(randomUUID())).toEqual(notFound);
 
@@ -147,20 +162,90 @@ describe("notebook Server Actions", () => {
       signIn(owner);
 
       const notFound = { ok: false, errorKey: "notFound" };
-      expect(await createNote(id, { body: "A" })).toEqual(notFound);
-      expect(await updateNote(id, { body: "A" })).toEqual(notFound);
+      expect(await createNote(id, typed("A"))).toEqual(notFound);
+      expect(await updateNote(id, typed("A"))).toEqual(notFound);
       expect(await deleteNote(id)).toEqual(notFound);
     },
   );
 
   it.each([
-    ["an empty body", { body: "  " }, "bodyRequired"],
-    ["no body", {}, "bodyRequired"],
+    ["an empty note", doc({ type: "paragraph" }), "bodyRequired"],
+    ["no content", {}, "bodyRequired"],
     ["not an object", "text", "bodyRequired"],
-    ["a body that is not text", { body: ["a"] }, "bodyRequired"],
-    ["a body over the limit", { body: "a".repeat(10_001) }, "bodyTooLong"],
-    ["a control character", { body: "a\u0000b" }, "invalidCharacters"],
-    ["a bidirectional override", { body: "a‮b" }, "invalidCharacters"],
+    ["a US-018 body", { body: "Plain" }, "bodyRequired"],
+    ["HTML instead of a document", { content: "<p>a</p>" }, "invalidContent"],
+    [
+      "a script node",
+      doc({ type: "script", text: "alert(1)" }),
+      "invalidContent",
+    ],
+    [
+      "an image with onerror",
+      doc({ type: "image", attrs: { src: "x", onerror: "alert(1)" } }),
+      "invalidContent",
+    ],
+    [
+      "a javascript: link",
+      doc(
+        paragraph("a", [
+          { type: "link", attrs: { href: "javascript:alert(1)" } },
+        ]),
+      ),
+      "invalidLink",
+    ],
+    [
+      "a data: link",
+      doc(
+        paragraph("a", [
+          {
+            type: "link",
+            attrs: { href: "data:text/html,<script>alert(1)</script>" },
+          },
+        ]),
+      ),
+      "invalidLink",
+    ],
+    [
+      "a structure the editor cannot open",
+      doc({
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [
+              { type: "codeBlock", content: [{ type: "text", text: "x" }] },
+            ],
+          },
+        ],
+      }),
+      "invalidContent",
+    ],
+    [
+      "a text over the limit",
+      doc(paragraph("a".repeat(10_000)), paragraph("b")),
+      "bodyTooLong",
+    ],
+    [
+      "a document too deep",
+      {
+        content: {
+          type: "doc",
+          content: [
+            Array.from({ length: 200 }).reduce<unknown>(
+              (inner) => ({ type: "blockquote", content: [inner] }),
+              paragraph("deep"),
+            ),
+          ],
+        },
+      },
+      "contentTooLarge",
+    ],
+    ["a control character", doc(paragraph("a\u0000b")), "invalidCharacters"],
+    [
+      "a bidirectional override",
+      doc(paragraph("a\u202Eb")),
+      "invalidCharacters",
+    ],
   ])("refuses %s before touching the database", async (_name, input, key) => {
     const { owner } = await create();
     const { nodeId, noteId } = await chapterWithNote(owner.id);
@@ -173,12 +258,76 @@ describe("notebook Server Actions", () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
+  it("stores the rebuilt document, never what the client sent", async () => {
+    const { owner } = await create();
+    const { nodeId, noteId } = await chapterWithNote(owner.id);
+    signIn(owner);
+
+    const sent = {
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            attrs: { onclick: "alert(1)" },
+            content: [
+              {
+                type: "text",
+                text: "site",
+                style: "x",
+                marks: [
+                  {
+                    type: "link",
+                    attrs: {
+                      href: "https://example.com",
+                      target: "_self",
+                      onmouseover: "x",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: "codeBlock",
+            attrs: { language: "<script>" },
+            content: [{ type: "text", text: "print(1)" }],
+          },
+        ],
+      },
+    };
+    expect(await updateNote(noteId, sent)).toEqual({ ok: true });
+
+    const [stored] = await listNotes(owner.id, nodeId, db);
+    expect(stored.content).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "site",
+              marks: [{ type: "link", attrs: { href: "https://example.com" } }],
+            },
+          ],
+        },
+        {
+          type: "codeBlock",
+          attrs: { language: null },
+          content: [{ type: "text", text: "print(1)" }],
+        },
+      ],
+    });
+    expect(stored.body).toBe("site\nprint(1)");
+  });
+
   it.each([
-    ["additions", 30, (nodeId: string) => createNote(nodeId, { body: "N" })],
+    ["additions", 30, (nodeId: string) => createNote(nodeId, typed("N"))],
     [
       "updates",
       60,
-      (_nodeId: string, noteId: string) => updateNote(noteId, { body: "U" }),
+      (_nodeId: string, noteId: string) => updateNote(noteId, typed("U")),
     ],
     ["deletions", 30, () => deleteNote(randomUUID())],
   ] as const)(
@@ -220,10 +369,10 @@ describe("notebook Server Actions", () => {
     );
 
     const failed = { ok: false, errorKey: "failed" };
-    expect(await createNote(randomUUID(), { body: "Secret Note" })).toEqual(
+    expect(await createNote(randomUUID(), typed("Secret Note"))).toEqual(
       failed,
     );
-    expect(await updateNote(randomUUID(), { body: "Secret Note" })).toEqual(
+    expect(await updateNote(randomUUID(), typed("Secret Note"))).toEqual(
       failed,
     );
     expect(await deleteNote(randomUUID())).toEqual(failed);
