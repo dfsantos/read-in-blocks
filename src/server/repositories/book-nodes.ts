@@ -3,6 +3,13 @@ import { and, asc, count, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { getDb, type Database } from "@/db/client";
 import { book, bookNode } from "@/db/schema";
 import { canPlace, type NodeKind } from "@/domain/structure/hierarchy";
+import {
+  changeStatus,
+  editDates,
+  type ReadingDateError,
+  type ReadingState,
+  type ReadingStatus,
+} from "@/domain/reading/status";
 import { planMove } from "@/domain/structure/move";
 import {
   MAX_NODES_PER_BOOK,
@@ -27,12 +34,20 @@ const nodeColumns = {
   position: bookNode.position,
   summary: bookNode.summary,
   goalPages: bookNode.goalPages,
+  status: bookNode.status,
+  startedAt: bookNode.startedAt,
+  completedAt: bookNode.completedAt,
 };
 
-// The kind column is text with a CHECK constraint (book_node_kind): it only holds NodeKind values.
+// kind and status are text columns with CHECK constraints (book_node_kind, book_node_status): they
+// only hold NodeKind and ReadingStatus values.
 const asFlatNode = (
-  row: Omit<FlatNode, "kind"> & { kind: string },
-): FlatNode => ({ ...row, kind: row.kind as NodeKind });
+  row: Omit<FlatNode, "kind" | "status"> & { kind: string; status: string },
+): FlatNode => ({
+  ...row,
+  kind: row.kind as NodeKind,
+  status: row.status as ReadingStatus,
+});
 
 // Every node of the reader's book, in no particular order (buildTree orders them). Empty both for a
 // book without structure and for a missing or someone else's book.
@@ -339,6 +354,118 @@ export async function moveNode(
         .where(ownedBy(bookNode.ownerId, userId, inArray(bookNode.id, ids)));
       return { ok: true };
     },
+    db,
+  );
+}
+
+export type ReadingChangeResult =
+  | { ok: true; state: ReadingState }
+  | {
+      ok: false;
+      // notFound: missing or someone else's node; notLeaf: a node with children derives its state.
+      reason: "notFound" | "notLeaf";
+    }
+  | { ok: false; reason: ReadingDateError; field: "startedAt" | "completedAt" };
+
+// Reads the reader's node under the book lock (as addNodes does, so no child can appear meanwhile),
+// checks it is a leaf, and writes the state `next` computes from the current one (US-013).
+async function changeReading(
+  userId: string,
+  nodeId: string,
+  next: (current: ReadingState) =>
+    | { ok: true; state: ReadingState }
+    | {
+        ok: false;
+        error: ReadingDateError;
+        field: "startedAt" | "completedAt";
+      },
+  db: Database,
+): Promise<ReadingChangeResult> {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const findNode = async () => {
+        const [row] = await tx
+          .select({
+            bookId: bookNode.bookId,
+            status: bookNode.status,
+            startedAt: bookNode.startedAt,
+            completedAt: bookNode.completedAt,
+          })
+          .from(bookNode)
+          .where(ownedBy(bookNode.ownerId, userId, eq(bookNode.id, nodeId)))
+          .limit(1);
+        return row;
+      };
+      const found = await findNode();
+      if (!found) return { ok: false, reason: "notFound" };
+      await tx.execute(
+        sql`select ${book.id} from ${book} where ${ownedBy(book.ownerId, userId, eq(book.id, found.bookId))} for update`,
+      );
+      const node = await findNode();
+      if (!node) return { ok: false, reason: "notFound" };
+
+      const [child] = await tx
+        .select({ id: bookNode.id })
+        .from(bookNode)
+        .where(
+          ownedBy(
+            bookNode.ownerId,
+            userId,
+            eq(bookNode.bookId, node.bookId),
+            eq(bookNode.parentId, nodeId),
+          ),
+        )
+        .limit(1);
+      if (child) return { ok: false, reason: "notLeaf" };
+
+      const result = next({
+        status: node.status as ReadingStatus,
+        startedAt: node.startedAt,
+        completedAt: node.completedAt,
+      });
+      if (!result.ok) {
+        return { ok: false, reason: result.error, field: result.field };
+      }
+      await tx
+        .update(bookNode)
+        .set({ ...result.state, updatedAt: sql`now()` })
+        .where(ownedBy(bookNode.ownerId, userId, eq(bookNode.id, nodeId)));
+      return { ok: true, state: result.state };
+    },
+    db,
+  );
+}
+
+// Sets a leaf's reading state on `today` (a calendar day in the app's time zone), filling or
+// clearing its dates (ADR-0009, "Datas").
+export async function setReadingStatus(
+  userId: string,
+  nodeId: string,
+  status: ReadingStatus,
+  today: string,
+  db: Database = getDb(),
+): Promise<ReadingChangeResult> {
+  return changeReading(
+    userId,
+    nodeId,
+    (current) => ({ ok: true, state: changeStatus(current, status, today) }),
+    db,
+  );
+}
+
+// Replaces a leaf's dates, to log a past reading; they must fit its state and not pass `today`.
+export async function setReadingDates(
+  userId: string,
+  nodeId: string,
+  dates: { startedAt: string | null; completedAt: string | null },
+  today: string,
+  db: Database = getDb(),
+): Promise<ReadingChangeResult> {
+  return changeReading(
+    userId,
+    nodeId,
+    (current) => editDates(current, dates, today),
     db,
   );
 }

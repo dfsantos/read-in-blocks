@@ -40,8 +40,11 @@ import {
   addNodes,
   deleteNode,
   moveNode,
+  setReadingDates,
+  setReadingStatus,
   updateNode,
 } from "@/server/actions/book-nodes";
+import { calendarDay } from "@/domain/reading/status";
 
 afterAll(() => pool.end());
 
@@ -90,6 +93,8 @@ describe("book structure Server Actions", () => {
       () => updateNode(randomUUID(), { title: "A" }),
       () => deleteNode(randomUUID()),
       () => moveNode(randomUUID(), { parentId: null, index: 0 }),
+      () => setReadingStatus(randomUUID(), { status: "completed" }),
+      () => setReadingDates(randomUUID(), { startedAt: "2026-10-01" }),
     ]) {
       await expect(call()).rejects.toThrow("NEXT_REDIRECT /login");
     }
@@ -143,6 +148,10 @@ describe("book structure Server Actions", () => {
       await deleteNode(randomUUID()),
       await moveNode(owned.nodeId, { parentId: null, index: 0 }),
       await moveNode(randomUUID(), { parentId: null, index: 0 }),
+      await setReadingStatus(owned.nodeId, { status: "completed" }),
+      await setReadingStatus(randomUUID(), { status: "completed" }),
+      await setReadingDates(owned.nodeId, { startedAt: "", completedAt: "" }),
+      await setReadingDates(randomUUID(), { startedAt: "", completedAt: "" }),
     ];
 
     for (const answer of answers) {
@@ -183,6 +192,8 @@ describe("book structure Server Actions", () => {
         await updateNode(id, { title: "A" }),
         await deleteNode(id),
         await moveNode(id, { parentId: null, index: 0 }),
+        await setReadingStatus(id, { status: "completed" }),
+        await setReadingDates(id, { startedAt: "", completedAt: "" }),
         await moveNode(randomUUID(), { parentId: id ?? "", index: 0 }),
       ]) {
         expect(answer).toEqual({ ok: false, errorKey: "notFound" });
@@ -362,6 +373,77 @@ describe("book structure Server Actions", () => {
     },
   );
 
+  it("marks the reader's leaf completed today, in the app's time zone", async () => {
+    const { owner } = await create();
+    const { bookId, nodeId } = await bookWithChapter(owner.id);
+    signIn(owner);
+    const before = calendarDay(new Date(), "America/Sao_Paulo");
+
+    expect(await setReadingStatus(nodeId, { status: "completed" })).toEqual({
+      ok: true,
+    });
+
+    const after = calendarDay(new Date(), "America/Sao_Paulo");
+    const [node] = await listNodes(owner.id, bookId, db);
+    expect(node.status).toBe("completed");
+    // The day may only turn over during the call itself.
+    expect([before, after]).toContain(node.startedAt);
+    expect(node.completedAt).toBe(node.startedAt);
+  });
+
+  it.each([
+    ["an unknown state", { status: "done" }],
+    ["no state", {}],
+    ["not an object", "completed"],
+  ])(
+    "answers a state change with %s like a missing node",
+    async (_name, input) => {
+      const { owner } = await create();
+      const { nodeId } = await bookWithChapter(owner.id);
+      signIn(owner);
+
+      expect(await setReadingStatus(nodeId, input)).toEqual({
+        ok: false,
+        errorKey: "notFound",
+      });
+    },
+  );
+
+  it("logs a past reading and refuses dates after today or out of order", async () => {
+    const { owner } = await create();
+    const { bookId, nodeId } = await bookWithChapter(owner.id);
+    signIn(owner);
+    await setReadingStatus(nodeId, { status: "completed" });
+
+    expect(
+      await setReadingDates(nodeId, {
+        startedAt: "2025-01-10",
+        completedAt: "2025-02-01",
+      }),
+    ).toEqual({ ok: true });
+    expect(await listNodes(owner.id, bookId, db)).toMatchObject([
+      { startedAt: "2025-01-10", completedAt: "2025-02-01" },
+    ]);
+    expect(
+      await setReadingDates(nodeId, {
+        startedAt: "2025-01-10",
+        completedAt: "2999-01-01",
+      }),
+    ).toEqual({ ok: false, errorKey: "dateInFuture", field: "completedAt" });
+    expect(
+      await setReadingDates(nodeId, {
+        startedAt: "2025-03-01",
+        completedAt: "2025-02-01",
+      }),
+    ).toEqual({ ok: false, errorKey: "datesOutOfOrder", field: "completedAt" });
+    expect(
+      await setReadingDates(nodeId, {
+        startedAt: "2025-02-30",
+        completedAt: "",
+      }),
+    ).toEqual({ ok: false, errorKey: "dateInvalid", field: "startedAt" });
+  });
+
   it("deletes the reader's node and logs the event without its title", async () => {
     const { owner } = await create();
     const { bookId, nodeId } = await bookWithChapter(owner.id);
@@ -393,6 +475,12 @@ describe("book structure Server Actions", () => {
       (_bookId: string, nodeId: string) => updateNode(nodeId, { title: "R" }),
     ],
     ["deletions", 30, () => deleteNode(randomUUID())],
+    [
+      "state changes",
+      60,
+      (_bookId: string, nodeId: string) =>
+        setReadingStatus(nodeId, { status: "in_progress" }),
+    ],
     [
       "moves",
       60,
@@ -447,11 +535,23 @@ describe("book structure Server Actions", () => {
       ok: false,
       errorKey: "failed",
     });
+    expect(
+      await setReadingStatus(randomUUID(), { status: "completed" }),
+    ).toEqual({
+      ok: false,
+      errorKey: "failed",
+    });
+    expect(await setReadingDates(randomUUID(), {})).toEqual({
+      ok: false,
+      errorKey: "failed",
+    });
     expect(error.mock.calls.map((call) => call[0])).toEqual([
       "structure.create failed",
       "structure.update failed",
       "structure.delete failed",
       "structure.move failed",
+      "reading.status failed",
+      "reading.dates failed",
     ]);
     expect(JSON.stringify(error.mock.calls)).not.toContain("Secret Title");
   });

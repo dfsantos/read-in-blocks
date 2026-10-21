@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  date,
   foreignKey,
   integer,
   pgTable,
@@ -82,6 +83,11 @@ export const bookNode = pgTable(
     // takes the default weight (src/domain/progress/weight.ts).
     summary: text("summary"),
     goalPages: integer("goal_pages"),
+    // Reading state (US-013, ADR-0009): stored for leaves; a node with children derives its own
+    // (US-014). Dates are calendar days in the app's time zone (src/i18n/time-zone.ts).
+    status: text("status").notNull().default("not_started"),
+    startedAt: date("started_at", { mode: "string" }),
+    completedAt: date("completed_at", { mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -128,6 +134,15 @@ export const bookNode = pgTable(
     check(
       "book_node_summary_length",
       sql`${table.summary} is null or char_length(${table.summary}) between 1 and 1000`,
+    ),
+    check(
+      "book_node_status",
+      sql`${table.status} in ('not_started', 'in_progress', 'completed')`,
+    ),
+    // The dates each state carries (src/domain/reading/status.ts).
+    check(
+      "book_node_reading_dates",
+      sql`(${table.status} = 'not_started' and ${table.startedAt} is null and ${table.completedAt} is null) or (${table.status} = 'in_progress' and ${table.startedAt} is not null and ${table.completedAt} is null) or (${table.status} = 'completed' and ${table.startedAt} is not null and ${table.completedAt} is not null and ${table.startedAt} <= ${table.completedAt})`,
     ),
     check(
       "book_node_goal_pages",

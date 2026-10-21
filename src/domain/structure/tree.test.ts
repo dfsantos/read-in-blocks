@@ -15,6 +15,9 @@ const node = (
   position,
   summary: null,
   goalPages: null,
+  status: "not_started",
+  startedAt: null,
+  completedAt: null,
 });
 
 describe("buildTree", () => {

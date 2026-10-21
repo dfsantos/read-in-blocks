@@ -68,6 +68,9 @@ describe("moveTargets", () => {
     position,
     summary: null,
     goalPages: null,
+    status: "not_started",
+    startedAt: null,
+    completedAt: null,
   });
   const tree = buildTree([
     node("pre", null, "chapter", 0),

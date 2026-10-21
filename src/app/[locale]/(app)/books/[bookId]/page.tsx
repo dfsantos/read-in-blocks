@@ -13,6 +13,8 @@ import {
   addNodes,
   deleteNode,
   moveNode,
+  setReadingDates,
+  setReadingStatus,
   updateNode,
 } from "@/server/actions/book-nodes";
 import { deleteBook } from "@/server/actions/books";
@@ -85,6 +87,8 @@ export default async function BookPage({ params }: Props) {
           add: addNodes.bind(null, book.id),
           update: updateNode,
           move: moveNode,
+          setStatus: setReadingStatus,
+          setDates: setReadingDates,
           remove: deleteNode,
         }}
       />

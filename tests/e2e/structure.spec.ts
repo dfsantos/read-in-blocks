@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 import { closeTestAuth, E2E_ACCOUNTS, seedSession } from "./auth-helpers";
 
 // US-010: the reader builds a book's structure from its page, pasting a table of contents, adds a
-// topic inside a chapter, edits a node's title, summary and goal (US-011), reorders and moves chapters (US-012) and deletes a
-// part with its subtree after confirming.
+// topic inside a chapter, edits a node's title, summary and goal (US-011), reorders and moves chapters (US-012), marks a leaf's reading state
+// (US-013) and deletes a part with its subtree after confirming.
 test.afterAll(closeTestAuth);
 
 test("a reader builds, renames and prunes a book's structure", async ({
@@ -105,6 +105,30 @@ test("a reader builds, renames and prunes a book's structure", async ({
         .filter({ hasText: /^Capítulo/ })
         .first(),
     ).toContainText("Prefácio");
+
+    // Reading state of a leaf (US-013): completed fills both dates, which can be corrected.
+    await page.getByLabel("Estado de Prefácio").selectOption("completed");
+    const preface = structure
+      .getByRole("listitem")
+      .filter({ hasText: "Prefácio" })
+      .first();
+    await expect(preface).toContainText("Conclusão:");
+    // Parts with children derive their state: no control of their own.
+    await expect(page.getByLabel("Estado de Parte I")).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Editar as datas de Prefácio", exact: true })
+      .click();
+    const dates = page.getByRole("form", { name: "Datas de Prefácio" });
+    await dates.getByLabel("Início").fill("2025-01-10");
+    await dates.getByLabel("Conclusão").fill("2025-02-01");
+    await dates.getByRole("button", { name: "Salvar datas" }).click();
+    await expect(dates).toBeHidden();
+    await expect(preface).toContainText("Início: 10 de jan. de 2025");
+    await expect(preface).toContainText("Conclusão: 1 de fev. de 2025");
+    await page.reload();
+    await expect(page.getByLabel("Estado de Prefácio")).toHaveValue(
+      "completed",
+    );
 
     // Edit in place: title, summary and goal in pages (US-011).
     await page
