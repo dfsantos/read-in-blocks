@@ -1,4 +1,11 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,6 +56,7 @@ function renderStructure(
   const actions = {
     add: vi.fn().mockResolvedValue({ ok: true, data: { count: 2 } }),
     update: vi.fn().mockResolvedValue({ ok: true }),
+    move: vi.fn().mockResolvedValue({ ok: true }),
     remove: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
   };
@@ -310,6 +318,111 @@ describe("BookStructure", () => {
       ),
     ).toBeInTheDocument();
     expect(within(form).getByLabelText("Resumo")).toHaveFocus();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("moves a node up and down among its siblings, never past the ends", async () => {
+    const { actions, user } = renderStructure();
+
+    expect(
+      screen.getByRole("button", { name: "Subir Prefácio" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Descer Parte I" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Subir 1.1" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Subir Parte I" }));
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+    expect(actions.move).toHaveBeenLastCalledWith("p1", {
+      parentId: null,
+      index: 0,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Descer 1.1" }));
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(2));
+    expect(actions.move).toHaveBeenLastCalledWith("t1", {
+      parentId: "c1",
+      index: 1,
+    });
+  });
+
+  it("reorders by dragging a node onto a sibling, and only onto a sibling", async () => {
+    const { actions } = renderStructure();
+    const row = (title: string) =>
+      screen
+        .getByText(title, { selector: "span" })
+        .closest("[draggable]") as HTMLElement;
+    const dataTransfer = {
+      setData: vi.fn(),
+      effectAllowed: "",
+      dropEffect: "",
+    };
+
+    fireEvent.dragStart(row("1.2"), { dataTransfer });
+    // Not a sibling: the drop is not accepted.
+    const overPart = createEvent.dragOver(row("Parte I"), { dataTransfer });
+    fireEvent(row("Parte I"), overPart);
+    expect(overPart.defaultPrevented).toBe(false);
+
+    const overSibling = createEvent.dragOver(row("1.1"), { dataTransfer });
+    fireEvent(row("1.1"), overSibling);
+    expect(overSibling.defaultPrevented).toBe(true);
+    fireEvent.drop(row("1.1"), { dataTransfer });
+
+    await vi.waitFor(() =>
+      expect(actions.move).toHaveBeenCalledWith("t2", {
+        parentId: "c1",
+        index: 0,
+      }),
+    );
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("moves a chapter to the book's root and a topic to another chapter", async () => {
+    const { actions, user } = renderStructure();
+
+    // A part only reorders: it has nowhere else to go.
+    expect(
+      screen.queryByRole("button", { name: "Mover Parte I" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Mover Um" }));
+    const destination = screen.getByLabelText("Mover Um para");
+    expect(
+      within(destination)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Direto no livro"]);
+    await user.click(screen.getByRole("button", { name: "Mover" }));
+
+    await vi.waitFor(() =>
+      expect(actions.move).toHaveBeenCalledWith("c1", {
+        parentId: null,
+        index: 2000,
+      }),
+    );
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(screen.queryByLabelText("Mover Um para")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Mover 1.1" }));
+    expect(
+      within(screen.getByLabelText("Mover 1.1 para"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Prefácio"]);
+  });
+
+  it("shows a refused move next to the node", async () => {
+    const { user } = renderStructure(NODES, {
+      move: vi.fn().mockResolvedValue({ ok: false, errorKey: "rateLimited" }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Descer Prefácio" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
+    );
     expect(refresh).not.toHaveBeenCalled();
   });
 
