@@ -91,6 +91,14 @@ test("a reader follows the book's weighted progress", async ({
     await expect(overall).toHaveAttribute("aria-valuenow", "40");
     await expect(overall).toHaveAttribute("aria-valuetext", "40%");
     await expect(panel).toContainText("2 de 3 capítulos concluídos");
+    // Two completions today are not a pace yet (US-023): it says so instead of guessing.
+    const pace = panel.getByRole("region", { name: "Ritmo e previsão" });
+    await expect(pace).toContainText(
+      "Ainda não há dados para prever a conclusão",
+    );
+    await expect(pace).toContainText(
+      "Até agora: 2 conclusões nas últimas 4 semanas.",
+    );
     await expect(
       panel.getByRole("progressbar", { name: "Progresso de Base" }),
     ).toHaveAttribute("aria-valuenow", "100");

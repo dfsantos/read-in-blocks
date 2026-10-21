@@ -5,6 +5,7 @@ import {
   countChapters,
   wholePercent,
 } from "@/domain/progress/compute";
+import { readingPace, type Pace } from "@/domain/progress/pace";
 import type { TreeNode } from "@/domain/structure/tree";
 
 import { ProgressBar } from "./progress-bar";
@@ -12,13 +13,16 @@ import { ProgressBar } from "./progress-bar";
 type Props = Readonly<{
   // The book's structure, every parent with its derived state (buildTree).
   tree: readonly TreeNode[];
+  // Today in the app's time zone (D-19), from the server, for the pace (US-023).
+  today: string;
 }>;
 
 // The book's weighted progress (US-016, RF-008): the whole book and each part and chapter, weighted
 // by their goals in pages, where only completed leaves count (D-03). Next to it, a plain count of
 // completed chapters, kept apart so it is not mistaken for the percentage. A Server Component
-// (no client code): the page refreshes it after every change. Titles are the reader's content, rendered as text.
-export function ProgressPanel({ tree }: Props) {
+// (no client code): the page refreshes it after every change. Below, the reading pace and the expected
+// finish (US-023), left out once the book is finished. Titles are the reader's content, rendered as text.
+export function ProgressPanel({ tree, today }: Props) {
   const t = useTranslations("progress");
   const format = useFormatter();
 
@@ -86,6 +90,7 @@ export function ProgressPanel({ tree }: Props) {
           </p>
         ) : null}
       </div>
+      <PaceSummary pace={readingPace(tree, today)} />
       <ul aria-label={t("sectionsLabel")} className="flex flex-col gap-3">
         {tree.map((node) => (
           <li key={node.id} className="flex flex-col gap-1">
@@ -152,5 +157,55 @@ function Section({
         className={small ? "h-1.5" : undefined}
       />
     </div>
+  );
+}
+
+// A calendar day ("YYYY-MM-DD") as a Date at noon UTC, so formatting it in the app's time zone (D-19)
+// never shifts it to the day before or after.
+const asDate = (day: string) => new Date(`${day}T12:00:00Z`);
+
+function PaceSummary({ pace }: Readonly<{ pace: Pace }>) {
+  const t = useTranslations("progress.pace");
+  const format = useFormatter();
+  if (pace.kind === "empty" || pace.kind === "completed") return null;
+
+  return (
+    <section
+      aria-labelledby="pace-title"
+      className="flex flex-col gap-1 text-sm"
+    >
+      <h3 id="pace-title" className="font-medium">
+        {t("title")}
+      </h3>
+      {pace.kind === "forecast" ? (
+        <>
+          <p className="font-medium">
+            {t("forecast", {
+              date: format.dateTime(asDate(pace.finishOn), {
+                dateStyle: "long",
+              }),
+            })}
+          </p>
+          <p>
+            {t("rate", {
+              percent: format.number(pace.sharePerWeek, {
+                style: "percent",
+                maximumFractionDigits: 1,
+              }),
+              count: pace.completions,
+              days: pace.days,
+            })}
+          </p>
+          <p className="text-muted-foreground text-xs">{t("rule")}</p>
+        </>
+      ) : (
+        <>
+          <p>{t("insufficient")}</p>
+          <p className="text-muted-foreground text-xs">
+            {t("insufficientNow", { count: pace.completions })}
+          </p>
+        </>
+      )}
+    </section>
   );
 }
