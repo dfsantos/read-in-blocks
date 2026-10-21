@@ -64,6 +64,8 @@ test("a reader navigates the table of contents and marks a topic from it", async
     await page.keyboard.press("Enter");
     const details = page.getByRole("complementary", { name: "Modelo" });
     await details.getByLabel("Estado de Modelo").selectOption("completed");
+    // The tree changes at once; the select comes back once the server has saved it.
+    await expect(details.getByLabel("Estado de Modelo")).toBeEnabled();
     await expect(item("Linguagem ubíqua")).toHaveAccessibleName(
       "Linguagem ubíqua Em andamento · 1 de 2 concluídos",
     );

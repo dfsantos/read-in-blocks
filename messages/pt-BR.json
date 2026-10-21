@@ -230,5 +230,16 @@
       "goal": "Meta",
       "state": "Estado"
     }
+  },
+  "progress": {
+    "title": "Progresso",
+    "empty": "Monte a estrutura do livro abaixo para acompanhar o progresso: cada parte e capítulo concluído aparece aqui.",
+    "overallLabel": "do livro",
+    "overallBar": "Progresso do livro",
+    "rule": "Percentual ponderado pelas metas em páginas; só itens concluídos contam.",
+    "chapters": "{completed} de {total} {total, plural, one {capítulo concluído} other {capítulos concluídos}}",
+    "defaultWeight": "{count, plural, one {# item sem meta usa} other {# itens sem meta usam}} o peso padrão (a média das metas ao lado), o que pode distorcer o percentual. Defina as metas para um resultado mais fiel.",
+    "sectionsLabel": "Progresso por parte e capítulo",
+    "sectionBar": "Progresso de {title}"
   }
 }
