@@ -35,10 +35,14 @@ const completed = {
   completedAt: "2026-10-02",
 } as const;
 
-function renderPanel(nodes: FlatNode[]) {
+function renderPanel(nodes: FlatNode[], today = "2026-10-21") {
   render(
-    <NextIntlClientProvider locale="pt-BR" messages={messages}>
-      <ProgressPanel tree={buildTree(nodes)} />
+    <NextIntlClientProvider
+      locale="pt-BR"
+      messages={messages}
+      timeZone="America/Sao_Paulo"
+    >
+      <ProgressPanel tree={buildTree(nodes)} today={today} />
     </NextIntlClientProvider>,
   );
 }
@@ -132,5 +136,72 @@ describe("ProgressPanel", () => {
       name: "Progresso por parte e capítulo",
     });
     expect(within(sections).getByText("<b>Um</b>")).toBeInTheDocument();
+  });
+
+  describe("pace and expected finish (US-023)", () => {
+    const doneOn = (day: string) =>
+      ({ status: "completed", startedAt: day, completedAt: day }) as const;
+    const pace = () =>
+      screen.queryByRole("region", { name: "Ritmo e previsão" });
+
+    it("forecasts the finish from the recent weighted pace", () => {
+      renderPanel([
+        node("a", null, "chapter", "A", 0, doneOn("2026-10-15")),
+        node("b", null, "chapter", "B", 1, doneOn("2026-10-21")),
+        node("c", null, "chapter", "C", 2),
+        node("d", null, "chapter", "D", 3),
+      ]);
+
+      expect(pace()).toHaveTextContent(
+        "Previsão de conclusão: 28 de outubro de 2026",
+      );
+      expect(pace()).toHaveTextContent(
+        "Ritmo: 50% do livro por semana, cerca de 2 itens concluídos por semana (2 itens nos últimos 7 dias).",
+      );
+    });
+
+    it("explains instead of forecasting without enough data", () => {
+      renderPanel([
+        node("a", null, "chapter", "A", 0, doneOn("2026-10-20")),
+        node("b", null, "chapter", "B", 1),
+      ]);
+
+      expect(pace()).toHaveTextContent(
+        "Ainda não há dados para prever a conclusão",
+      );
+      expect(pace()).toHaveTextContent(
+        "Até agora: 1 conclusão nas últimas 4 semanas.",
+      );
+      expect(pace()).not.toHaveTextContent("Previsão de conclusão");
+    });
+
+    it("gives no date when the finish is more than ten years away", () => {
+      renderPanel([
+        node("a", null, "chapter", "A", 0, {
+          ...doneOn("2026-10-10"),
+          goalPages: 1,
+        }),
+        node("b", null, "chapter", "B", 1, {
+          ...doneOn("2026-10-18"),
+          goalPages: 1,
+        }),
+        ...Array.from({ length: 1998 }, (_, i) =>
+          node(`x${i}`, null, "chapter", `X${i}`, i + 2, { goalPages: 10_000 }),
+        ),
+      ]);
+
+      expect(pace()).toHaveTextContent("a conclusão ficaria a mais de 10 anos");
+      expect(pace()).not.toHaveTextContent("Previsão de conclusão");
+    });
+
+    it("shows no forecast for a finished book", () => {
+      renderPanel([
+        node("a", null, "chapter", "A", 0, doneOn("2026-10-01")),
+        node("b", null, "chapter", "B", 1, doneOn("2026-10-20")),
+      ]);
+
+      expect(bar("Progresso do livro")).toHaveAttribute("aria-valuenow", "100");
+      expect(pace()).toBeNull();
+    });
   });
 });

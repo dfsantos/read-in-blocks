@@ -259,7 +259,16 @@
     "chapters": "{completed} de {total} {total, plural, one {capítulo concluído} other {capítulos concluídos}}",
     "defaultWeight": "{count, plural, one {# item sem meta usa} other {# itens sem meta usam}} o peso padrão (a média das metas ao lado), o que pode distorcer o percentual. Defina as metas para um resultado mais fiel.",
     "sectionsLabel": "Progresso por parte e capítulo",
-    "sectionBar": "Progresso de {title}"
+    "sectionBar": "Progresso de {title}",
+    "pace": {
+      "title": "Ritmo e previsão",
+      "forecast": "Previsão de conclusão: {date}",
+      "rate": "Ritmo: {percent} do livro por semana, cerca de {perWeek} {perWeekCount, plural, one {item concluído} other {itens concluídos}} por semana ({count, plural, one {# item} other {# itens}} {days, plural, one {no último dia} other {nos últimos # dias}}).",
+      "rule": "Estimativa pelo ritmo das últimas 4 semanas, ponderado pelas metas em páginas, como o percentual.",
+      "insufficient": "Ainda não há dados para prever a conclusão: são necessárias ao menos 2 conclusões nas últimas 4 semanas, com a primeira feita há pelo menos 1 semana.",
+      "insufficientNow": "Até agora: {count, plural, =0 {nenhuma conclusão} one {# conclusão} other {# conclusões}} nas últimas 4 semanas.",
+      "tooSlow": "No ritmo das últimas 4 semanas, a conclusão ficaria a mais de 10 anos; conclua mais itens para ter uma previsão."
+    }
   },
   "notes": {
     "metadataTitle": "{title} — Caderno — Read in Blocks",

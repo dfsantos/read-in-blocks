@@ -11,8 +11,10 @@ import { BookStructure } from "@/components/structure/book-structure";
 import { TableOfContents } from "@/components/toc/table-of-contents";
 import { buttonVariants } from "@/components/ui/button";
 import { bookIdSchema } from "@/domain/books/book-input";
+import { calendarDay } from "@/domain/reading/status";
 import { buildTree } from "@/domain/structure/tree";
 import { Link } from "@/i18n/navigation";
+import { APP_TIME_ZONE } from "@/i18n/time-zone";
 import { editBookPath, LIBRARY_PATH } from "@/lib/routes";
 import {
   addNodes,
@@ -92,7 +94,10 @@ export default async function BookPage({ params }: Props) {
           action={deleteBook.bind(null, book.id)}
         />
       </div>
-      <ProgressPanel tree={tree} />
+      <ProgressPanel
+        tree={tree}
+        today={calendarDay(new Date(), APP_TIME_ZONE)}
+      />
       <MostNoted bookId={book.id} tree={tree} noteCounts={noteCounts} />
       <ContentsViews
         toc={
