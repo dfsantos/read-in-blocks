@@ -99,6 +99,7 @@
     "title": "Estrutura",
     "listLabel": "Estrutura do livro",
     "empty": "Nenhuma parte ou capítulo ainda. Cole a lista do sumário abaixo para começar.",
+    "reorderHint": "Arraste um item sobre outro do mesmo nível para reordenar, ou use Subir e Descer.",
     "kinds": {
       "part": "Parte",
       "chapter": "Capítulo",
@@ -134,6 +135,21 @@
     "details": {
       "goal": "{count, plural, one {# página} other {# páginas}}",
       "defaultWeight": "Peso padrão"
+    },
+    "move": {
+      "up": "Subir",
+      "upFor": "Subir {title}",
+      "down": "Descer",
+      "downFor": "Descer {title}",
+      "open": "Mover",
+      "openFor": "Mover {title}",
+      "close": "Fechar",
+      "closeFor": "Fechar a movimentação de {title}",
+      "destination": "Mover {title} para",
+      "root": "Direto no livro",
+      "submit": "Mover",
+      "submitting": "Movendo…",
+      "moved": "“{title}” foi movido."
     },
     "delete": {
       "open": "Excluir {title}",

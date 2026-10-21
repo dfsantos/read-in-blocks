@@ -12,6 +12,7 @@ import {
   addNodes,
   deleteNode,
   listNodes,
+  moveNode,
   updateNode,
 } from "@/server/repositories/book-nodes";
 import { createBook, deleteBook } from "@/server/repositories/books";
@@ -87,6 +88,8 @@ const nodesSpec: IsolationSpec<Owned> = {
         db,
       ),
     delete: (userId, target) => deleteNode(userId, target.nodeId, db),
+    move: (userId, target) =>
+      moveNode(userId, target.nodeId, { parentId: null, index: 0 }, db),
   },
 };
 
@@ -283,6 +286,188 @@ describe("book structure repository", () => {
     ]);
   });
 
+  async function outline(ownerId: string, bookId: string) {
+    const render = (nodes: ReturnType<typeof buildTree>): unknown[] =>
+      nodes.map((node) =>
+        node.children.length
+          ? [`${node.title}@${node.position}`, render(node.children)]
+          : `${node.title}@${node.position}`,
+      );
+    return render(buildTree(await listNodes(ownerId, bookId, db)));
+  }
+
+  async function sampleBook(ownerId: string) {
+    const bookId = await newBook(ownerId);
+    const root = await add(ownerId, bookId, null, "part", ["P1", "P2"]);
+    if (!root.ok) throw new Error("unexpected refusal");
+    const [p1, p2] = root.ids;
+    const inP1 = await add(ownerId, bookId, p1, "chapter", ["A", "B", "C"]);
+    const inP2 = await add(ownerId, bookId, p2, "chapter", ["D"]);
+    if (!inP1.ok || !inP2.ok) throw new Error("unexpected refusal");
+    const topics = await add(ownerId, bookId, inP1.ids[0], "topic", [
+      "a1",
+      "a2",
+    ]);
+    if (!topics.ok) throw new Error("unexpected refusal");
+    const [a, b, c] = inP1.ids;
+    return { bookId, p1, p2, a, b, c, d: inP2.ids[0], topics: topics.ids };
+  }
+
+  it.each([
+    ["up", "c", 1, ["A@0", "C@1", "B@2"]],
+    ["down", "a", 1, ["B@0", "A@1", "C@2"]],
+    ["to the end", "a", 2, ["B@0", "C@1", "A@2"]],
+    ["to the start", "c", 0, ["C@0", "A@1", "B@2"]],
+  ] as const)(
+    "reorders a chapter %s among its siblings",
+    async (_name, key, index, chapters) => {
+      const { owner } = await create();
+      const ids = await sampleBook(owner.id);
+      const p1 = ids.p1;
+
+      expect(
+        await moveNode(owner.id, ids[key], { parentId: p1, index }, db),
+      ).toEqual({
+        ok: true,
+      });
+
+      const p1Children = buildTree(await listNodes(owner.id, ids.bookId, db))[0]
+        .children;
+      expect(
+        p1Children.map((node) => `${node.title}@${node.position}`),
+      ).toEqual(chapters);
+    },
+  );
+
+  it("moves a chapter with its topics to another part and renumbers both parts", async () => {
+    const { owner } = await create();
+    const ids = await sampleBook(owner.id);
+
+    expect(
+      await moveNode(owner.id, ids.a, { parentId: ids.p2, index: 0 }, db),
+    ).toEqual({
+      ok: true,
+    });
+
+    expect(await outline(owner.id, ids.bookId)).toEqual([
+      ["P1@0", ["B@0", "C@1"]],
+      ["P2@1", [["A@0", ["a1@0", "a2@1"]], "D@1"]],
+    ]);
+  });
+
+  it("moves a chapter out of its part to the book's root, and a topic to another chapter", async () => {
+    const { owner } = await create();
+    const ids = await sampleBook(owner.id);
+
+    await moveNode(owner.id, ids.c, { parentId: null, index: 0 }, db);
+    await moveNode(owner.id, ids.topics[1], { parentId: ids.d, index: 5 }, db);
+
+    expect(await outline(owner.id, ids.bookId)).toEqual([
+      "C@0",
+      ["P1@1", [["A@0", ["a1@0"]], "B@1"]],
+      ["P2@2", [["D@0", ["a2@0"]]]],
+    ]);
+  });
+
+  it.each([
+    ["a part under a part", "p1", "p2"],
+    ["a chapter under a chapter", "a", "d"],
+    ["a topic at the root", "topic", null],
+    ["a chapter under its own topic", "a", "topic"],
+    ["a node under itself", "a", "a"],
+  ] as const)(
+    "refuses to move %s and changes nothing",
+    async (_name, key, parent) => {
+      const { owner } = await create();
+      const ids = await sampleBook(owner.id);
+      const pick = (name: string) =>
+        name === "topic" ? ids.topics[0] : ids[name as "a"];
+      const before = await outline(owner.id, ids.bookId);
+
+      expect(
+        await moveNode(
+          owner.id,
+          pick(key),
+          { parentId: parent === null ? null : pick(parent), index: 0 },
+          db,
+        ),
+      ).toEqual({ ok: false, reason: "invalidPlacement" });
+      expect(await outline(owner.id, ids.bookId)).toEqual(before);
+    },
+  );
+
+  it("refuses a parent from another book of the same reader", async () => {
+    const { owner } = await create();
+    const one = await sampleBook(owner.id);
+    const other = await sampleBook(owner.id);
+
+    expect(
+      await moveNode(owner.id, one.a, { parentId: other.p1, index: 0 }, db),
+    ).toEqual({
+      ok: false,
+      reason: "notFound",
+    });
+    expect(
+      await moveNode(owner.id, randomUUID(), { parentId: null, index: 0 }, db),
+    ).toEqual({
+      ok: false,
+      reason: "notFound",
+    });
+  });
+
+  it("refuses to move a reader's own node under another reader's node, like a missing parent", async () => {
+    const { owner, intruder } = await create();
+    const victim = await sampleBook(owner.id);
+    const own = await sampleBook(intruder.id);
+    const before = {
+      victim: await outline(owner.id, victim.bookId),
+      own: await outline(intruder.id, own.bookId),
+    };
+
+    const onForeign = await moveNode(
+      intruder.id,
+      own.a,
+      { parentId: victim.p1, index: 0 },
+      db,
+    );
+    const onMissing = await moveNode(
+      intruder.id,
+      own.a,
+      { parentId: randomUUID(), index: 0 },
+      db,
+    );
+
+    expect(onForeign).toEqual({ ok: false, reason: "notFound" });
+    expect(onMissing).toEqual(onForeign);
+    expect(await outline(owner.id, victim.bookId)).toEqual(before.victim);
+    expect(await outline(intruder.id, own.bookId)).toEqual(before.own);
+  });
+
+  it("keeps positions unique and gapless when moves race in the same book", async () => {
+    const { owner } = await create();
+    const ids = await sampleBook(owner.id);
+
+    const results = await Promise.all([
+      moveNode(owner.id, ids.a, { parentId: ids.p2, index: 0 }, db),
+      moveNode(owner.id, ids.b, { parentId: ids.p2, index: 0 }, db),
+      moveNode(owner.id, ids.c, { parentId: null, index: 1 }, db),
+      moveNode(owner.id, ids.d, { parentId: ids.p1, index: 0 }, db),
+    ]);
+
+    expect(results.every((result) => result.ok)).toBe(true);
+    const nodes = await listNodes(owner.id, ids.bookId, db);
+    const groups = new Map<string, number[]>();
+    for (const node of nodes) {
+      const key = node.parentId ?? "root";
+      groups.set(key, [...(groups.get(key) ?? []), node.position]);
+    }
+    for (const positions of groups.values()) {
+      expect(positions.sort((x, y) => x - y)).toEqual(
+        positions.map((_, i) => i),
+      );
+    }
+  });
+
   it("deletes a node with its whole subtree and nothing else", async () => {
     const { owner } = await create();
     const bookId = await newBook(owner.id);
@@ -411,6 +596,7 @@ describe("book structure repository", () => {
           db,
         ),
       () => deleteNode("", randomUUID(), db),
+      () => moveNode("", randomUUID(), { parentId: null, index: 0 }, db),
     ]) {
       await expect(call()).rejects.toThrow(
         "repository called without a userId",

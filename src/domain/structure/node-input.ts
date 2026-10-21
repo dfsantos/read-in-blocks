@@ -133,6 +133,15 @@ export const nodeDetailsSchema = z.object({
   goalPages: nodeGoalSchema,
 });
 
+// Where a node goes (US-012): a parent in the same book (null: the root) and its index among the
+// new siblings. The repository checks the parent's book and kind.
+export const moveNodeSchema = z.object({
+  parentId: nodeIdSchema.nullable(),
+  index: z.number().int().min(0).max(MAX_NODES_PER_BOOK),
+});
+
+export type MoveNodeInput = z.output<typeof moveNodeSchema>;
+
 // What the forms hold (strings) and what the server works with.
 export type AddNodesFormValues = z.input<typeof addNodesSchema>;
 export type AddNodesInput = z.output<typeof addNodesSchema>;

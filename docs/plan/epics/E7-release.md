@@ -16,6 +16,8 @@ Endurecimento e entrada em produção. Podem ser executadas assim que M6 estiver
 - [ ] Metadados, título de página por rota, favicon.
 - [ ] Desempenho verificado (Lighthouse/Speed Insights) nas páginas principais.
 
+**Notas técnicas (revisão de aceite da US-012):** na estrutura do livro, o botão Subir/Descer fica desabilitado quando o item chega à ponta e o foco se perde; o movimento já é anunciado por `role="status"`, mas o foco deve voltar ao item movido.
+
 ---
 
 ### US-026 — Auditoria de privacidade e segurança

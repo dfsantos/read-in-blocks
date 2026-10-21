@@ -1,23 +1,30 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { createContext, use, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { allowedChildKinds } from "@/domain/structure/hierarchy";
 import { effectiveWeights } from "@/domain/progress/weight";
-import type {
-  AddNodesFormValues,
-  NodeDetailsFormValues,
+import { allowedChildKinds } from "@/domain/structure/hierarchy";
+import { moveTargets } from "@/domain/structure/move";
+import {
+  MAX_NODES_PER_BOOK,
+  type AddNodesFormValues,
+  type MoveNodeInput,
+  type NodeDetailsFormValues,
 } from "@/domain/structure/node-input";
 import { countDescendants, type TreeNode } from "@/domain/structure/tree";
+import { useRouter } from "@/i18n/navigation";
 import type {
   AddNodesResult,
   DeleteNodeResult,
+  MoveNodeResult,
+  StructureErrorKey,
   UpdateNodeResult,
 } from "@/server/actions/book-nodes";
 
 import { AddNodesForm } from "./add-nodes-form";
+import { MoveNodeForm } from "./move-node-form";
 import { DeleteNodeButton, EditNodeForm } from "./node-actions";
 
 // The Server Actions, injected so tests can replace them; add is already bound to the book.
@@ -30,44 +37,86 @@ export type StructureActions = Readonly<{
     nodeId: string,
     input: NodeDetailsFormValues,
   ) => Promise<UpdateNodeResult>;
+  move: (nodeId: string, input: MoveNodeInput) => Promise<MoveNodeResult>;
   remove: (nodeId: string) => Promise<DeleteNodeResult>;
 }>;
+
+type Dragging = { id: string; parentId: string | null };
+
+// What every node needs from the whole structure: the actions, the tree (to list where a node may
+// move) and the node being dragged, if any.
+const StructureContext = createContext<{
+  actions: StructureActions;
+  roots: readonly TreeNode[];
+  dragging: Dragging | null;
+  setDragging: (dragging: Dragging | null) => void;
+  // Read out by screen readers after a reorder or move: the item may lose focus when it moves.
+  announce: (message: string) => void;
+} | null>(null);
+
+function useStructure() {
+  const context = use(StructureContext);
+  if (!context) throw new Error("useStructure outside BookStructure");
+  return context;
+}
 
 type Props = Readonly<{ tree: TreeNode[]; actions: StructureActions }>;
 
 // The book's structure as a simple nested list (US-010); the interactive table of contents arrives
-// in US-015. Each node can be edited (title, summary and goal, US-011), deleted with its subtree, and receive children of the kinds
-// the hierarchy allows. Titles are the reader's content: rendered as text, never as markup.
+// in US-015. Each node can be edited (title, summary and goal, US-011), reordered among its
+// siblings by dragging or with Subir/Descer, moved to another parent (US-012), deleted with its
+// subtree, and receive children of the kinds the hierarchy allows. Titles are the reader's
+// content: rendered as text, never as markup.
 export function BookStructure({ tree, actions }: Props) {
   const t = useTranslations("structure");
+  const [dragging, setDragging] = useState<Dragging | null>(null);
+  const [announcement, setAnnouncement] = useState("");
 
   return (
-    <section aria-labelledby="structure-title" className="flex flex-col gap-4">
-      <h2 id="structure-title" className="text-lg font-semibold">
-        {t("title")}
-      </h2>
-      {tree.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("empty")}</p>
-      ) : (
-        <NodeList nodes={tree} actions={actions} label={t("listLabel")} />
-      )}
-      <div className="flex flex-col gap-2 rounded-xl border p-4">
-        <h3 className="font-medium">{t("add.rootTitle")}</h3>
-        <AddNodesForm
-          parentId={null}
-          kinds={allowedChildKinds(null)}
-          action={actions.add}
-        />
-      </div>
-    </section>
+    <StructureContext
+      value={{
+        actions,
+        roots: tree,
+        dragging,
+        setDragging,
+        announce: setAnnouncement,
+      }}
+    >
+      <section
+        aria-labelledby="structure-title"
+        className="flex flex-col gap-4"
+      >
+        <h2 id="structure-title" className="text-lg font-semibold">
+          {t("title")}
+        </h2>
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
+        {tree.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("empty")}</p>
+        ) : (
+          <>
+            <p className="text-muted-foreground text-sm">{t("reorderHint")}</p>
+            <NodeList nodes={tree} label={t("listLabel")} />
+          </>
+        )}
+        <div className="flex flex-col gap-2 rounded-xl border p-4">
+          <h3 className="font-medium">{t("add.rootTitle")}</h3>
+          <AddNodesForm
+            parentId={null}
+            kinds={allowedChildKinds(null)}
+            action={actions.add}
+          />
+        </div>
+      </section>
+    </StructureContext>
   );
 }
 
 function NodeList({
   nodes,
-  actions,
   label,
-}: Readonly<{ nodes: TreeNode[]; actions: StructureActions; label?: string }>) {
+}: Readonly<{ nodes: TreeNode[]; label?: string }>) {
   // Weights are relative to the siblings (ADR-0009): a node without a goal is marked as taking
   // the default weight of its group.
   const weights = effectiveWeights(nodes);
@@ -80,8 +129,9 @@ function NodeList({
         <NodeItem
           key={node.id}
           node={node}
+          index={index}
+          siblings={nodes.length}
           defaultWeight={weights[index].isDefault}
-          actions={actions}
         />
       ))}
     </ul>
@@ -90,17 +140,49 @@ function NodeList({
 
 function NodeItem({
   node,
+  index,
+  siblings,
   defaultWeight,
-  actions,
 }: Readonly<{
   node: TreeNode;
+  index: number;
+  siblings: number;
   defaultWeight: boolean;
-  actions: StructureActions;
 }>) {
   const t = useTranslations("structure");
+  const router = useRouter();
+  const { actions, roots, dragging, setDragging, announce } = useStructure();
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [dropTarget, setDropTarget] = useState(false);
+  const [errorKey, setErrorKey] = useState<StructureErrorKey>();
   const childKinds = allowedChildKinds(node.kind);
+  const targets = moveTargets(roots, node);
+  // Only among siblings: moving elsewhere goes through "Mover" (US-012).
+  const canDrop =
+    dragging !== null &&
+    dragging.id !== node.id &&
+    dragging.parentId === node.parentId;
+
+  async function move(nodeId: string, input: MoveNodeInput) {
+    setErrorKey(undefined);
+    const result = await actions.move(nodeId, input);
+    if (result.ok) {
+      setMoving(false);
+      announce(t("move.moved", { title: titleOf(nodeId) }));
+      router.refresh();
+      return;
+    }
+    setErrorKey(result.errorKey);
+  }
+
+  // The moved node is this one, or a sibling dropped on it.
+  const titleOf = (nodeId: string) =>
+    nodeId === node.id ? node.title : findTitle(roots, nodeId);
+
+  const reorder = (to: number) =>
+    move(node.id, { parentId: node.parentId, index: to });
 
   return (
     <li className="flex flex-col gap-1">
@@ -111,7 +193,32 @@ function NodeItem({
           onDone={() => setEditing(false)}
         />
       ) : (
-        <div className="flex flex-col gap-0.5">
+        <div
+          draggable
+          data-drop-target={dropTarget || undefined}
+          onDragStart={(event) => {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", node.id);
+            setDragging({ id: node.id, parentId: node.parentId });
+          }}
+          onDragEnd={() => setDragging(null)}
+          onDragOver={(event) => {
+            if (!canDrop) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            setDropTarget(true);
+          }}
+          onDragLeave={() => setDropTarget(false)}
+          onDrop={(event) => {
+            setDropTarget(false);
+            if (!canDrop || !dragging) return;
+            event.preventDefault();
+            setDragging(null);
+            // The dragged node takes the place of the one it was dropped on (planMove).
+            void move(dragging.id, { parentId: node.parentId, index });
+          }}
+          className="data-drop-target:bg-muted flex cursor-grab flex-col gap-0.5 rounded-md"
+        >
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-muted-foreground text-xs uppercase">
               {t(`kinds.${node.kind}`)}
@@ -122,6 +229,37 @@ function NodeItem({
                 ? t("details.defaultWeight")
                 : t("details.goal", { count: node.goalPages ?? 0 })}
             </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={index === 0}
+              aria-label={t("move.upFor", { title: node.title })}
+              onClick={() => reorder(index - 1)}
+            >
+              {t("move.up")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={index === siblings - 1}
+              aria-label={t("move.downFor", { title: node.title })}
+              onClick={() => reorder(index + 1)}
+            >
+              {t("move.down")}
+            </Button>
+            {targets.length > 0 ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-expanded={moving}
+                aria-label={t(moving ? "move.closeFor" : "move.openFor", {
+                  title: node.title,
+                })}
+                onClick={() => setMoving((open) => !open)}
+              >
+                {moving ? t("move.close") : t("move.open")}
+              </Button>
+            ) : null}
             <Button
               size="sm"
               variant="ghost"
@@ -157,6 +295,25 @@ function NodeItem({
           ) : null}
         </div>
       )}
+      {errorKey ? (
+        <p role="alert" className="text-destructive text-sm">
+          {t(`errors.${errorKey}`)}
+        </p>
+      ) : null}
+      {moving ? (
+        <div className="ml-4 rounded-xl border p-3">
+          <MoveNodeForm
+            title={node.title}
+            targets={targets}
+            onMove={(parentId) =>
+              // To the end of the new siblings: no group is longer than a book, and the server
+              // clamps the index to the group's length.
+              move(node.id, { parentId, index: MAX_NODES_PER_BOOK })
+            }
+            onDone={() => setMoving(false)}
+          />
+        </div>
+      ) : null}
       {adding ? (
         <div className="ml-4 rounded-xl border p-3">
           <AddNodesForm
@@ -167,9 +324,16 @@ function NodeItem({
           />
         </div>
       ) : null}
-      {node.children.length > 0 ? (
-        <NodeList nodes={node.children} actions={actions} />
-      ) : null}
+      {node.children.length > 0 ? <NodeList nodes={node.children} /> : null}
     </li>
   );
+}
+
+function findTitle(nodes: readonly TreeNode[], id: string): string {
+  for (const node of nodes) {
+    if (node.id === id) return node.title;
+    const found = findTitle(node.children, id);
+    if (found) return found;
+  }
+  return "";
 }
