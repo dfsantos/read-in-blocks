@@ -50,6 +50,8 @@ const StructureContext = createContext<{
   roots: readonly TreeNode[];
   dragging: Dragging | null;
   setDragging: (dragging: Dragging | null) => void;
+  // Read out by screen readers after a reorder or move: the item may lose focus when it moves.
+  announce: (message: string) => void;
 } | null>(null);
 
 function useStructure() {
@@ -68,9 +70,18 @@ type Props = Readonly<{ tree: TreeNode[]; actions: StructureActions }>;
 export function BookStructure({ tree, actions }: Props) {
   const t = useTranslations("structure");
   const [dragging, setDragging] = useState<Dragging | null>(null);
+  const [announcement, setAnnouncement] = useState("");
 
   return (
-    <StructureContext value={{ actions, roots: tree, dragging, setDragging }}>
+    <StructureContext
+      value={{
+        actions,
+        roots: tree,
+        dragging,
+        setDragging,
+        announce: setAnnouncement,
+      }}
+    >
       <section
         aria-labelledby="structure-title"
         className="flex flex-col gap-4"
@@ -78,6 +89,9 @@ export function BookStructure({ tree, actions }: Props) {
         <h2 id="structure-title" className="text-lg font-semibold">
           {t("title")}
         </h2>
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
         {tree.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("empty")}</p>
         ) : (
@@ -137,7 +151,7 @@ function NodeItem({
 }>) {
   const t = useTranslations("structure");
   const router = useRouter();
-  const { actions, roots, dragging, setDragging } = useStructure();
+  const { actions, roots, dragging, setDragging, announce } = useStructure();
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -156,11 +170,16 @@ function NodeItem({
     const result = await actions.move(nodeId, input);
     if (result.ok) {
       setMoving(false);
+      announce(t("move.moved", { title: titleOf(nodeId) }));
       router.refresh();
       return;
     }
     setErrorKey(result.errorKey);
   }
+
+  // The moved node is this one, or a sibling dropped on it.
+  const titleOf = (nodeId: string) =>
+    nodeId === node.id ? node.title : findTitle(roots, nodeId);
 
   const reorder = (to: number) =>
     move(node.id, { parentId: node.parentId, index: to });
@@ -308,4 +327,13 @@ function NodeItem({
       {node.children.length > 0 ? <NodeList nodes={node.children} /> : null}
     </li>
   );
+}
+
+function findTitle(nodes: readonly TreeNode[], id: string): string {
+  for (const node of nodes) {
+    if (node.id === id) return node.title;
+    const found = findTitle(node.children, id);
+    if (found) return found;
+  }
+  return "";
 }

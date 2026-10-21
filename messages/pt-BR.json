@@ -148,7 +148,8 @@
       "destination": "Mover {title} para",
       "root": "Direto no livro",
       "submit": "Mover",
-      "submitting": "Movendo…"
+      "submitting": "Movendo…",
+      "moved": "“{title}” foi movido."
     },
     "delete": {
       "open": "Excluir {title}",

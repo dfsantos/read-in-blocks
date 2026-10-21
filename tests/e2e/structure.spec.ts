@@ -28,13 +28,15 @@ test("a reader builds, renames and prunes a book's structure", async ({
     await page.getByLabel("Tipo").selectOption("chapter");
     await page.getByLabel("Títulos", { exact: true }).fill("Prefácio");
     await page.getByRole("button", { name: "Adicionar", exact: true }).click();
-    await expect(page.getByRole("status")).toHaveText("1 item adicionado.");
+    // The add form's own status (the structure also has one for moves).
+    const added = page.getByRole("status").filter({ hasText: /adicionado/ });
+    await expect(added).toHaveText("1 item adicionado.");
     await page.getByLabel("Tipo").selectOption("part");
     await page
       .getByLabel("Títulos", { exact: true })
       .fill("Parte I\n\nParte II\n");
     await page.getByRole("button", { name: "Adicionar", exact: true }).click();
-    await expect(page.getByRole("status")).toHaveText("2 itens adicionados.");
+    await expect(added).toHaveText("2 itens adicionados.");
 
     const structure = page.getByRole("list", { name: "Estrutura do livro" });
     await expect(structure).toContainText("Prefácio");

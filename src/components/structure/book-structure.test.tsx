@@ -122,9 +122,11 @@ describe("BookStructure", () => {
     await user.click(screen.getByRole("button", { name: "Adicionar" }));
 
     await vi.waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent(
-        "2 itens adicionados.",
-      ),
+      expect(
+        within(
+          screen.getByLabelText("Títulos").closest("form") as HTMLFormElement,
+        ).getByRole("status"),
+      ).toHaveTextContent("2 itens adicionados."),
     );
     expect(actions.add).toHaveBeenCalledWith(null, {
       kind: "chapter",
@@ -334,6 +336,14 @@ describe("BookStructure", () => {
 
     await user.click(screen.getByRole("button", { name: "Subir Parte I" }));
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+    // Announced: the moved item may lose focus.
+    expect(
+      screen
+        .getAllByRole("status")
+        .some((status) =>
+          status.textContent?.includes("“Parte I” foi movido."),
+        ),
+    ).toBe(true);
     expect(actions.move).toHaveBeenLastCalledWith("p1", {
       parentId: null,
       index: 0,
