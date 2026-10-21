@@ -95,7 +95,7 @@ describe("BlocksView", () => {
   });
 
   it("shows each chapter's state, weighted progress, goal and notes, linking to its notebook", () => {
-    renderBlocks(NODES, { c1: 2 });
+    renderBlocks(NODES, { c1: 2, t2: 1, pre: 1 });
 
     const card = within(group("Parte I")).getAllByRole("listitem")[0];
     // User content is text, never markup.
@@ -107,12 +107,14 @@ describe("BlocksView", () => {
     expect(
       within(card).getByRole("progressbar", { name: "Progresso de <b>Um</b>" }),
     ).toHaveAttribute("aria-valuenow", "25");
-    expect(card).toHaveTextContent("Meta: 20 páginas · 2 anotações");
+    expect(card).toHaveTextContent("Meta: 20 páginas");
+    // Density (US-024): the chapter's notes and its topics', in words, never by color alone.
+    expect(card).toHaveTextContent("Muitas anotações: 3 anotações");
 
     const second = within(group("Parte I")).getAllByRole("listitem")[1];
     expect(second).toHaveTextContent("Não iniciado");
     expect(second).toHaveTextContent("Peso padrão");
-    expect(second).not.toHaveTextContent("anotaç");
+    expect(second).toHaveTextContent("Sem anotações: nenhuma anotação");
 
     const preface = screen.getAllByRole("listitem")[0];
     expect(preface).toHaveTextContent("Concluído");

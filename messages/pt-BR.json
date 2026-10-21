@@ -312,7 +312,6 @@
     "noPart": "Fora das partes",
     "emptyPart": "Nenhum capítulo nesta parte ainda.",
     "progressBar": "Progresso de {title}",
-    "notes": "{count, plural, one {# anotação} other {# anotações}}",
     "views": {
       "label": "Ver a estrutura como",
       "toc": "Sumário",
@@ -320,5 +319,20 @@
     },
     "title": "Blocos",
     "goal": "Meta: {goal}"
+  },
+  "density": {
+    "levels": {
+      "0": "Sem anotações",
+      "1": "Poucas anotações",
+      "2": "Algumas anotações",
+      "3": "Muitas anotações"
+    },
+    "label": "{level}: {count, plural, =0 {nenhuma anotação} one {# anotação} other {# anotações}}",
+    "mostNoted": {
+      "title": "Capítulos com mais anotações",
+      "empty": "Nenhuma anotação ainda. Os capítulos em que você mais anotar aparecem aqui.",
+      "listLabel": "Capítulos com mais anotações, do mais anotado ao menos",
+      "rule": "Cada capítulo conta as anotações dele e as dos seus tópicos."
+    }
   }
 }

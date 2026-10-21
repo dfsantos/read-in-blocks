@@ -5,6 +5,7 @@ import { cache } from "react";
 import { BlocksView } from "@/components/blocks/blocks-view";
 import { ContentsViews } from "@/components/blocks/contents-views";
 import { DeleteBookButton } from "@/components/books/delete-book-button";
+import { MostNoted } from "@/components/notes/most-noted";
 import { ProgressPanel } from "@/components/progress/progress-panel";
 import { BookStructure } from "@/components/structure/book-structure";
 import { TableOfContents } from "@/components/toc/table-of-contents";
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 // The book page (US-007), with its edit and delete actions (US-009), its weighted progress
-// (US-016), its interactive table of contents (US-015) or blocks view (US-017) with each node's notebook (US-018) and its structure of parts, chapters and
+// (US-016), the chapters with the most notes (US-024), its interactive table of contents (US-015) or blocks view (US-017) with each node's notebook (US-018) and its structure of parts, chapters and
 // topics (US-010).
 export default async function BookPage({ params }: Props) {
   const book = await loadBook((await params).bookId);
@@ -92,6 +93,7 @@ export default async function BookPage({ params }: Props) {
         />
       </div>
       <ProgressPanel tree={tree} />
+      <MostNoted bookId={book.id} tree={tree} noteCounts={noteCounts} />
       <ContentsViews
         toc={
           <TableOfContents

@@ -49,9 +49,11 @@ test("a reader builds, renames and prunes a book's structure", async ({
         exact: true,
       })
       .click();
-    await page.getByLabel("Capítulos").fill("1. Design\n2. Arquitetura");
     await page
-      .getByLabel("Capítulos")
+      .getByLabel("Capítulos", { exact: true })
+      .fill("1. Design\n2. Arquitetura");
+    await page
+      .getByLabel("Capítulos", { exact: true })
       .locator("xpath=ancestor::form")
       .getByRole("button", { name: "Adicionar", exact: true })
       .click();

@@ -22,6 +22,7 @@ test("a reader resumes a book from the library, takes a note and completes the c
     await expect(
       page.getByRole("heading", { level: 1, name: "Refactoring" }),
     ).toBeVisible();
+    await page.getByLabel("Tipo").selectOption("chapter");
     await page
       .getByLabel("Títulos", { exact: true })
       .fill("Princípios\nCheiros");
