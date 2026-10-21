@@ -144,6 +144,11 @@ describe("nodeDetailsSchema", () => {
     ],
     ["an infinite goal", { ...valid, goalPages: Infinity }, "goalInvalid"],
     ["a goal of the wrong type", { ...valid, goalPages: true }, "goalInvalid"],
+    [
+      "a very long goal",
+      { ...valid, goalPages: "9".repeat(1000) },
+      "goalInvalid",
+    ],
   ])("refuses %s", (_name, input, error) => {
     expect(errorOf(nodeDetailsSchema.safeParse(input))).toBe(error);
   });

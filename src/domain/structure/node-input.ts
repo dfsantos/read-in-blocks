@@ -99,9 +99,17 @@ export const nodeSummarySchema = z
 // Optional goal in whole pages (D-02). The form sends what was typed ("", "30"); a client may send
 // a number or null. Blank means no goal: the node takes the default weight (ADR-0009, US-011).
 export const nodeGoalSchema = z
-  .union([z.string(), z.number(), z.null()], {
-    error: nodeInputErrors.goalInvalid,
-  })
+  // 10 characters cover any goal in range with room for spaces; the regex never sees more.
+  .union(
+    [
+      z.string().max(10, { error: nodeInputErrors.goalInvalid }),
+      z.number(),
+      z.null(),
+    ],
+    {
+      error: nodeInputErrors.goalInvalid,
+    },
+  )
   .optional()
   .transform((goal, context) => {
     const text = typeof goal === "string" ? goal.trim() : goal;
