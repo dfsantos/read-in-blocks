@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 
 import { closeTestAuth, E2E_ACCOUNTS, seedSession } from "./auth-helpers";
 
-// US-018 and US-019: the reader opens a chapter's notebook from the table of contents, writes
+// US-018, US-019 and US-020: the reader opens a chapter's notebook from the table of contents, writes
 // formatted notes (toolbar, shortcuts, highlighted code), sees pasted and typed markup neutralized,
-// edits with automatic saving, deletes notes, sees the count in the table of contents, and another reader gets the
+// edits with automatic saving, gives notes a kind (a quote with its page, a resolved action) and
+// filters by kind, deletes notes, sees the count in the table of contents, and another reader gets the
 // 404 page for that notebook. Deleting the book takes the notes with it (D-09).
 test.afterAll(closeTestAuth);
 test.describe.configure({ mode: "serial" });
@@ -72,7 +73,10 @@ test("a reader keeps notes in a chapter's notebook", async ({
     await page.getByRole("button", { name: "Salvar anotação" }).click();
     await expect(page.getByText("1 anotação")).toBeVisible();
 
+    // The second one is a quote (US-020): its page is required.
     await page.getByRole("button", { name: "Escrever anotação" }).click();
+    await page.getByLabel("Tipo da anotação").selectOption("Citação");
+    await page.getByLabel("Página ou posição").fill("p. 42");
     await page
       .getByRole("textbox", { name: "Nova anotação" })
       .fill("<b>Plugins</b><script>window.pwned = 1</script>");
@@ -135,6 +139,34 @@ test("a reader keeps notes in a chapter's notebook", async ({
       "aponta para dentro sempre",
     );
     await expect(list.getByRole("listitem").nth(0)).toContainText("editada em");
+
+    // Kinds (US-020): the first one becomes an action, resolved; the filter shows each kind.
+    await expect(list.getByRole("listitem").nth(0)).toContainText(
+      "Conceito-chave",
+    );
+    await expect(list.getByRole("listitem").nth(1)).toContainText("Citação");
+    await expect(list.getByRole("listitem").nth(1)).toContainText("p. 42");
+    await list
+      .getByRole("listitem")
+      .nth(0)
+      .getByRole("button", { name: /^Editar a anotação de / })
+      .click();
+    await page.getByLabel("Tipo da anotação").selectOption("Ação/dúvida");
+    await expect(page.getByText("Salvo", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Concluir edição" }).click();
+    await list
+      .getByRole("listitem")
+      .nth(0)
+      .getByRole("button", { name: /^Marcar como resolvida a anotação de / })
+      .click();
+    await expect(list.getByRole("listitem").nth(0)).toContainText(
+      "Ação/dúvidaResolvida",
+    );
+    const filter = page.getByRole("group", { name: "Filtrar por tipo" });
+    await filter.getByRole("button", { name: "Citações (1)" }).click();
+    await expect(list.getByRole("listitem")).toHaveCount(1);
+    await expect(list.getByRole("listitem")).toContainText("Plugins");
+    await filter.getByRole("button", { name: "Todas (2)" }).click();
 
     // Delete the second one, after confirming.
     await list

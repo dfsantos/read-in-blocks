@@ -172,6 +172,11 @@ export const note = pgTable(
     nodeId: uuid("node_id").notNull(),
     body: text("body").notNull(),
     content: jsonb("content").$type<unknown>(),
+    // US-020 (src/domain/notes/note-type.ts): the note's kind, the page or position of a quote and
+    // when an action or question was resolved. Rows written before keep the default kind.
+    type: text("type").notNull().default("key_concept"),
+    reference: text("reference"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -209,6 +214,21 @@ export const note = pgTable(
     check(
       "note_content_shape",
       sql`${table.content} is null or (jsonb_typeof(${table.content}) = 'object' and char_length(${table.content}::text) <= 400000)`,
+    ),
+    check(
+      "note_type",
+      sql`${table.type} in ('key_concept', 'quote', 'action_or_question')`,
+    ),
+    // A quote always has its reference (1 to 50 characters); no other kind keeps one. The explicit
+    // `is not null` matters: a CHECK that evaluates to null passes.
+    check(
+      "note_reference",
+      sql`(${table.type} = 'quote' and ${table.reference} is not null and char_length(${table.reference}) between 1 and 50) or (${table.type} <> 'quote' and ${table.reference} is null)`,
+    ),
+    // Only an action or question is resolved.
+    check(
+      "note_resolved",
+      sql`${table.resolvedAt} is null or ${table.type} = 'action_or_question'`,
     ),
     ownerPolicy(),
   ],

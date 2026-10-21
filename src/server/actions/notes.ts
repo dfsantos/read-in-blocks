@@ -1,5 +1,7 @@
 "use server";
 
+import { z } from "zod";
+
 import {
   noteIdSchema,
   noteInputErrors,
@@ -12,6 +14,7 @@ import { fitsEditorSchema } from "@/server/notes/content-structure";
 import {
   createNote as insertNote,
   deleteNote as removeNote,
+  setNoteResolved as markResolved,
   updateNote as changeNote,
 } from "@/server/repositories/notes";
 import {
@@ -38,6 +41,9 @@ export type NoteResult = { ok: true } | NoteFailure;
 export type CreateNoteResult =
   { ok: true; id: string } | Extract<NoteResult, { ok: false }>;
 
+export type ResolveNoteResult =
+  { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
+
 export type DeleteNoteResult =
   { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
 
@@ -56,6 +62,13 @@ const UPDATE_NOTE_QUOTA = {
 const DELETE_NOTE_QUOTA = {
   action: "notes.delete",
   limit: 30,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+
+// Resolving is one click per action or question; a reader never needs 60 a minute.
+const RESOLVE_NOTE_QUOTA = {
+  action: "notes.resolve",
+  limit: 60,
   windowSeconds: 60,
 } satisfies WriteQuota;
 
@@ -153,6 +166,30 @@ export async function updateNote(
       : { ok: false, errorKey: "notFound" };
   } catch (error) {
     logFailure(UPDATE_NOTE_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+// Marks an action or question as resolved, or open again (US-020). Any other kind of note is
+// answered like a missing one.
+export async function setNoteResolved(
+  noteId: unknown,
+  resolved: unknown,
+): Promise<ResolveNoteResult> {
+  const id = noteIdSchema.safeParse(noteId);
+  const flag = z.boolean().safeParse(resolved);
+  const user = await requireUser();
+  if (!id.success || !flag.success) return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, RESOLVE_NOTE_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    return (await markResolved(user.id, id.data, flag.data))
+      ? { ok: true }
+      : { ok: false, errorKey: "notFound" };
+  } catch (error) {
+    logFailure(RESOLVE_NOTE_QUOTA.action, error);
     return { ok: false, errorKey: "failed" };
   }
 }

@@ -1,6 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import {
+  CircleCheckIcon,
+  CircleHelpIcon,
+  LightbulbIcon,
+  QuoteIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useId, useRef, useState, type ReactNode } from "react";
 
@@ -16,15 +23,32 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import {
+  NOTE_REFERENCE_MAX,
+  NOTE_TYPES,
+  type NoteType,
+} from "@/domain/notes/note-type";
 import type { NoteDoc } from "@/domain/notes/rich-text";
 import { useRouter } from "@/i18n/navigation";
 import type {
   CreateNoteResult,
   DeleteNoteResult,
+  NoteErrorKey,
   NoteResult,
+  ResolveNoteResult,
 } from "@/server/actions/notes";
 
-import { useAutosave, type AutosaveStatus } from "./use-autosave";
+import {
+  useAutosave,
+  type AutosaveStatus,
+  type NoteDraft,
+} from "./use-autosave";
 
 // The editor (Tiptap, ProseMirror and the highlighter) is downloaded only when the reader starts
 // writing or editing (US-019): reading a notebook never pays for it.
@@ -48,17 +72,29 @@ export type NotebookNote = Readonly<{
   content: NoteDoc;
   // Its read-only view, rendered on the server (NoteContent).
   view: ReactNode;
+  // Its kind (US-020): a quote's reference, an action or question's resolution.
+  type: NoteType;
+  reference: string | null;
+  resolvedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }>;
 
-export type NoteInputPayload = { content: unknown };
-
 export type NotebookActions = Readonly<{
-  create: (input: NoteInputPayload) => Promise<CreateNoteResult>;
-  update: (noteId: string, input: NoteInputPayload) => Promise<NoteResult>;
+  create: (input: NoteDraft) => Promise<CreateNoteResult>;
+  update: (noteId: string, input: NoteDraft) => Promise<NoteResult>;
+  resolve: (noteId: string, resolved: boolean) => Promise<ResolveNoteResult>;
   remove: (noteId: string) => Promise<DeleteNoteResult>;
 }>;
+
+// Each kind is told by its icon and its label, never by color alone.
+const TYPE_ICONS: Record<NoteType, LucideIcon> = {
+  key_concept: LightbulbIcon,
+  quote: QuoteIcon,
+  action_or_question: CircleHelpIcon,
+};
+
+type Filter = "all" | NoteType;
 
 type Props = Readonly<{
   // The node's title, for the labels of the list.
@@ -76,13 +112,17 @@ function useStamp() {
 }
 
 // A node's notebook (US-018, RF-005): its notes in chronological order, each with when it was
-// written and last edited, and the means to add, edit (rich text, saved on its own, US-019) and
-// delete (with confirmation) notes. Notes are the reader's content: shown through the read-only
+// written and last edited, its kind (US-020) and the means to add, edit (rich text, saved on its
+// own, US-019), resolve (actions and questions) and delete (with confirmation) notes; the list can
+// be filtered by kind. Notes are the reader's content: shown through the read-only
 // view, never as markup. The page refreshes its data without reloading (router.refresh).
 export function Notebook({ title, notes, actions }: Props) {
   const t = useTranslations("notes");
   const headingId = useId();
   const [announcement, setAnnouncement] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const shown =
+    filter === "all" ? notes : notes.filter((note) => note.type === filter);
 
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-4">
@@ -100,11 +140,17 @@ export function Notebook({ title, notes, actions }: Props) {
       {notes.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("empty")}</p>
       ) : (
+        <TypeFilter notes={notes} filter={filter} onChange={setFilter} />
+      )}
+      {notes.length > 0 && shown.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("filter.empty")}</p>
+      ) : null}
+      {shown.length === 0 ? null : (
         <ol
           aria-label={t("listLabel", { title })}
           className="flex flex-col gap-3"
         >
-          {notes.map((note) => (
+          {shown.map((note) => (
             <NoteItem
               key={note.id}
               note={note}
@@ -117,6 +163,155 @@ export function Notebook({ title, notes, actions }: Props) {
       <AddNote actions={actions} announce={setAnnouncement} />
     </section>
   );
+}
+
+// Shows all notes or those of one kind, with how many each has.
+function TypeFilter({
+  notes,
+  filter,
+  onChange,
+}: Readonly<{
+  notes: readonly NotebookNote[];
+  filter: Filter;
+  onChange: (filter: Filter) => void;
+}>) {
+  const t = useTranslations("notes.filter");
+  const options: Filter[] = ["all", ...NOTE_TYPES];
+  return (
+    <div role="group" aria-label={t("label")} className="flex flex-wrap gap-1">
+      {options.map((option) => {
+        const Icon = option === "all" ? undefined : TYPE_ICONS[option];
+        const count =
+          option === "all"
+            ? notes.length
+            : notes.filter((note) => note.type === option).length;
+        return (
+          <Button
+            key={option}
+            type="button"
+            size="sm"
+            variant={filter === option ? "secondary" : "ghost"}
+            aria-pressed={filter === option}
+            onClick={() => onChange(option)}
+          >
+            {Icon ? <Icon aria-hidden="true" /> : null}
+            {t(option, { count })}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+// The kind of a note in the list: icon and label, a quote's reference and whether an action or
+// question was resolved.
+function KindBadge({ note }: Readonly<{ note: NotebookNote }>) {
+  const t = useTranslations("notes");
+  const Icon = TYPE_ICONS[note.type];
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
+      <span className="bg-muted inline-flex items-center gap-1 rounded-md px-1.5 py-0.5">
+        <Icon aria-hidden="true" className="size-3.5" />
+        {t(`types.${note.type}`)}
+      </span>
+      {note.reference ? (
+        <span className="text-muted-foreground break-all">
+          {note.reference}
+        </span>
+      ) : null}
+      {note.type === "action_or_question" && note.resolvedAt ? (
+        <span className="inline-flex items-center gap-1">
+          <CircleCheckIcon aria-hidden="true" className="size-3.5" />
+          {t("resolve.resolved")}
+        </span>
+      ) : null}
+    </p>
+  );
+}
+
+// The kind fields above the editor: the type and, for a quote, its page or position.
+function KindFields({
+  type,
+  reference,
+  errorKey,
+  onChange,
+}: Readonly<{
+  type: NoteType;
+  reference: string;
+  errorKey?: NoteErrorKey;
+  onChange: (patch: { type?: NoteType; reference?: string }) => void;
+}>) {
+  const t = useTranslations("notes");
+  const id = useId();
+  const referenceInvalid = errorKey?.startsWith("reference") ?? false;
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <Field className="w-auto">
+        <FieldLabel htmlFor={`${id}-type`}>{t("kind.label")}</FieldLabel>
+        <NativeSelect
+          id={`${id}-type`}
+          value={type}
+          onChange={(event) =>
+            onChange({ type: event.target.value as NoteType })
+          }
+        >
+          {NOTE_TYPES.map((option) => (
+            <NativeSelectOption key={option} value={option}>
+              {t(`types.${option}`)}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </Field>
+      {type === "quote" ? (
+        <Field
+          className="w-auto"
+          data-invalid={referenceInvalid ? true : undefined}
+        >
+          <FieldLabel htmlFor={`${id}-reference`}>
+            {t("kind.reference")}
+          </FieldLabel>
+          <Input
+            id={`${id}-reference`}
+            value={reference}
+            maxLength={NOTE_REFERENCE_MAX}
+            placeholder={t("kind.referencePlaceholder")}
+            aria-invalid={referenceInvalid ? true : undefined}
+            onChange={(event) => onChange({ reference: event.target.value })}
+          />
+        </Field>
+      ) : null}
+    </div>
+  );
+}
+
+// The note being written: its latest document and kind, sent whole on every change once there is a
+// document (a kind alone is not a note yet).
+function useDraft(
+  initial: { content?: unknown; type: NoteType; reference: string },
+  schedule: (draft: NoteDraft) => void,
+) {
+  const draft = useRef(initial);
+  const [kind, setKind] = useState({
+    type: initial.type,
+    reference: initial.reference,
+  });
+  function change(patch: {
+    content?: unknown;
+    type?: NoteType;
+    reference?: string;
+  }) {
+    draft.current = { ...draft.current, ...patch };
+    setKind({ type: draft.current.type, reference: draft.current.reference });
+    if (draft.current.content !== undefined) {
+      schedule({
+        content: draft.current.content,
+        type: draft.current.type,
+        reference:
+          draft.current.type === "quote" ? draft.current.reference : undefined,
+      });
+    }
+  }
+  return { kind, change };
 }
 
 function AddNote({
@@ -176,6 +371,12 @@ function NewNote({
     setCreated(true);
     return { ok: true };
   });
+  const draft = useDraft(
+    { type: "key_concept", reference: "" },
+    autosave.schedule,
+  );
+  const failedKey =
+    autosave.status.kind === "failed" ? autosave.status.errorKey : undefined;
 
   async function save() {
     setClosing(true);
@@ -191,15 +392,21 @@ function NewNote({
 
   return (
     <div className="flex flex-col gap-2">
+      <KindFields
+        type={draft.kind.type}
+        reference={draft.kind.reference}
+        errorKey={failedKey}
+        onChange={draft.change}
+      />
       <span aria-hidden="true" className="text-sm font-medium">
         {t("add.label")}
       </span>
       <NoteEditor
         label={t("add.label")}
         autoFocus
-        invalid={autosave.status.kind === "failed"}
+        invalid={failedKey !== undefined && !failedKey.startsWith("reference")}
         describedBy={`${id}-status`}
-        onUpdate={autosave.schedule}
+        onUpdate={(content) => draft.change({ content })}
         onSubmit={() => void save()}
       />
       <AutosaveIndicator status={autosave.status} id={`${id}-status`} />
@@ -264,8 +471,17 @@ function NoteItem({
         />
       ) : (
         <>
+          <KindBadge note={note} />
           {note.view}
           <div className="flex flex-wrap gap-2">
+            {note.type === "action_or_question" ? (
+              <ResolveButton
+                note={note}
+                date={created}
+                resolve={actions.resolve}
+                announce={announce}
+              />
+            ) : null}
             <Button
               size="sm"
               variant="ghost"
@@ -333,7 +549,16 @@ function EditNote({
   const id = useId();
   const autosave = useAutosave((input) => update(note.id, input));
   const [closing, setClosing] = useState(false);
-  const failed = autosave.status.kind === "failed";
+  const draft = useDraft(
+    {
+      content: note.content,
+      type: note.type,
+      reference: note.reference ?? "",
+    },
+    autosave.schedule,
+  );
+  const failedKey =
+    autosave.status.kind === "failed" ? autosave.status.errorKey : undefined;
 
   async function done() {
     const changed = autosave.status.kind !== "idle";
@@ -348,13 +573,19 @@ function EditNote({
 
   return (
     <div className="flex flex-col gap-2">
+      <KindFields
+        type={draft.kind.type}
+        reference={draft.kind.reference}
+        errorKey={failedKey}
+        onChange={draft.change}
+      />
       <NoteEditor
         label={t("edit.label")}
         initialContent={note.content}
         autoFocus
-        invalid={failed}
+        invalid={failedKey !== undefined && !failedKey.startsWith("reference")}
         describedBy={`${id}-status`}
-        onUpdate={autosave.schedule}
+        onUpdate={(content) => draft.change({ content })}
         onSubmit={() => void done()}
       />
       <AutosaveIndicator status={autosave.status} id={`${id}-status`} />
@@ -368,6 +599,59 @@ function EditNote({
         {t("edit.done")}
       </Button>
     </div>
+  );
+}
+
+// Marks an action or question as resolved, or opens it again (US-020).
+function ResolveButton({
+  note,
+  date,
+  resolve,
+  announce,
+}: Readonly<{
+  note: NotebookNote;
+  date: string;
+  resolve: NotebookActions["resolve"];
+  announce: (message: string) => void;
+}>) {
+  const t = useTranslations("notes");
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [errorKey, setErrorKey] = useState<NoteErrorKey>();
+  const resolved = note.resolvedAt !== null;
+
+  async function toggle() {
+    setPending(true);
+    setErrorKey(undefined);
+    const result = await resolve(note.id, !resolved);
+    setPending(false);
+    if (!result.ok) {
+      setErrorKey(result.errorKey);
+      return;
+    }
+    announce(t(resolved ? "resolve.reopened" : "resolve.marked"));
+    router.refresh();
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={pending}
+        aria-label={t(resolved ? "resolve.reopenFor" : "resolve.markFor", {
+          date,
+        })}
+        onClick={() => void toggle()}
+      >
+        {t(resolved ? "resolve.reopen" : "resolve.mark")}
+      </Button>
+      {errorKey ? (
+        <p role="alert" className="text-destructive basis-full text-sm">
+          {t(`errors.${errorKey}`)}
+        </p>
+      ) : null}
+    </>
   );
 }
 

@@ -31,19 +31,24 @@ export function useLeaveGuard(active: boolean) {
   }, [active]);
 }
 
+// What the notebook sends for a note: its document, its kind and a quote's reference (US-020).
+export type NoteDraft = {
+  content: unknown;
+  type: unknown;
+  reference?: unknown;
+};
+
 // The client check only spares a round trip: the Server Action parses again.
-export function checkNote(content: unknown): NoteErrorKey | undefined {
-  const parsed = noteInputSchema.safeParse({ content });
+export function checkNote(draft: NoteDraft): NoteErrorKey | undefined {
+  const parsed = noteInputSchema.safeParse(draft);
   return parsed.success
     ? undefined
     : (parsed.error.issues[0].message as NoteErrorKey);
 }
 
-export function useAutosave(
-  save: (input: { content: unknown }) => Promise<NoteResult>,
-) {
+export function useAutosave(save: (input: NoteDraft) => Promise<NoteResult>) {
   const [status, setStatus] = useState<AutosaveStatus>({ kind: "idle" });
-  const pending = useRef<{ content: unknown } | undefined>(undefined);
+  const pending = useRef<NoteDraft | undefined>(undefined);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const running = useRef<Promise<boolean> | undefined>(undefined);
   const saveRef = useRef(save);
@@ -58,7 +63,7 @@ export function useAutosave(
     const next = pending.current;
     if (!next) return true;
 
-    const invalid = checkNote(next.content);
+    const invalid = checkNote(next);
     if (invalid) {
       setStatus({ kind: "failed", errorKey: invalid });
       return false;
@@ -90,8 +95,8 @@ export function useAutosave(
   }, []);
 
   const schedule = useCallback(
-    (content: unknown) => {
-      pending.current = { content };
+    (draft: NoteDraft) => {
+      pending.current = draft;
       setStatus({ kind: "unsaved" });
       clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(), AUTOSAVE_DELAY_MS);
@@ -104,7 +109,7 @@ export function useAutosave(
     () => () => {
       clearTimeout(timer.current);
       const next = pending.current;
-      if (next && !checkNote(next.content)) void saveRef.current(next);
+      if (next && !checkNote(next)) void saveRef.current(next);
     },
     [],
   );
