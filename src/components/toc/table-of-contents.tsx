@@ -10,7 +10,7 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DerivedReading,
   ReadingControls,
@@ -27,7 +27,9 @@ import {
   type FlatNode,
   type TreeNode,
 } from "@/domain/structure/tree";
+import { Link } from "@/i18n/navigation";
 import { APP_TIME_ZONE } from "@/i18n/time-zone";
+import { nodePath } from "@/lib/routes";
 
 import { keyEffect, parentIds, visibleItems } from "./tree-keys";
 
@@ -36,6 +38,8 @@ type Props = Readonly<{
   // The book's nodes as stored; the tree (and every parent's derived state) is built here, so a
   // change shows up in the ancestors before the server answers.
   nodes: readonly FlatNode[];
+  // How many notes each node's notebook holds (US-018); nodes without notes may be left out.
+  noteCounts: Readonly<Record<string, number>>;
   // The reading Server Actions; injected so tests can replace them.
   actions: ReadingActions;
 }>;
@@ -106,7 +110,7 @@ const today = () => calendarDay(new Date(), APP_TIME_ZONE);
 // its details (summary, goal and state), where a leaf's state can change: the new state shows in
 // the tree and in its ancestors right away, then the page data refreshes. Titles are the reader's
 // content: rendered as text, never as markup.
-export function TableOfContents({ bookId, nodes, actions }: Props) {
+export function TableOfContents({ bookId, nodes, noteCounts, actions }: Props) {
   const t = useTranslations("toc");
   const treeId = useId();
   // Leaf states changed here and not yet back from the server.
@@ -284,12 +288,15 @@ export function TableOfContents({ bookId, nodes, actions }: Props) {
                   onToggle={toggle}
                   onSelect={select}
                   onFocusItem={setFocusedId}
+                  noteCounts={noteCounts}
                 />
               ))}
             </ul>
           </div>
           <NodeDetails
+            bookId={bookId}
             node={selected}
+            notes={selected ? (noteCounts[selected.id] ?? 0) : 0}
             actions={detailActions}
             announce={setAnnouncement}
           />
@@ -311,6 +318,7 @@ function TreeItem({
   onToggle,
   onSelect,
   onFocusItem,
+  noteCounts,
 }: Readonly<{
   node: TreeNode;
   level: number;
@@ -323,10 +331,12 @@ function TreeItem({
   onToggle: (id: string, expand: boolean) => void;
   onSelect: (id: string) => void;
   onFocusItem: (id: string) => void;
+  noteCounts: Readonly<Record<string, number>>;
 }>) {
   const t = useTranslations("toc");
   const tStructure = useTranslations("structure");
   const labelId = useId();
+  const notes = noteCounts[node.id] ?? 0;
   const hasChildren = node.children.length > 0;
   const expanded = hasChildren && !collapsed.has(node.id);
   const count = countLeaves(node);
@@ -380,6 +390,7 @@ function TreeItem({
             {hasChildren
               ? ` · ${t("progress", { completed: count.completed, total: count.total })}`
               : null}
+            {notes > 0 ? ` · ${t("notes", { count: notes })}` : null}
           </span>
         </span>
         {hasChildren ? (
@@ -415,6 +426,7 @@ function TreeItem({
               onToggle={onToggle}
               onSelect={onSelect}
               onFocusItem={onFocusItem}
+              noteCounts={noteCounts}
             />
           ))}
         </ul>
@@ -424,11 +436,15 @@ function TreeItem({
 }
 
 function NodeDetails({
+  bookId,
   node,
+  notes,
   actions,
   announce,
 }: Readonly<{
+  bookId: string;
   node: TreeNode | undefined;
+  notes: number;
   actions: ReadingActions;
   announce: (message: string) => void;
 }>) {
@@ -471,6 +487,20 @@ function NodeDetails({
             {node.goalPages === null
               ? tStructure("details.defaultWeight")
               : tStructure("details.goal", { count: node.goalPages })}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground text-xs">
+            {t("details.notes")}
+          </dt>
+          <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>{t("notes", { count: notes })}</span>
+            <Link
+              href={nodePath(bookId, node.id)}
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+            >
+              {t("details.openNotebook")}
+            </Link>
           </dd>
         </div>
       </dl>

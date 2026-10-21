@@ -10,7 +10,10 @@ import messages from "../../../messages/pt-BR.json";
 
 const refresh = vi.hoisted(() => vi.fn());
 // next-intl's navigation does not load outside Next.js.
-vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("@/i18n/navigation", () => ({
+  Link: (props: React.ComponentProps<"a">) => <a {...props} />,
+  useRouter: () => ({ refresh }),
+}));
 
 import { TableOfContents } from "./table-of-contents";
 
@@ -60,7 +63,11 @@ let books = 0;
 
 function renderToc(
   overrides: Partial<ReadingActions> = {},
-  { bookId = `book-${++books}`, nodes = NODES } = {},
+  {
+    bookId = `book-${++books}`,
+    nodes = NODES,
+    noteCounts = {} as Record<string, number>,
+  } = {},
 ) {
   const actions = {
     setStatus: vi.fn().mockResolvedValue({ ok: true }),
@@ -76,7 +83,12 @@ function renderToc(
       messages={messages}
       timeZone="America/Sao_Paulo"
     >
-      <TableOfContents bookId={bookId} nodes={list} actions={actions} />
+      <TableOfContents
+        bookId={bookId}
+        nodes={list}
+        noteCounts={noteCounts}
+        actions={actions}
+      />
     </NextIntlClientProvider>
   );
   const result = render(view(nodes));
@@ -119,6 +131,31 @@ describe("TableOfContents", () => {
     expect(item("Um")).toHaveAttribute("aria-level", "2");
     expect(item("1.1")).toHaveAttribute("aria-level", "3");
     expect(item("1.1")).toHaveAttribute("aria-setsize", "2");
+  });
+
+  it("shows how many notes each node's notebook holds, and opens it from the details", async () => {
+    const { user, bookId } = renderToc({}, { noteCounts: { c1: 2, t1: 1 } });
+
+    expect(item("Um")).toHaveAccessibleName(
+      "Um Em andamento · 1 de 2 concluídos · 2 anotações",
+    );
+    expect(item("1.1")).toHaveAccessibleName("1.1 Não iniciado · 1 anotação");
+    // No count on a node without notes.
+    expect(item("Dois")).toHaveAccessibleName("Dois Não iniciado");
+
+    await user.click(item("Um"));
+    const details = screen.getByRole("complementary", { name: "Um" });
+    expect(within(details).getByText("2 anotações")).toBeInTheDocument();
+    expect(
+      within(details).getByRole("link", { name: "Abrir caderno" }),
+    ).toHaveAttribute("href", `/books/${bookId}/nodes/c1`);
+
+    await user.click(item("Dois"));
+    expect(
+      within(screen.getByRole("complementary", { name: "Dois" })).getByText(
+        "sem anotações",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("invites the reader to build the structure when the book has none", () => {
