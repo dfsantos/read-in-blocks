@@ -61,6 +61,8 @@ pnpm dev
 
 **Estado de nós com filhos (US-014, D-20).** O estado e as datas de um nó com filhos são sempre derivados dos filhos (`src/domain/reading/derived.ts`, aplicado em `buildTree`) e nunca gravados: a linha de um pai fica sempre em `not_started`, sem datas. Os repositórios zeram a linha quando o nó ganha o primeiro filho (`addNodes`, `moveNode`), e a migração `0009` (só dados, idempotente) zerou as que já estavam assim.
 
+**Anotações (US-018).** A tabela `note` (migração `0010`, só criação) guarda cada anotação do caderno de um nó, em texto simples (`body`, 1 a 10.000 caracteres; o conteúdo rico do ADR-0007 chega na US-019 com nova coluna). Tem `owner_id`, `book_id` e `node_id`, a política de dono e duas FKs compostas com o dono, ambas em cascata: `(owner_id, book_id)` → `book (owner_id, id)` e `(owner_id, book_id, node_id)` → `book_node (owner_id, book_id, id)`. Assim uma anotação só pende de um nó do mesmo dono e do mesmo livro, e excluir o livro ou o nó (com a subárvore) apaga as anotações (D-09). O índice `(owner_id, book_id, node_id, created_at)` atende às duas cascatas, à contagem por nó do sumário e à lista do caderno em ordem cronológica. O repositório limita 500 anotações por nó, contando sob `FOR UPDATE` na linha do nó.
+
 ## RLS nas tabelas de conteúdo
 
 Segunda barreira do isolamento ([ADR-0008](../adr/0008-data-isolation-per-user.md), item 6; US-033). O filtro de dono dos repositórios (`ownedBy`) continua obrigatório; o RLS pega o filtro esquecido.
