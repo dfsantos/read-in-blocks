@@ -185,7 +185,8 @@ export async function updateNode(
 }
 
 // Whether the reader's node was deleted, with its whole subtree (book_node_parent_fk cascades):
-// false both for a missing node and for someone else's.
+// false both for a missing node and for someone else's. Takes the book lock like addNodes and
+// moveNode, so a deletion never runs in the middle of a reorder (security review, US-012).
 export async function deleteNode(
   userId: string,
   nodeId: string,
@@ -194,6 +195,15 @@ export async function deleteNode(
   return withOwner(
     userId,
     async (tx) => {
+      const [node] = await tx
+        .select({ bookId: bookNode.bookId })
+        .from(bookNode)
+        .where(ownedBy(bookNode.ownerId, userId, eq(bookNode.id, nodeId)))
+        .limit(1);
+      if (!node) return false;
+      await tx.execute(
+        sql`select ${book.id} from ${book} where ${ownedBy(book.ownerId, userId, eq(book.id, node.bookId))} for update`,
+      );
       const deleted = await tx
         .delete(bookNode)
         .where(ownedBy(bookNode.ownerId, userId, eq(bookNode.id, nodeId)))

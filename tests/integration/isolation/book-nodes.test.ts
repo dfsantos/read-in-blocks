@@ -415,6 +415,34 @@ describe("book structure repository", () => {
     });
   });
 
+  it("refuses to move a reader's own node under another reader's node, like a missing parent", async () => {
+    const { owner, intruder } = await create();
+    const victim = await sampleBook(owner.id);
+    const own = await sampleBook(intruder.id);
+    const before = {
+      victim: await outline(owner.id, victim.bookId),
+      own: await outline(intruder.id, own.bookId),
+    };
+
+    const onForeign = await moveNode(
+      intruder.id,
+      own.a,
+      { parentId: victim.p1, index: 0 },
+      db,
+    );
+    const onMissing = await moveNode(
+      intruder.id,
+      own.a,
+      { parentId: randomUUID(), index: 0 },
+      db,
+    );
+
+    expect(onForeign).toEqual({ ok: false, reason: "notFound" });
+    expect(onMissing).toEqual(onForeign);
+    expect(await outline(owner.id, victim.bookId)).toEqual(before.victim);
+    expect(await outline(intruder.id, own.bookId)).toEqual(before.own);
+  });
+
   it("keeps positions unique and gapless when moves race in the same book", async () => {
     const { owner } = await create();
     const ids = await sampleBook(owner.id);

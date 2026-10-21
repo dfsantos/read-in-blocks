@@ -321,6 +321,28 @@ describe("book structure Server Actions", () => {
     });
   });
 
+  it("refuses to move the reader's chapter under another reader's part", async () => {
+    const { owner, intruder } = await create();
+    const victim = await bookWithChapter(owner.id);
+    signIn(owner);
+    await addNodes(victim.bookId, null, { kind: "part", titles: "Parte" });
+    const victimPart = (await listNodes(owner.id, victim.bookId, db)).find(
+      (node) => node.kind === "part",
+    );
+    const own = await bookWithChapter(intruder.id);
+    signIn(intruder);
+
+    expect(
+      await moveNode(own.nodeId, { parentId: victimPart?.id, index: 0 }),
+    ).toEqual({
+      ok: false,
+      errorKey: "notFound",
+    });
+    expect(await listNodes(intruder.id, own.bookId, db)).toMatchObject([
+      { id: own.nodeId, parentId: null },
+    ]);
+  });
+
   it.each([
     ["an index as text", { parentId: null, index: "0" }],
     ["a negative index", { parentId: null, index: -1 }],
