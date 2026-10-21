@@ -3,7 +3,10 @@ import { and, asc, count, eq, isNull, max, sql } from "drizzle-orm";
 import { getDb, type Database } from "@/db/client";
 import { book, bookNode } from "@/db/schema";
 import { canPlace, type NodeKind } from "@/domain/structure/hierarchy";
-import { MAX_NODES_PER_BOOK } from "@/domain/structure/node-input";
+import {
+  MAX_NODES_PER_BOOK,
+  type NodeDetails,
+} from "@/domain/structure/node-input";
 import type { FlatNode } from "@/domain/structure/tree";
 
 import { ownedBy } from "./owner-scope";
@@ -20,16 +23,14 @@ const nodeColumns = {
   kind: bookNode.kind,
   title: bookNode.title,
   position: bookNode.position,
+  summary: bookNode.summary,
+  goalPages: bookNode.goalPages,
 };
 
 // The kind column is text with a CHECK constraint (book_node_kind): it only holds NodeKind values.
-const asFlatNode = (row: {
-  id: string;
-  parentId: string | null;
-  kind: string;
-  title: string;
-  position: number;
-}): FlatNode => ({ ...row, kind: row.kind as NodeKind });
+const asFlatNode = (
+  row: Omit<FlatNode, "kind"> & { kind: string },
+): FlatNode => ({ ...row, kind: row.kind as NodeKind });
 
 // Every node of the reader's book, in no particular order (buildTree orders them). Empty both for a
 // book without structure and for a missing or someone else's book.
@@ -154,22 +155,28 @@ export async function addNodes(
   );
 }
 
-// Whether the reader's node was renamed: false both for a missing node and for someone else's.
-export async function renameNode(
+// Whether the reader's node was updated (US-011: title, summary and goal): false both for a missing
+// node and for someone else's.
+export async function updateNode(
   userId: string,
   nodeId: string,
-  title: string,
+  details: NodeDetails,
   db: Database = getDb(),
 ): Promise<boolean> {
   return withOwner(
     userId,
     async (tx) => {
-      const renamed = await tx
+      const updated = await tx
         .update(bookNode)
-        .set({ title, updatedAt: sql`now()` })
+        .set({
+          title: details.title,
+          summary: details.summary,
+          goalPages: details.goalPages,
+          updatedAt: sql`now()`,
+        })
         .where(ownedBy(bookNode.ownerId, userId, eq(bookNode.id, nodeId)))
         .returning({ id: bookNode.id });
-      return renamed.length > 0;
+      return updated.length > 0;
     },
     db,
   );

@@ -12,7 +12,7 @@ import {
   addNodes,
   deleteNode,
   listNodes,
-  renameNode,
+  updateNode,
 } from "@/server/repositories/book-nodes";
 import { createBook, deleteBook } from "@/server/repositories/books";
 
@@ -79,7 +79,13 @@ const nodesSpec: IsolationSpec<Owned> = {
         },
         db,
       ),
-    rename: (userId, target) => renameNode(userId, target.nodeId, "Taken", db),
+    update: (userId, target) =>
+      updateNode(
+        userId,
+        target.nodeId,
+        { title: "Taken", summary: "Intruder", goalPages: 1 },
+        db,
+      ),
     delete: (userId, target) => deleteNode(userId, target.nodeId, db),
   },
 };
@@ -229,15 +235,52 @@ describe("book structure repository", () => {
     expect(positions).toEqual(Array.from({ length: 12 }, (_, i) => i));
   });
 
-  it("renames a node", async () => {
+  it("updates a node's title, summary and goal, and clears them", async () => {
     const { owner } = await create();
     const { bookId, nodeId } = await seedBookWithChapter(owner.id);
 
-    expect(await renameNode(owner.id, nodeId, "Renamed", db)).toBe(true);
+    expect(
+      await updateNode(
+        owner.id,
+        nodeId,
+        { title: "Renamed", summary: "Linha 1\nLinha 2", goalPages: 30 },
+        db,
+      ),
+    ).toBe(true);
     expect(await listNodes(owner.id, bookId, db)).toMatchObject([
-      { id: nodeId, title: "Renamed" },
+      {
+        id: nodeId,
+        title: "Renamed",
+        summary: "Linha 1\nLinha 2",
+        goalPages: 30,
+      },
     ]);
-    expect(await renameNode(owner.id, randomUUID(), "Nope", db)).toBe(false);
+
+    await updateNode(
+      owner.id,
+      nodeId,
+      { title: "Renamed", summary: null, goalPages: null },
+      db,
+    );
+    expect(await listNodes(owner.id, bookId, db)).toMatchObject([
+      { id: nodeId, summary: null, goalPages: null },
+    ]);
+    expect(
+      await updateNode(
+        owner.id,
+        randomUUID(),
+        { title: "Nope", summary: null, goalPages: null },
+        db,
+      ),
+    ).toBe(false);
+  });
+
+  it("starts nodes without summary or goal", async () => {
+    const { owner } = await create();
+    const { bookId } = await seedBookWithChapter(owner.id);
+    expect(await listNodes(owner.id, bookId, db)).toMatchObject([
+      { summary: null, goalPages: null },
+    ]);
   });
 
   it("deletes a node with its whole subtree and nothing else", async () => {
@@ -302,6 +345,10 @@ describe("book structure repository", () => {
       [{ title: "" }, "23514"],
       [{ title: "a".repeat(201) }, "23514"],
       [{ position: -1 }, "23514"],
+      [{ summary: "" }, "23514"],
+      [{ summary: "a".repeat(1001) }, "23514"],
+      [{ goalPages: 0 }, "23514"],
+      [{ goalPages: 10_001 }, "23514"],
       [{ position: 0 }, "23505"],
       // A node in someone else's book, or under someone else's node.
       [{ bookId: foreign.bookId }, "23503"],
@@ -356,7 +403,13 @@ describe("book structure repository", () => {
           },
           db,
         ),
-      () => renameNode("", randomUUID(), "t", db),
+      () =>
+        updateNode(
+          "",
+          randomUUID(),
+          { title: "t", summary: null, goalPages: null },
+          db,
+        ),
       () => deleteNode("", randomUUID(), db),
     ]) {
       await expect(call()).rejects.toThrow(

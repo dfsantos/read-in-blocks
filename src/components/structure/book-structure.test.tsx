@@ -13,18 +13,33 @@ vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import { BookStructure, type StructureActions } from "./book-structure";
 
+const node = (
+  id: string,
+  parentId: string | null,
+  kind: FlatNode["kind"],
+  title: string,
+  position: number,
+  details: Partial<Pick<FlatNode, "summary" | "goalPages">> = {},
+): FlatNode => ({
+  id,
+  parentId,
+  kind,
+  title,
+  position,
+  summary: null,
+  goalPages: null,
+  ...details,
+});
+
 const NODES: FlatNode[] = [
-  {
-    id: "pre",
-    parentId: null,
-    kind: "chapter",
-    title: "Prefácio",
-    position: 0,
-  },
-  { id: "p1", parentId: null, kind: "part", title: "Parte I", position: 1 },
-  { id: "c1", parentId: "p1", kind: "chapter", title: "Um", position: 0 },
-  { id: "t1", parentId: "c1", kind: "topic", title: "1.1", position: 0 },
-  { id: "t2", parentId: "c1", kind: "topic", title: "1.2", position: 1 },
+  node("pre", null, "chapter", "Prefácio", 0, { goalPages: 10 }),
+  node("p1", null, "part", "Parte I", 1),
+  node("c1", "p1", "chapter", "Um", 0, {
+    summary: "Sobre o começo.\nE o resto.",
+    goalPages: 1,
+  }),
+  node("t1", "c1", "topic", "1.1", 0),
+  node("t2", "c1", "topic", "1.2", 1),
 ];
 
 function renderStructure(
@@ -33,7 +48,7 @@ function renderStructure(
 ) {
   const actions = {
     add: vi.fn().mockResolvedValue({ ok: true, data: { count: 2 } }),
-    rename: vi.fn().mockResolvedValue({ ok: true }),
+    update: vi.fn().mockResolvedValue({ ok: true }),
     remove: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
   };
@@ -165,50 +180,137 @@ describe("BookStructure", () => {
     });
   });
 
-  it("renames a node in place", async () => {
+  it("shows each node's goal, or that it takes the default weight, and its summary", () => {
+    renderStructure();
+
+    const item = (title: string) =>
+      screen.getByText(title, { selector: "span" })
+        .parentElement as HTMLElement;
+    expect(item("Prefácio")).toHaveTextContent("10 páginas");
+    // No goal: the default weight of its siblings (ADR-0009, D-16).
+    expect(item("Parte I")).toHaveTextContent("Peso padrão");
+    expect(item("Um")).toHaveTextContent("1 página");
+    expect(item("1.1")).toHaveTextContent("Peso padrão");
+    expect(screen.getByText(/Sobre o começo\./)).toHaveTextContent(
+      "Sobre o começo. E o resto.",
+    );
+  });
+
+  it("edits a node's title, summary and goal in place", async () => {
     const { actions, user } = renderStructure();
 
-    await user.click(screen.getByRole("button", { name: "Renomear Um" }));
-    const input = screen.getByLabelText("Novo título de Um");
-    expect(input).toHaveValue("Um");
-    await user.clear(input);
-    await user.type(input, "Capítulo um");
-    await user.click(screen.getByRole("button", { name: "Salvar" }));
+    await user.click(screen.getByRole("button", { name: "Editar Um" }));
+    const form = screen.getByRole("form", { name: "Editar Um" });
+    expect(within(form).getByLabelText("Título")).toHaveValue("Um");
+    expect(within(form).getByLabelText("Resumo")).toHaveValue(
+      "Sobre o começo.\nE o resto.",
+    );
+    expect(within(form).getByLabelText("Meta (páginas)")).toHaveValue("1");
+
+    await user.clear(within(form).getByLabelText("Título"));
+    await user.type(within(form).getByLabelText("Título"), "Capítulo um");
+    await user.clear(within(form).getByLabelText("Resumo"));
+    await user.clear(within(form).getByLabelText("Meta (páginas)"));
+    await user.type(within(form).getByLabelText("Meta (páginas)"), "25");
+    await user.click(within(form).getByRole("button", { name: "Salvar" }));
 
     await vi.waitFor(() =>
       expect(
-        screen.queryByLabelText("Novo título de Um"),
+        screen.queryByRole("form", { name: "Editar Um" }),
       ).not.toBeInTheDocument(),
     );
-    expect(actions.rename).toHaveBeenCalledWith("c1", { title: "Capítulo um" });
+    expect(actions.update).toHaveBeenCalledWith("c1", {
+      title: "Capítulo um",
+      summary: "",
+      goalPages: "25",
+    });
     expect(refresh).toHaveBeenCalledOnce();
   });
 
-  it("leaves the title as it was when the reader cancels a rename", async () => {
+  it("starts the edit of a node without goal or summary from empty fields", async () => {
+    const { user } = renderStructure();
+
+    await user.click(screen.getByRole("button", { name: "Editar Parte I" }));
+    const form = screen.getByRole("form", { name: "Editar Parte I" });
+    expect(within(form).getByLabelText("Resumo")).toHaveValue("");
+    expect(within(form).getByLabelText("Meta (páginas)")).toHaveValue("");
+    expect(
+      within(form).getByLabelText("Meta (páginas)"),
+    ).toHaveAccessibleDescription(
+      "Opcional. Sem meta, o item usa o peso padrão: a média das metas dos itens ao lado.",
+    );
+  });
+
+  it("leaves the node as it was when the reader cancels the edit", async () => {
     const { actions, user } = renderStructure();
 
-    await user.click(screen.getByRole("button", { name: "Renomear Um" }));
+    await user.click(screen.getByRole("button", { name: "Editar Um" }));
     await user.type(
-      screen.getByLabelText("Novo título de Um"),
+      within(screen.getByRole("form", { name: "Editar Um" })).getByLabelText(
+        "Título",
+      ),
       " mudado{Escape}",
     );
 
     expect(
-      screen.queryByLabelText("Novo título de Um"),
+      screen.queryByRole("form", { name: "Editar Um" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Um")).toBeInTheDocument();
-    expect(actions.rename).not.toHaveBeenCalled();
+    expect(screen.getByText("Um", { selector: "span" })).toBeInTheDocument();
+    expect(actions.update).not.toHaveBeenCalled();
   });
 
-  it("refuses a blank rename without calling the server", async () => {
-    const { actions, user } = renderStructure();
+  it.each([
+    ["Título", "", "Informe o título."],
+    [
+      "Meta (páginas)",
+      "0",
+      "A meta deve ser um número inteiro de páginas, de 1 a 10.000.",
+    ],
+    [
+      "Meta (páginas)",
+      "2,5",
+      "A meta deve ser um número inteiro de páginas, de 1 a 10.000.",
+    ],
+  ])(
+    "refuses %s set to %j without calling the server",
+    async (label, value, text) => {
+      const { actions, user } = renderStructure();
 
-    await user.click(screen.getByRole("button", { name: "Renomear Um" }));
-    await user.clear(screen.getByLabelText("Novo título de Um"));
-    await user.click(screen.getByRole("button", { name: "Salvar" }));
+      await user.click(screen.getByRole("button", { name: "Editar Um" }));
+      const form = screen.getByRole("form", { name: "Editar Um" });
+      await user.clear(within(form).getByLabelText(label));
+      if (value) await user.type(within(form).getByLabelText(label), value);
+      await user.click(within(form).getByRole("button", { name: "Salvar" }));
 
-    expect(await screen.findByText("Informe o título.")).toBeInTheDocument();
-    expect(actions.rename).not.toHaveBeenCalled();
+      expect(await within(form).findByText(text)).toBeInTheDocument();
+      expect(within(form).getByLabelText(label)).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      );
+      expect(actions.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it("shows the server's answer on the field it belongs to", async () => {
+    const { user } = renderStructure(NODES, {
+      update: vi.fn().mockResolvedValue({
+        ok: false,
+        errorKey: "summaryTooLong",
+        field: "summary",
+      }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Editar Um" }));
+    const form = screen.getByRole("form", { name: "Editar Um" });
+    await user.click(within(form).getByRole("button", { name: "Salvar" }));
+
+    expect(
+      await within(form).findByText(
+        "O resumo pode ter no máximo 1.000 caracteres.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(form).getByLabelText("Resumo")).toHaveFocus();
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("asks before deleting a node and says how many nodes go with it", async () => {
