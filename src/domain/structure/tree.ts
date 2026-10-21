@@ -58,3 +58,14 @@ export function countDescendants(node: TreeNode): number {
     0,
   );
 }
+
+// The nodes from a root down to the node with `id` (itself last), or an empty list when it is not in
+// the tree.
+export function pathTo(roots: readonly TreeNode[], id: string): TreeNode[] {
+  for (const node of roots) {
+    if (node.id === id) return [node];
+    const below = pathTo(node.children, id);
+    if (below.length > 0) return [node, ...below];
+  }
+  return [];
+}

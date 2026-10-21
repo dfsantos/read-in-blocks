@@ -25,6 +25,7 @@ import { requireUser } from "@/server/auth/session";
 import { foundOrNotFound } from "@/server/not-found";
 import { listNodes } from "@/server/repositories/book-nodes";
 import { findBook } from "@/server/repositories/books";
+import { countNotesByNode } from "@/server/repositories/notes";
 
 type Props = Readonly<{ params: Promise<{ bookId: string }> }>;
 
@@ -45,12 +46,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 // The book page (US-007), with its edit and delete actions (US-009), its weighted progress
-// (US-016), its interactive table of contents (US-015) and its structure of parts, chapters and
+// (US-016), its interactive table of contents (US-015) with each node's notebook (US-018) and its structure of parts, chapters and
 // topics (US-010).
 export default async function BookPage({ params }: Props) {
   const book = await loadBook((await params).bookId);
   const user = await requireUser();
-  const nodes = await listNodes(user.id, book.id);
+  const [nodes, noteCounts] = await Promise.all([
+    listNodes(user.id, book.id),
+    countNotesByNode(user.id, book.id),
+  ]);
   const tree = buildTree(nodes);
   const t = await getTranslations("books.detail");
 
@@ -89,6 +93,7 @@ export default async function BookPage({ params }: Props) {
       <TableOfContents
         bookId={book.id}
         nodes={nodes}
+        noteCounts={noteCounts}
         actions={{
           setStatus: setReadingStatus,
           setDates: setReadingDates,

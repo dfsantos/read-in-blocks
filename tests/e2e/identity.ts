@@ -10,6 +10,8 @@ export const E2E_ACCOUNTS = {
   structure: "e2e-structure@example.test",
   toc: "e2e-toc@example.test",
   progress: "e2e-progress@example.test",
+  notes: "e2e-notes@example.test",
+  notesIntruder: "e2e-notes-intruder@example.test",
 } as const;
 
 export const E2E_ALLOWLIST = Object.values(E2E_ACCOUNTS).join(",");

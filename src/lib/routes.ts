@@ -14,6 +14,10 @@ export function bookPath(bookId: string): string {
 export function editBookPath(bookId: string): string {
   return `${bookPath(bookId)}/edit`;
 }
+// A node's page with its notebook (US-018).
+export function nodePath(bookId: string, nodeId: string): string {
+  return `${bookPath(bookId)}/nodes/${encodeURIComponent(nodeId)}`;
+}
 // Query parameter carrying the page an anonymous visitor tried to open.
 export const NEXT_PARAM = "next";
 

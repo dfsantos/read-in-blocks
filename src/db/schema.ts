@@ -3,6 +3,7 @@ import {
   check,
   date,
   foreignKey,
+  index,
   integer,
   pgTable,
   primaryKey,
@@ -147,6 +148,55 @@ export const bookNode = pgTable(
     check(
       "book_node_goal_pages",
       sql`${table.goalPages} is null or ${table.goalPages} between 1 and 10000`,
+    ),
+    ownerPolicy(),
+  ],
+);
+
+// A note in a node's notebook (US-018, RF-005, ADR-0007): plain text for now; rich content arrives
+// in US-019. Content table with its own owner_id and the owner RLS policy. Both foreign keys are
+// composite with the owner (an FK ignores RLS): a note can only hang from its owner's book and from
+// a node of that same owner and book. Deleting the book or the node deletes its notes (D-09).
+export const note = pgTable(
+  "note",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    bookId: uuid("book_id").notNull(),
+    nodeId: uuid("node_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Indexes owner_id (leading column), both cascades (book, then node) and a node's notebook in
+    // chronological order.
+    index("note_owner_book_node_created_idx").on(
+      table.ownerId,
+      table.bookId,
+      table.nodeId,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "note_book_fk",
+      columns: [table.ownerId, table.bookId],
+      foreignColumns: [book.ownerId, book.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "note_node_fk",
+      columns: [table.ownerId, table.bookId, table.nodeId],
+      foreignColumns: [bookNode.ownerId, bookNode.bookId, bookNode.id],
+    }).onDelete("cascade"),
+    // Last line of the limit the Server Action already checks with Zod (src/domain/notes).
+    check(
+      "note_body_length",
+      sql`char_length(${table.body}) between 1 and 10000`,
     ),
     ownerPolicy(),
   ],

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   findBook: vi.fn(),
   deleteBook: vi.fn(),
   listNodes: vi.fn(),
+  countNotesByNode: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NEXT_HTTP_ERROR_FALLBACK;404");
   }),
@@ -32,6 +33,9 @@ vi.mock("@/i18n/navigation", () => ({
 vi.mock("@/server/actions/books", () => ({ deleteBook: mocks.deleteBook }));
 vi.mock("@/server/repositories/book-nodes", () => ({
   listNodes: mocks.listNodes,
+}));
+vi.mock("@/server/repositories/notes", () => ({
+  countNotesByNode: mocks.countNotesByNode,
 }));
 vi.mock("@/server/actions/book-nodes", () => ({
   addNodes: vi.fn(),
@@ -60,6 +64,7 @@ describe("BookPage", () => {
     mocks.requireUser.mockReset().mockResolvedValue(READER);
     mocks.findBook.mockReset();
     mocks.listNodes.mockReset().mockResolvedValue([]);
+    mocks.countNotesByNode.mockReset().mockResolvedValue({});
     mocks.notFound.mockClear();
   });
   afterEach(cleanup);
@@ -158,6 +163,7 @@ describe("BookPage", () => {
     );
 
     expect(mocks.listNodes).toHaveBeenCalledWith(READER.id, BOOK_ID);
+    expect(mocks.countNotesByNode).toHaveBeenCalledWith(READER.id, BOOK_ID);
     const structure = screen.getByRole("list", { name: "Estrutura do livro" });
     expect(structure).toHaveTextContent("Part I");
     // The table of contents (US-015) shows the same structure.

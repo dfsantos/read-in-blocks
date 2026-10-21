@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTree,
   countDescendants,
+  pathTo,
   type FlatNode,
   type TreeNode,
 } from "./tree";
@@ -131,5 +132,24 @@ describe("countDescendants", () => {
     ],
   ])("counts %s", (_name, nodes, expected) => {
     expect(countDescendants(buildTree(nodes)[0])).toBe(expected);
+  });
+});
+
+describe("pathTo", () => {
+  const roots = buildTree([
+    node("pre", null, "chapter", 0),
+    node("p1", null, "part", 1),
+    node("c1", "p1", "chapter", 0),
+    node("t1", "c1", "topic", 0),
+  ]);
+
+  it.each([
+    ["a root", "pre", ["pre"]],
+    ["a part", "p1", ["p1"]],
+    ["a chapter in a part", "c1", ["p1", "c1"]],
+    ["a topic", "t1", ["p1", "c1", "t1"]],
+    ["a node not in the tree", "missing", []],
+  ])("%s", (_name, id, expected) => {
+    expect(pathTo(roots, id).map((item) => item.id)).toEqual(expected);
   });
 });
