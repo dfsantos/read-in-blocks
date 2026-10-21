@@ -57,3 +57,23 @@ export function leavesToComplete(node: ReadingNode): string[] {
       : leavesToComplete(child),
   );
 }
+
+export type LeafCount = { completed: number; total: number };
+
+// How many leaves under `node` there are and how many are completed: the simple progress of a
+// section in the table of contents (US-015). A leaf counts itself.
+export function countLeaves(node: ReadingNode): LeafCount {
+  if (node.children.length === 0) {
+    return { completed: node.status === "completed" ? 1 : 0, total: 1 };
+  }
+  return node.children.reduce<LeafCount>(
+    (sum, child) => {
+      const count = countLeaves(child);
+      return {
+        completed: sum.completed + count.completed,
+        total: sum.total + count.total,
+      };
+    },
+    { completed: 0, total: 0 },
+  );
+}

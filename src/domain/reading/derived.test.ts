@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countLeaves,
   deriveReading,
   leavesToComplete,
   resolveReading,
@@ -172,5 +173,39 @@ describe("leavesToComplete", () => {
     ],
   ])("%s", (_, node, expected) => {
     expect(leavesToComplete(node)).toEqual(expected);
+  });
+});
+
+describe("countLeaves", () => {
+  it.each<[string, ReadingNode, { completed: number; total: number }]>([
+    [
+      "a leaf not completed",
+      leaf(reading("2026-10-01")),
+      { completed: 0, total: 1 },
+    ],
+    [
+      "a completed leaf",
+      leaf(done("2026-10-01", "2026-10-02")),
+      { completed: 1, total: 1 },
+    ],
+    [
+      "the topics of a chapter",
+      parent([leaf(done("2026-10-01", "2026-10-02")), leaf(notStarted)]),
+      { completed: 1, total: 2 },
+    ],
+    [
+      "leaves at every depth of a part, never its parents",
+      parent([
+        parent([
+          leaf(done("2026-10-01", "2026-10-02")),
+          leaf(done("2026-10-01", "2026-10-03")),
+          leaf(notStarted),
+        ]),
+        leaf(done("2026-10-04", "2026-10-05")),
+      ]),
+      { completed: 3, total: 4 },
+    ],
+  ])("%s", (_, node, expected) => {
+    expect(countLeaves(node)).toEqual(expected);
   });
 });
