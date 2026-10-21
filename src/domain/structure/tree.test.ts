@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTree, countDescendants, type FlatNode } from "./tree";
+import {
+  buildTree,
+  countDescendants,
+  type FlatNode,
+  type TreeNode,
+} from "./tree";
 
 const node = (
   id: string,
@@ -58,6 +63,47 @@ describe("buildTree", () => {
     const copy = structuredClone(nodes);
     buildTree(nodes);
     expect(nodes).toEqual(copy);
+  });
+
+  it("gives every node with children the state derived from them (US-014)", () => {
+    const [part] = buildTree([
+      // Stored on the part's row, ignored: a parent's state is always derived.
+      {
+        ...node("p1", null, "part", 0),
+        status: "completed",
+        startedAt: "2020-01-01",
+        completedAt: "2020-01-02",
+      },
+      node("c1", "p1", "chapter", 0),
+      {
+        ...node("t1", "c1", "topic", 0),
+        status: "completed",
+        startedAt: "2026-10-01",
+        completedAt: "2026-10-03",
+      },
+      {
+        ...node("c2", "p1", "chapter", 1),
+        status: "in_progress",
+        startedAt: "2026-10-05",
+      },
+    ]);
+    const reading = (item: TreeNode) => [
+      item.status,
+      item.startedAt,
+      item.completedAt,
+    ];
+
+    expect(reading(part.children[0])).toEqual([
+      "completed",
+      "2026-10-01",
+      "2026-10-03",
+    ]);
+    expect(reading(part.children[1])).toEqual([
+      "in_progress",
+      "2026-10-05",
+      null,
+    ]);
+    expect(reading(part)).toEqual(["in_progress", "2026-10-01", null]);
   });
 });
 

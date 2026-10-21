@@ -1,3 +1,4 @@
+import { deriveReading } from "@/domain/reading/derived";
 import type { ReadingState } from "@/domain/reading/status";
 
 import type { NodeKind } from "./hierarchy";
@@ -16,10 +17,13 @@ export type FlatNode = {
   goalPages: number | null;
 } & ReadingState;
 
+// A node with children carries its derived reading state (US-014), never the one stored in its row.
 export type TreeNode = FlatNode & { children: TreeNode[] };
 
-// Roots and children ordered by position. A node whose parent is not in the list is left out: the
-// database cannot hold one (composite foreign key), so it can only come from a partial list.
+// Roots and children ordered by position, every node with children holding the reading state
+// derived from them, so every screen shows the same one. A node whose parent is not in the list is
+// left out: the database cannot hold one (composite foreign key), so it can only come from a
+// partial list.
 export function buildTree(nodes: readonly FlatNode[]): TreeNode[] {
   const byId = new Map<string, TreeNode>();
   for (const node of nodes) byId.set(node.id, { ...node, children: [] });
@@ -35,7 +39,13 @@ export function buildTree(nodes: readonly FlatNode[]): TreeNode[] {
 
   const sort = (list: TreeNode[]) => {
     list.sort((a, b) => a.position - b.position);
-    for (const node of list) sort(node.children);
+    for (const node of list) {
+      sort(node.children);
+      // Children first: their own state is already the effective one.
+      if (node.children.length > 0) {
+        Object.assign(node, deriveReading(node.children));
+      }
+    }
     return list;
   };
   return sort(roots);

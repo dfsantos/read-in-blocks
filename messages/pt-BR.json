@@ -168,7 +168,18 @@
       "save": "Salvar datas",
       "saving": "Salvando…",
       "cancel": "Cancelar",
-      "changed": "“{title}”: {status}."
+      "changed": "“{title}”: {status}.",
+      "derivedHint": "Calculado a partir dos subitens",
+      "completeAll": {
+        "open": "Concluir tudo",
+        "openFor": "Concluir tudo em {title}",
+        "title": "Concluir tudo em “{title}”?",
+        "description": "{count, plural, one {O item ainda não concluído dentro dele será marcado como concluído hoje.} other {Os # itens ainda não concluídos dentro dele serão marcados como concluídos hoje.}} Os que já estavam em andamento mantêm a data de início.",
+        "cancel": "Cancelar",
+        "confirm": "Concluir tudo",
+        "completing": "Concluindo…",
+        "done": "“{title}”: tudo concluído."
+      }
     },
     "delete": {
       "open": "Excluir {title}",
@@ -200,7 +211,8 @@
       "completionNotAllowed": "Itens em andamento ainda não têm data de conclusão.",
       "completionRequired": "Informe a data de conclusão.",
       "datesOutOfOrder": "A conclusão não pode ser antes do início.",
-      "dateInFuture": "A data não pode ser depois de hoje."
+      "dateInFuture": "A data não pode ser depois de hoje.",
+      "notParent": "Este item não tem subitens; marque o estado dele diretamente."
     }
   }
 }

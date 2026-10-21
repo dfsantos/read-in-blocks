@@ -38,6 +38,7 @@ vi.mock("@/db/client", () => ({ getDb: () => db }));
 
 import {
   addNodes,
+  completeAll,
   deleteNode,
   moveNode,
   setReadingDates,
@@ -95,6 +96,7 @@ describe("book structure Server Actions", () => {
       () => moveNode(randomUUID(), { parentId: null, index: 0 }),
       () => setReadingStatus(randomUUID(), { status: "completed" }),
       () => setReadingDates(randomUUID(), { startedAt: "2026-10-01" }),
+      () => completeAll(randomUUID()),
     ]) {
       await expect(call()).rejects.toThrow("NEXT_REDIRECT /login");
     }
@@ -152,6 +154,8 @@ describe("book structure Server Actions", () => {
       await setReadingStatus(randomUUID(), { status: "completed" }),
       await setReadingDates(owned.nodeId, { startedAt: "", completedAt: "" }),
       await setReadingDates(randomUUID(), { startedAt: "", completedAt: "" }),
+      await completeAll(owned.nodeId),
+      await completeAll(randomUUID()),
     ];
 
     for (const answer of answers) {
@@ -390,6 +394,48 @@ describe("book structure Server Actions", () => {
     expect([before, after]).toContain(node.startedAt);
     expect(node.completedAt).toBe(node.startedAt);
   });
+
+  it("completes everything under the reader's chapter today, and refuses a leaf", async () => {
+    const { owner } = await create();
+    const { bookId, nodeId } = await bookWithChapter(owner.id);
+    signIn(owner);
+    expect(
+      await addNodes(bookId, nodeId, { kind: "topic", titles: "A\nB" }),
+    ).toEqual({ ok: true, data: { count: 2 } });
+    const before = calendarDay(new Date(), "America/Sao_Paulo");
+
+    expect(await completeAll(nodeId)).toEqual({
+      ok: true,
+      data: { completed: 2 },
+    });
+
+    const after = calendarDay(new Date(), "America/Sao_Paulo");
+    const topics = (await listNodes(owner.id, bookId, db)).filter(
+      (node) => node.parentId === nodeId,
+    );
+    expect(topics.map((node) => node.status)).toEqual([
+      "completed",
+      "completed",
+    ]);
+    expect([before, after]).toContain(topics[0].completedAt);
+    expect(await completeAll(topics[0].id)).toEqual({
+      ok: false,
+      errorKey: "notParent",
+    });
+  });
+
+  it.each(MALFORMED_IDS)(
+    'answers "complete all" on %s like a missing node',
+    async (_name, id) => {
+      const { owner } = await create();
+      signIn(owner);
+
+      expect(await completeAll(id)).toEqual({
+        ok: false,
+        errorKey: "notFound",
+      });
+    },
+  );
 
   it.each([
     ["an unknown state", { status: "done" }],

@@ -1,11 +1,23 @@
-import { and, asc, count, eq, inArray, isNull, max, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  inArray,
+  isNull,
+  max,
+  ne,
+  sql,
+} from "drizzle-orm";
 
 import { getDb, type Database } from "@/db/client";
 import { book, bookNode } from "@/db/schema";
 import { canPlace, type NodeKind } from "@/domain/structure/hierarchy";
+import { leavesToComplete } from "@/domain/reading/derived";
 import {
   changeStatus,
   editDates,
+  NOT_STARTED,
   type ReadingDateError,
   type ReadingState,
   type ReadingStatus,
@@ -16,7 +28,11 @@ import {
   type MoveNodeInput,
   type NodeDetails,
 } from "@/domain/structure/node-input";
-import type { FlatNode } from "@/domain/structure/tree";
+import {
+  buildTree,
+  type FlatNode,
+  type TreeNode,
+} from "@/domain/structure/tree";
 
 import { ownedBy } from "./owner-scope";
 import { withOwner } from "./with-owner";
@@ -48,6 +64,30 @@ const asFlatNode = (
   kind: row.kind as NodeKind,
   status: row.status as ReadingStatus,
 });
+
+type Transaction = Parameters<Parameters<typeof withOwner>[1]>[0];
+
+// A node that gains children stops storing a reading state (US-014): its state is derived from
+// them from now on, and its row goes back to "not started" so no stale state or date hides there
+// (nor reappears if it becomes a leaf again, D-20). Runs under the book lock, like the change that
+// gives it children.
+async function clearParentReading(
+  tx: Transaction,
+  userId: string,
+  parentId: string,
+) {
+  await tx
+    .update(bookNode)
+    .set({ ...NOT_STARTED, updatedAt: sql`now()` })
+    .where(
+      ownedBy(
+        bookNode.ownerId,
+        userId,
+        eq(bookNode.id, parentId),
+        ne(bookNode.status, "not_started"),
+      ),
+    );
+}
 
 // Every node of the reader's book, in no particular order (buildTree orders them). Empty both for a
 // book without structure and for a missing or someone else's book.
@@ -166,6 +206,9 @@ export async function addNodes(
           })),
         )
         .returning({ id: bookNode.id });
+      if (input.parentId !== null) {
+        await clearParentReading(tx, userId, input.parentId);
+      }
       return { ok: true, ids: created.map((row) => row.id) };
     },
     db,
@@ -352,6 +395,9 @@ export async function moveNode(
           updatedAt: sql`case when ${bookNode.id} = ${nodeId} then now() else ${bookNode.updatedAt} end`,
         })
         .where(ownedBy(bookNode.ownerId, userId, inArray(bookNode.id, ids)));
+      if (input.parentId !== null) {
+        await clearParentReading(tx, userId, input.parentId);
+      }
       return { ok: true };
     },
     db,
@@ -468,4 +514,72 @@ export async function setReadingDates(
     (current) => editDates(current, dates, today),
     db,
   );
+}
+
+export type CompleteAllResult =
+  | { ok: true; completed: number }
+  // notFound: missing or someone else's node; notParent: a leaf has its own control.
+  | { ok: false; reason: "notFound" | "notParent" };
+
+// "Complete all" on a node with children (US-014, D-07): every leaf under it that is not completed
+// yet becomes completed on `today`, as changeStatus does (keeps its start, or starts today).
+// Parents are never written: their state follows from the leaves.
+export async function completeAll(
+  userId: string,
+  nodeId: string,
+  today: string,
+  db: Database = getDb(),
+): Promise<CompleteAllResult> {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const [found] = await tx
+        .select({ bookId: bookNode.bookId })
+        .from(bookNode)
+        .where(ownedBy(bookNode.ownerId, userId, eq(bookNode.id, nodeId)))
+        .limit(1);
+      if (!found) return { ok: false, reason: "notFound" };
+      // Same lock as the structure changes: no child appears or moves meanwhile.
+      await tx.execute(
+        sql`select ${book.id} from ${book} where ${ownedBy(book.ownerId, userId, eq(book.id, found.bookId))} for update`,
+      );
+      const rows = await tx
+        .select(nodeColumns)
+        .from(bookNode)
+        .where(
+          ownedBy(bookNode.ownerId, userId, eq(bookNode.bookId, found.bookId)),
+        )
+        .limit(MAX_NODES_PER_BOOK);
+      const node = findNode(buildTree(rows.map(asFlatNode)), nodeId);
+      if (!node) return { ok: false, reason: "notFound" };
+      if (node.children.length === 0) return { ok: false, reason: "notParent" };
+
+      const ids = leavesToComplete(node);
+      if (ids.length > 0) {
+        await tx
+          .update(bookNode)
+          .set({
+            status: "completed",
+            startedAt: sql`coalesce(${bookNode.startedAt}, ${today}::date)`,
+            completedAt: sql`${today}::date`,
+            updatedAt: sql`now()`,
+          })
+          .where(ownedBy(bookNode.ownerId, userId, inArray(bookNode.id, ids)));
+      }
+      return { ok: true, completed: ids.length };
+    },
+    db,
+  );
+}
+
+function findNode(
+  nodes: readonly TreeNode[],
+  id: string,
+): TreeNode | undefined {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const found = findNode(node.children, id);
+    if (found) return found;
+  }
+  return undefined;
 }

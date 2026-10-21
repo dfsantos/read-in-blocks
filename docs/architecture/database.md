@@ -59,6 +59,8 @@ pnpm dev
 
 **Datas de leitura (US-013, D-19).** `book_node.started_at` e `completed_at` são do tipo `date`: uma leitura é um dia do calendário, não um instante. O dia é sempre o do fuso único do app (`America/Sao_Paulo`, `src/i18n/time-zone.ts`), calculado no servidor; `created_at` e `updated_at` continuam `timestamptz`. Os CHECKs das US-011 e US-013 foram adicionados sem `NOT VALID`: o runner aplica a migração inteira numa transação, então `NOT VALID` seguido de `VALIDATE` só reduziria o bloqueio com o `VALIDATE` num deploy posterior. Foi aceito porque as colunas eram novas (todas as linhas já passavam) e a tabela é pequena. Numa tabela grande, separar o `VALIDATE` em outra migração.
 
+**Estado de nós com filhos (US-014, D-20).** O estado e as datas de um nó com filhos são sempre derivados dos filhos (`src/domain/reading/derived.ts`, aplicado em `buildTree`) e nunca gravados: a linha de um pai fica sempre em `not_started`, sem datas. Os repositórios zeram a linha quando o nó ganha o primeiro filho (`addNodes`, `moveNode`), e a migração `0009` (só dados, idempotente) zerou as que já estavam assim.
+
 ## RLS nas tabelas de conteúdo
 
 Segunda barreira do isolamento ([ADR-0008](../adr/0008-data-isolation-per-user.md), item 6; US-033). O filtro de dono dos repositórios (`ownedBy`) continua obrigatório; o RLS pega o filtro esquecido.

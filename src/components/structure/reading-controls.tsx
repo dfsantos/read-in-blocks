@@ -3,6 +3,17 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useId, useState } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -10,6 +21,7 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
+import { leavesToComplete, type ReadingNode } from "@/domain/reading/derived";
 import type { ReadingDatesFormValues } from "@/domain/reading/reading-input";
 import {
   READING_STATUSES,
@@ -18,6 +30,7 @@ import {
 } from "@/domain/reading/status";
 import { useRouter } from "@/i18n/navigation";
 import type {
+  CompleteAllResult,
   ReadingResult,
   StructureErrorKey,
 } from "@/server/actions/book-nodes";
@@ -31,6 +44,7 @@ export type ReadingActions = Readonly<{
     nodeId: string,
     input: ReadingDatesFormValues,
   ) => Promise<ReadingResult>;
+  completeAll: (nodeId: string) => Promise<CompleteAllResult>;
 }>;
 
 type Props = Readonly<{
@@ -44,12 +58,18 @@ type Props = Readonly<{
 // (D-19) never shifts it to the day before or after.
 const asDate = (day: string) => new Date(`${day}T12:00:00Z`);
 
+function useDay() {
+  const format = useFormatter();
+  return (value: string) =>
+    format.dateTime(asDate(value), { dateStyle: "medium" });
+}
+
 // The reading state of a leaf (US-013): a select to mark it not started, in progress or completed,
 // the dates that come with it, and a form to correct them (to log a past reading). The page
 // refreshes its data without reloading (router.refresh).
 export function ReadingControls({ node, actions, announce }: Props) {
   const t = useTranslations("structure");
-  const format = useFormatter();
+  const day = useDay();
   const router = useRouter();
   const id = useId();
   const [pending, setPending] = useState(false);
@@ -73,9 +93,6 @@ export function ReadingControls({ node, actions, announce }: Props) {
     }
     setErrorKey(result.errorKey);
   }
-
-  const day = (value: string) =>
-    format.dateTime(asDate(value), { dateStyle: "medium" });
 
   return (
     <div className="flex flex-col gap-1">
@@ -247,5 +264,134 @@ function DayField({
         <FieldError id={`${id}-error`}>{t(`errors.${errorKey}`)}</FieldError>
       ) : null}
     </Field>
+  );
+}
+
+type DerivedProps = Readonly<{
+  // The node with its children; its reading state is already the derived one (buildTree).
+  node: { title: string } & ReadingNode;
+  completeAll: ReadingActions["completeAll"];
+  announce: (message: string) => void;
+}>;
+
+// The reading state of a node with children (US-014): derived from them, so shown as text, never
+// as a control, with its derived dates and "complete all" (D-07) while some leaf under it is not
+// completed.
+export function DerivedReading({ node, completeAll, announce }: DerivedProps) {
+  const t = useTranslations("structure");
+  const day = useDay();
+  const pendingLeaves = leavesToComplete(node).length;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span className="rounded-md border px-2 py-0.5 text-sm">
+        {t(`reading.statuses.${node.status}`)}
+      </span>
+      <span className="text-muted-foreground text-xs">
+        {t("reading.derivedHint")}
+      </span>
+      {node.startedAt ? (
+        <span className="text-muted-foreground text-xs">
+          {t("reading.startedAt", { date: day(node.startedAt) })}
+        </span>
+      ) : null}
+      {node.completedAt ? (
+        <span className="text-muted-foreground text-xs">
+          {t("reading.completedAt", { date: day(node.completedAt) })}
+        </span>
+      ) : null}
+      {pendingLeaves > 0 ? (
+        <CompleteAllButton
+          nodeId={node.id}
+          title={node.title}
+          count={pendingLeaves}
+          action={completeAll}
+          announce={announce}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CompleteAllButton({
+  nodeId,
+  title,
+  count,
+  action,
+  announce,
+}: Readonly<{
+  nodeId: string;
+  title: string;
+  // How many leaves it completes (leavesToComplete).
+  count: number;
+  action: ReadingActions["completeAll"];
+  announce: (message: string) => void;
+}>) {
+  const t = useTranslations("structure");
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [errorKey, setErrorKey] = useState<StructureErrorKey>();
+
+  async function confirm() {
+    setPending(true);
+    setErrorKey(undefined);
+    const result = await action(nodeId);
+    setPending(false);
+    if (result.ok) {
+      setOpen(false);
+      announce(t("reading.completeAll.done", { title }));
+      router.refresh();
+      return;
+    }
+    setErrorKey(result.errorKey);
+  }
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (pending) return;
+        setOpen(next);
+        if (!next) setErrorKey(undefined);
+      }}
+    >
+      <AlertDialogTrigger
+        render={
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label={t("reading.completeAll.openFor", { title })}
+          />
+        }
+      >
+        {t("reading.completeAll.open")}
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="break-words">
+            {t("reading.completeAll.title", { title })}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("reading.completeAll.description", { count })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {errorKey ? (
+          <p role="alert" className="text-destructive text-sm">
+            {t(`errors.${errorKey}`)}
+          </p>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>
+            {t("reading.completeAll.cancel")}
+          </AlertDialogCancel>
+          <AlertDialogAction disabled={pending} onClick={confirm}>
+            {pending
+              ? t("reading.completeAll.completing")
+              : t("reading.completeAll.confirm")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

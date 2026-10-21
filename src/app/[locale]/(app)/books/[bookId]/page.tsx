@@ -11,6 +11,7 @@ import { Link } from "@/i18n/navigation";
 import { editBookPath, LIBRARY_PATH } from "@/lib/routes";
 import {
   addNodes,
+  completeAll,
   deleteNode,
   moveNode,
   setReadingDates,
@@ -89,6 +90,7 @@ export default async function BookPage({ params }: Props) {
           move: moveNode,
           setStatus: setReadingStatus,
           setDates: setReadingDates,
+          completeAll,
           remove: deleteNode,
         }}
       />
