@@ -35,7 +35,12 @@ const mocks = vi.hoisted(() => ({ requireUser: vi.fn() }));
 vi.mock("@/server/auth/session", () => ({ requireUser: mocks.requireUser }));
 vi.mock("@/db/client", () => ({ getDb: () => db }));
 
-import { createNote, deleteNote, updateNote } from "@/server/actions/notes";
+import {
+  createNote,
+  deleteNote,
+  setNoteResolved,
+  updateNote,
+} from "@/server/actions/notes";
 
 afterAll(() => pool.end());
 
@@ -67,8 +72,14 @@ async function chapterWithNote(ownerId: string) {
 }
 
 // What the editor sends for a plain-text note.
-const typed = (body: string) => ({ content: textToDoc(body) });
-const doc = (...content: unknown[]) => ({ content: { type: "doc", content } });
+const typed = (body: string) => ({
+  content: textToDoc(body),
+  type: "key_concept",
+});
+const doc = (...content: unknown[]) => ({
+  content: { type: "doc", content },
+  type: "key_concept",
+});
 const paragraph = (text: string, marks?: unknown[]) => ({
   type: "paragraph",
   content: [{ type: "text", text, ...(marks ? { marks } : {}) }],
@@ -97,6 +108,7 @@ describe("notebook Server Actions", () => {
     for (const call of [
       () => createNote(randomUUID(), typed("A")),
       () => updateNote(randomUUID(), typed("A")),
+      () => setNoteResolved(randomUUID(), true),
       () => deleteNote(randomUUID()),
     ]) {
       await expect(call()).rejects.toThrow("NEXT_REDIRECT /login");
@@ -136,6 +148,35 @@ describe("notebook Server Actions", () => {
     expect(JSON.stringify(info.mock.calls)).not.toContain("Primeira");
   });
 
+  it("resolves the reader's actions and questions, and nothing else", async () => {
+    const { owner, intruder } = await create();
+    const { nodeId, noteId } = await chapterWithNote(owner.id);
+    signIn(owner);
+    const created = await createNote(nodeId, {
+      ...typed("Testar isso"),
+      type: "action_or_question",
+    });
+    if (!created.ok) throw new Error("unexpected refusal");
+
+    const notFound = { ok: false, errorKey: "notFound" };
+    expect(await setNoteResolved(created.id, true)).toEqual({ ok: true });
+    // A key concept is not resolvable: answered like a missing note.
+    expect(await setNoteResolved(noteId, true)).toEqual(notFound);
+    expect(await setNoteResolved(created.id, "yes")).toEqual(notFound);
+    expect(await setNoteResolved("not-a-uuid", true)).toEqual(notFound);
+    expect(
+      (await listNotes(owner.id, nodeId, db)).map(
+        (note) => note.resolvedAt !== null,
+      ),
+    ).toEqual([false, true]);
+
+    signIn(intruder);
+    expect(await setNoteResolved(created.id, false)).toEqual(notFound);
+    expect(
+      (await listNotes(owner.id, nodeId, db))[1].resolvedAt,
+    ).not.toBeNull();
+  });
+
   it("answers another reader's node or note like a missing one, and changes nothing", async () => {
     const { owner, intruder } = await create();
     const { nodeId, noteId } = await chapterWithNote(owner.id);
@@ -169,10 +210,36 @@ describe("notebook Server Actions", () => {
 
   it.each([
     ["an empty note", doc({ type: "paragraph" }), "bodyRequired"],
-    ["no content", {}, "bodyRequired"],
+    ["no content", { type: "key_concept" }, "bodyRequired"],
     ["not an object", "text", "bodyRequired"],
-    ["a US-018 body", { body: "Plain" }, "bodyRequired"],
-    ["HTML instead of a document", { content: "<p>a</p>" }, "invalidContent"],
+    ["a US-018 body", { type: "key_concept", body: "Plain" }, "bodyRequired"],
+    [
+      "HTML instead of a document",
+      { type: "key_concept", content: "<p>a</p>" },
+      "invalidContent",
+    ],
+    ["no kind", { content: textToDoc("a") }, "invalidType"],
+    ["an unknown kind", { ...typed("a"), type: "summary" }, "invalidType"],
+    [
+      "a quote without reference",
+      { ...typed("a"), type: "quote" },
+      "referenceRequired",
+    ],
+    [
+      "a quote with a blank reference",
+      { ...typed("a"), type: "quote", reference: "  " },
+      "referenceRequired",
+    ],
+    [
+      "a reference over the limit",
+      { ...typed("a"), type: "quote", reference: "p".repeat(51) },
+      "referenceTooLong",
+    ],
+    [
+      "a reference with a line break",
+      { ...typed("a"), type: "quote", reference: "p. 1\np. 2" },
+      "referenceInvalid",
+    ],
     [
       "a script node",
       doc({ type: "script", text: "alert(1)" }),
@@ -227,6 +294,7 @@ describe("notebook Server Actions", () => {
     [
       "a document too deep",
       {
+        type: "key_concept",
         content: {
           type: "doc",
           content: [
@@ -263,6 +331,8 @@ describe("notebook Server Actions", () => {
     signIn(owner);
 
     const sent = {
+      type: "quote",
+      reference: "  p. 42 ",
       content: {
         type: "doc",
         content: [
@@ -319,6 +389,7 @@ describe("notebook Server Actions", () => {
       ],
     });
     expect(stored.body).toBe("site\nprint(1)");
+    expect(stored).toMatchObject({ type: "quote", reference: "p. 42" });
   });
 
   it.each([
@@ -329,6 +400,7 @@ describe("notebook Server Actions", () => {
       (_nodeId: string, noteId: string) => updateNote(noteId, typed("U")),
     ],
     ["deletions", 30, () => deleteNote(randomUUID())],
+    ["resolutions", 60, () => setNoteResolved(randomUUID(), true)],
   ] as const)(
     "stops a reader past the quota of %s a minute",
     async (_name, limit, call) => {

@@ -3,6 +3,11 @@ import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { getDb, type Database } from "@/db/client";
 import { bookNode, note } from "@/db/schema";
 import { MAX_NOTES_PER_NODE } from "@/domain/notes/note-input";
+import {
+  isNoteType,
+  type NoteKind,
+  type NoteType,
+} from "@/domain/notes/note-type";
 import { storedNoteContent, type NoteDoc } from "@/domain/notes/rich-text";
 import {
   MAX_LIBRARY_NODES,
@@ -24,17 +29,25 @@ export type Note = {
   // Parsed again on the way out (storedNoteContent): a row that does not match the schema, or one
   // still without content, is read as its plain text.
   content: NoteDoc;
+  // Its kind (US-020): a quote carries its reference; an action or question may be resolved.
+  type: NoteType;
+  reference: string | null;
+  resolvedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-// What a Server Action stores: a document rebuilt by parseNoteContent and its plain text.
-export type NoteWrite = { content: NoteDoc; text: string };
+// What a Server Action stores: a document rebuilt by parseNoteContent, its plain text and its kind
+// (parseNoteKind).
+export type NoteWrite = { content: NoteDoc; text: string } & NoteKind;
 
 const noteColumns = {
   id: note.id,
   body: note.body,
   content: note.content,
+  type: note.type,
+  reference: note.reference,
+  resolvedAt: note.resolvedAt,
   createdAt: note.createdAt,
   updatedAt: note.updatedAt,
 };
@@ -61,6 +74,8 @@ export async function listNotes(
   return rows.map((row) => ({
     ...row,
     content: storedNoteContent(row.content, row.body),
+    // The column's CHECK only allows the known kinds.
+    type: isNoteType(row.type) ? row.type : "key_concept",
   }));
 }
 
@@ -158,6 +173,8 @@ export async function createNote(
           nodeId,
           body: write.text,
           content: write.content,
+          type: write.type,
+          reference: write.reference,
         })
         .returning({ id: note.id });
       return { ok: true, id: created.id };
@@ -181,9 +198,42 @@ export async function updateNote(
         .set({
           body: write.text,
           content: write.content,
+          type: write.type,
+          reference: write.reference,
+          // A note that stops being an action or question is no longer resolved.
+          resolvedAt:
+            write.type === "action_or_question" ? note.resolvedAt : null,
           updatedAt: sql`now()`,
         })
         .where(ownedBy(note.ownerId, userId, eq(note.id, noteId)))
+        .returning({ id: note.id });
+      return updated.length > 0;
+    },
+    db,
+  );
+}
+
+// Marks the reader's action or question as resolved (now) or open again. False for a missing note,
+// someone else's and a note of another kind. Not an edit of the text: updated_at stays.
+export async function setNoteResolved(
+  userId: string,
+  noteId: string,
+  resolved: boolean,
+  db: Database = getDb(),
+): Promise<boolean> {
+  return withOwner(
+    userId,
+    async (tx) => {
+      const updated = await tx
+        .update(note)
+        .set({ resolvedAt: resolved ? sql`now()` : null })
+        .where(
+          ownedBy(
+            note.ownerId,
+            userId,
+            and(eq(note.id, noteId), eq(note.type, "action_or_question")),
+          ),
+        )
         .returning({ id: note.id });
       return updated.length > 0;
     },

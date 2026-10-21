@@ -12,17 +12,45 @@ const errorOf = (result: {
 describe("noteInputSchema", () => {
   it("gives the rebuilt document and its plain text", () => {
     const content = textToDoc("Ideia\ncentral");
-    expect(noteInputSchema.parse({ content, extra: "x" })).toEqual({
+    expect(
+      noteInputSchema.parse({
+        content,
+        type: "quote",
+        reference: " p. 7 ",
+        extra: "x",
+      }),
+    ).toEqual({
       content,
       text: "Ideia\ncentral",
+      type: "quote",
+      reference: "p. 7",
     });
   });
 
   it.each([
-    ["no content", {}, "bodyRequired"],
+    ["no content", { type: "key_concept" }, "bodyRequired"],
     ["not an object", "text", "bodyRequired"],
-    ["a US-018 body instead of content", { body: "Ideia" }, "bodyRequired"],
-    ["HTML as content", { content: "<p>Ideia</p>" }, "invalidContent"],
+    [
+      "a US-018 body instead of content",
+      { type: "key_concept", body: "Ideia" },
+      "bodyRequired",
+    ],
+    [
+      "HTML as content",
+      { type: "key_concept", content: "<p>Ideia</p>" },
+      "invalidContent",
+    ],
+    ["no type", { content: textToDoc("Ideia") }, "invalidType"],
+    [
+      "an invalid type",
+      { type: "todo", content: textToDoc("Ideia") },
+      "invalidType",
+    ],
+    [
+      "a quote without reference",
+      { type: "quote", content: textToDoc("Ideia") },
+      "referenceRequired",
+    ],
   ])("refuses %s", (_name, input, error) => {
     expect(errorOf(noteInputSchema.safeParse(input))).toBe(error);
   });

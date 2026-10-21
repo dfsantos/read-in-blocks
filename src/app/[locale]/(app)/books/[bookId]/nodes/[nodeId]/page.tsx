@@ -15,7 +15,12 @@ import {
   setReadingDates,
   setReadingStatus,
 } from "@/server/actions/book-nodes";
-import { createNote, deleteNote, updateNote } from "@/server/actions/notes";
+import {
+  createNote,
+  deleteNote,
+  setNoteResolved,
+  updateNote,
+} from "@/server/actions/notes";
 import { requireUser } from "@/server/auth/session";
 import { foundOrNotFound } from "@/server/not-found";
 import { listNodes } from "@/server/repositories/book-nodes";
@@ -135,12 +140,16 @@ export default async function NodePage({ params }: Props) {
           content: note.content,
           // Rendered here, on the server: the notebook never ships the highlighter.
           view: <NoteContent content={note.content} />,
+          type: note.type,
+          reference: note.reference,
+          resolvedAt: note.resolvedAt,
           createdAt: note.createdAt,
           updatedAt: note.updatedAt,
         }))}
         actions={{
           create: createNote.bind(null, node.id),
           update: updateNote,
+          resolve: setNoteResolved,
           remove: deleteNote,
         }}
       />

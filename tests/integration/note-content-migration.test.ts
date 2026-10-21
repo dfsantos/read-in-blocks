@@ -77,6 +77,8 @@ describe("migration 0012: rich content for plain-text notes", () => {
           ],
         },
         text: "rica",
+        type: "key_concept",
+        reference: null,
       },
       db,
     );

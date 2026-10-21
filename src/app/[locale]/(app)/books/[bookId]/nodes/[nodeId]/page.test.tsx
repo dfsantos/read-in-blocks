@@ -42,6 +42,7 @@ vi.mock("@/server/actions/book-nodes", () => ({
 vi.mock("@/server/actions/notes", () => ({
   createNote: vi.fn(),
   updateNote: vi.fn(),
+  setNoteResolved: vi.fn(),
   deleteNote: vi.fn(),
 }));
 
@@ -90,6 +91,9 @@ describe("NodePage", () => {
       {
         id: "n1",
         body: "<i>nota</i>",
+        type: "quote",
+        reference: "p. <b>12</b>",
+        resolvedAt: null,
         content: {
           type: "doc",
           content: [
@@ -157,6 +161,9 @@ describe("NodePage", () => {
     // Rendered from the stored document (bold), with no element made from the text.
     expect(screen.getByText("<i>nota</i>").tagName).toBe("STRONG");
     expect(document.querySelector("li i")).toBeNull();
+    // Its kind, with the reference as text.
+    expect(screen.getByText("Citação")).toBeInTheDocument();
+    expect(screen.getByText("p. <b>12</b>")).toBeInTheDocument();
   });
 
   it("titles the page with the node", async () => {

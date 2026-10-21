@@ -329,8 +329,10 @@ export function storedNoteContent(content: unknown, body: string): NoteDoc {
     : textToDoc(body);
 }
 
-// A plain-text note ready to store (tests and seeds): its document and its text.
+// A plain-text note ready to store (tests and seeds): its document, its text and the default kind.
 export const plainNote = (body: string) => ({
   content: textToDoc(body),
   text: body,
+  type: "key_concept" as const,
+  reference: null,
 });
