@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { closeTestAuth, E2E_ACCOUNTS, seedSession } from "./auth-helpers";
 
 // US-010: the reader builds a book's structure from its page, pasting a table of contents, adds a
-// topic inside a chapter, renames a node and deletes a part with its subtree after confirming.
+// topic inside a chapter, edits a node's title, summary and goal (US-011) and deletes a part with its subtree after confirming.
 test.afterAll(closeTestAuth);
 
 test("a reader builds, renames and prunes a book's structure", async ({
@@ -76,16 +76,25 @@ test("a reader builds, renames and prunes a book's structure", async ({
         .first(),
     ).toContainText("Prefácio");
 
-    // Rename in place.
+    // Edit in place: title, summary and goal in pages (US-011).
     await page
-      .getByRole("button", {
-        name: "Renomear Parte II",
-        exact: true,
-      })
+      .getByRole("button", { name: "Editar Parte II", exact: true })
       .click();
-    await page.getByLabel("Novo título de Parte II").fill("Parte II — Prática");
-    await page.getByRole("button", { name: "Salvar" }).click();
-    await expect(structure).toContainText("Parte II — Prática");
+    const edit = page.getByRole("form", { name: "Editar Parte II" });
+    await edit.getByLabel("Título").fill("Parte II — Prática");
+    await edit.getByLabel("Resumo").fill("Exemplos do dia a dia.");
+    await edit.getByLabel("Meta (páginas)").fill("120");
+    await edit.getByRole("button", { name: "Salvar" }).click();
+    await expect(edit).toBeHidden();
+    const partTwo = structure
+      .getByRole("listitem")
+      .filter({ hasText: "Parte II — Prática" });
+    await expect(partTwo).toContainText("120 páginas");
+    await expect(partTwo).toContainText("Exemplos do dia a dia.");
+    // Parte I has no goal: it takes the default weight.
+    await expect(
+      structure.getByRole("listitem").filter({ hasText: "Parte I" }).first(),
+    ).toContainText("Peso padrão");
 
     // Deleting Parte I asks first and takes its 3 nodes with it.
     await page
