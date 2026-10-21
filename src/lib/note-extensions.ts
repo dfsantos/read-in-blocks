@@ -1,4 +1,4 @@
-import type { Extensions } from "@tiptap/core";
+import type { Extensions, NodeViewRenderer } from "@tiptap/core";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import StarterKit from "@tiptap/starter-kit";
 import { createLowlight } from "lowlight";
@@ -14,7 +14,15 @@ import { isSafeHref, NOTE_HEADING_LEVELS } from "@/domain/notes/rich-text";
 // Highlights code blocks in the editor; the read-only view highlights on the server with its own.
 export const noteLowlight = createLowlight(noteGrammars());
 
-export function noteExtensions(): Extensions {
+// The editor draws code blocks with its own view (a diagram's preview, US-022); the server only
+// needs the schema.
+export function noteExtensions(
+  options: Readonly<{ codeBlockView?: NodeViewRenderer }> = {},
+): Extensions {
+  const { codeBlockView } = options;
+  const codeBlock = codeBlockView
+    ? CodeBlockLowlight.extend({ addNodeView: () => codeBlockView })
+    : CodeBlockLowlight;
   return [
     StarterKit.configure({
       heading: { levels: [...NOTE_HEADING_LEVELS] },
@@ -36,7 +44,7 @@ export function noteExtensions(): Extensions {
         },
       },
     }),
-    CodeBlockLowlight.configure({
+    codeBlock.configure({
       lowlight: noteLowlight,
       defaultLanguage: "plaintext",
     }),

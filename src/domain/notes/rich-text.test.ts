@@ -142,6 +142,8 @@ describe("parseNoteContent", () => {
     ["a language that is not text", 42, null],
     ["a missing language", undefined, null],
     ["a listed language", "python", "python"],
+    ["a diagram (US-022)", "mermaid", "mermaid"],
+    ["a diagram written in capitals", "Mermaid", null],
   ])("keeps a code block with %s", (_name, language, expected) => {
     const parsed = parseNoteContent(
       docOf({

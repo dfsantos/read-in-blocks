@@ -3,18 +3,20 @@ import { createLowlight } from "lowlight";
 import { noteGrammars } from "@/lib/note-grammars";
 import { Fragment, type ReactNode } from "react";
 
-import type {
-  NoteBlock,
-  NoteDoc,
-  NoteInline,
-  NoteListItem,
+import { NoteDiagram } from "@/components/notes/note-diagram";
+import {
+  DIAGRAM_LANGUAGE,
+  type NoteBlock,
+  type NoteDoc,
+  type NoteInline,
+  type NoteListItem,
 } from "@/domain/notes/rich-text";
 
 // The read-only view of a note (US-019, ADR-0007): the same schema as the editor, rendered as React
 // elements, never as HTML (no dangerouslySetInnerHTML anywhere). Text is escaped by React; links
 // were already checked (http, https or mailto) and open in a new tab without the opener. Runs on
 // the server: the page passes the result to the notebook, so reading a note downloads neither the
-// editor nor the highlighter.
+// editor nor the highlighter. Diagrams (US-022) are the exception: drawn in the browser, on demand.
 
 const lowlight = createLowlight(noteGrammars());
 
@@ -110,6 +112,9 @@ function renderBlock(node: NoteBlock, index: number): ReactNode {
     case "codeBlock": {
       const code = (node.content ?? []).map((part) => part.text).join("");
       const language = node.attrs.language;
+      if (language === DIAGRAM_LANGUAGE) {
+        return <NoteDiagram key={index} source={code} showSource />;
+      }
       return (
         <pre key={index} data-language={language ?? undefined}>
           <code className={language ? `hljs language-${language}` : "hljs"}>

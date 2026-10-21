@@ -44,6 +44,17 @@ export type NoteLanguage = (typeof NOTE_LANGUAGES)[number];
 export const isNoteLanguage = (value: unknown): value is NoteLanguage =>
   (NOTE_LANGUAGES as readonly unknown[]).includes(value);
 
+// A code block in this "language" is a diagram (US-022, RF-012): its text is Mermaid syntax, drawn
+// in the browser instead of highlighted. It stays a code block, so the text is what is stored,
+// counted and searched, and a diagram that fails to draw still shows its source.
+export const DIAGRAM_LANGUAGE = "mermaid";
+export type CodeBlockLanguage = NoteLanguage | typeof DIAGRAM_LANGUAGE;
+
+export const isCodeBlockLanguage = (
+  value: unknown,
+): value is CodeBlockLanguage =>
+  value === DIAGRAM_LANGUAGE || isNoteLanguage(value);
+
 // The plain text of a note (what US-018 stored) keeps its limit.
 export const NOTE_TEXT_MAX = 10_000;
 // Bounds on the JSON itself, checked before the schema walks it: far beyond 10,000 characters of
@@ -88,7 +99,7 @@ export type NoteBlock =
     }
   | {
       type: "codeBlock";
-      attrs: { language: NoteLanguage | null };
+      attrs: { language: CodeBlockLanguage | null };
       content?: NoteCodeText[];
     }
   | { type: "blockquote"; content: NoteBlock[] }
@@ -146,7 +157,7 @@ const inlineContent = z.array(inline).max(NOTE_CONTENT_MAX_NODES).optional();
 // Pasted code may carry any language class: one outside the list is kept as plain code.
 const language = z
   .unknown()
-  .transform((value) => (isNoteLanguage(value) ? value : null));
+  .transform((value) => (isCodeBlockLanguage(value) ? value : null));
 
 const listItem: z.ZodType<NoteListItem> = z.object({
   type: z.literal("listItem"),

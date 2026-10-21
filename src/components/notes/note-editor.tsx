@@ -18,9 +18,15 @@ import {
   ListOrderedIcon,
   QuoteIcon,
   SquareCodeIcon,
+  WorkflowIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import {
+  useLocale,
+  useMessages,
+  useTimeZone,
+  useTranslations,
+} from "next-intl";
 import {
   useEffect,
   useId,
@@ -30,6 +36,7 @@ import {
   type MouseEvent,
 } from "react";
 
+import { codeBlockView } from "@/components/notes/code-block-view";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -38,7 +45,8 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import {
-  isNoteLanguage,
+  DIAGRAM_LANGUAGE,
+  isCodeBlockLanguage,
   isSafeHref,
   NOTE_LANGUAGES,
   type NoteDoc,
@@ -86,8 +94,15 @@ export default function NoteEditor({
     class: "note-content min-h-32 px-3 py-2 text-sm outline-none break-words",
   });
 
+  // A diagram's preview is rendered outside this React tree: it gets the same translations.
+  const intl = {
+    locale: useLocale(),
+    messages: useMessages(),
+    timeZone: useTimeZone(),
+  };
+
   const editor = useEditor({
-    extensions: noteExtensions(),
+    extensions: noteExtensions({ codeBlockView: codeBlockView(intl) }),
     content: initialContent,
     // Next.js renders on the server first; the editor only exists in the browser.
     immediatelyRender: false,
@@ -205,7 +220,9 @@ const TOOLS: readonly Tool[] = [
   {
     key: "codeBlock",
     icon: SquareCodeIcon,
-    active: (editor) => editor.isActive("codeBlock"),
+    active: (editor) =>
+      editor.isActive("codeBlock") &&
+      editor.getAttributes("codeBlock").language !== DIAGRAM_LANGUAGE,
     run: (editor) => editor.chain().focus().toggleCodeBlock().run(),
   },
 ];
@@ -227,6 +244,7 @@ function Toolbar({ editor }: Readonly<{ editor: Editor }>) {
         TOOLS.map((tool) => [tool.key, tool.active(current)]),
       ) as Record<Tool["key"], boolean>,
       link: current.isActive("link"),
+      diagram: current.isActive("codeBlock", { language: DIAGRAM_LANGUAGE }),
       language: current.isActive("codeBlock")
         ? ((current.getAttributes("codeBlock").language as unknown) ?? null)
         : undefined,
@@ -258,6 +276,33 @@ function Toolbar({ editor }: Readonly<{ editor: Editor }>) {
         <Button
           type="button"
           size="icon-sm"
+          variant={state.diagram ? "secondary" : "ghost"}
+          aria-label={t("diagram")}
+          aria-pressed={state.diagram}
+          title={t("diagram")}
+          onMouseDown={keepEditorFocus}
+          onClick={() => {
+            if (state.diagram) {
+              editor.chain().focus().toggleCodeBlock().run();
+              return;
+            }
+            // A starting diagram the reader edits; the preview appears below it.
+            editor
+              .chain()
+              .focus()
+              .insertContent({
+                type: "codeBlock",
+                attrs: { language: DIAGRAM_LANGUAGE },
+                content: [{ type: "text", text: t("diagramTemplate") }],
+              })
+              .run();
+          }}
+        >
+          <WorkflowIcon aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          size="icon-sm"
           variant={state.link || linkOpen ? "secondary" : "ghost"}
           aria-label={t("link")}
           aria-pressed={state.link}
@@ -273,7 +318,7 @@ function Toolbar({ editor }: Readonly<{ editor: Editor }>) {
             aria-label={t("language")}
             className="ml-1"
             value={
-              isNoteLanguage(state.language) ? state.language : "plaintext"
+              isCodeBlockLanguage(state.language) ? state.language : "plaintext"
             }
             onChange={(event) =>
               editor
@@ -296,6 +341,9 @@ function Toolbar({ editor }: Readonly<{ editor: Editor }>) {
                 {t(`languages.${language}`)}
               </NativeSelectOption>
             ))}
+            <NativeSelectOption value={DIAGRAM_LANGUAGE}>
+              {t("languages.mermaid")}
+            </NativeSelectOption>
           </NativeSelect>
         ) : null}
       </div>
