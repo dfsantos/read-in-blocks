@@ -1,0 +1,186 @@
+"use server";
+
+import { bookIdSchema } from "@/domain/books/book-input";
+import {
+  addNodesSchema,
+  nodeIdSchema,
+  renameNodeSchema,
+  type NodeInputError,
+} from "@/domain/structure/node-input";
+import { requireUser } from "@/server/auth/session";
+import {
+  addNodes as insertNodes,
+  deleteNode as removeNode,
+  renameNode as changeNode,
+} from "@/server/repositories/book-nodes";
+import {
+  consumeWriteQuota,
+  type WriteQuota,
+} from "@/server/repositories/write-quota";
+
+// Book structure Server Actions (US-010). Each one is a public endpoint (rule server-actions): Zod
+// first, then requireUser(), then the quota and the repository with the session's userId. The ids
+// (book, parent, node) are arguments anyone can forge: they are parsed like any other input, and a
+// malformed id, a missing book or node and another reader's all get the same "notFound", answered
+// only once the session is checked.
+
+// Keys under `structure.errors` in messages/pt-BR.json.
+export type StructureErrorKey =
+  | NodeInputError
+  | "invalidPlacement"
+  | "tooManyNodes"
+  | "notFound"
+  | "rateLimited"
+  | "failed";
+
+export type AddNodesResult =
+  | { ok: true; data: { count: number } }
+  | { ok: false; errorKey: StructureErrorKey; field?: "titles" | "kind" };
+
+export type RenameNodeResult =
+  { ok: true } | { ok: false; errorKey: StructureErrorKey; field?: "title" };
+
+export type DeleteNodeResult =
+  { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
+
+// A whole table of contents arrives in a few pastes of up to 100 titles each.
+const ADD_NODES_QUOTA = {
+  action: "structure.create",
+  limit: 30,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+// Fixing several titles in a row is normal; 60 a minute still stops a script.
+const RENAME_NODE_QUOTA = {
+  action: "structure.rename",
+  limit: 60,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+// Each deletion needs a confirmation in the page.
+const DELETE_NODE_QUOTA = {
+  action: "structure.delete",
+  limit: 30,
+  windowSeconds: 60,
+} satisfies WriteQuota;
+
+// Only the Postgres error code: messages may echo the reader's titles (zero-trust.md, 3.3).
+function logFailure(action: string, error: unknown) {
+  console.error(`${action} failed`, {
+    code: (error as { code?: unknown } | null)?.code,
+  });
+}
+
+// Security events (zero-trust.md, 3.3): ids and a timestamp, never a title.
+function logNodeDeleted(userId: string, nodeId: string) {
+  console.info(
+    JSON.stringify({
+      event: "structure.node_deleted",
+      userId,
+      nodeId,
+      at: new Date().toISOString(),
+    }),
+  );
+}
+
+// Adds the pasted titles (one per line) as nodes of the chosen kind at the end of `parentId`'s
+// children, or of the book's root when it is null.
+export async function addNodes(
+  bookId: unknown,
+  parentId: unknown,
+  input: unknown,
+): Promise<AddNodesResult> {
+  const book = bookIdSchema.safeParse(bookId);
+  const parent =
+    parentId === null
+      ? { success: true as const, data: null }
+      : nodeIdSchema.safeParse(parentId);
+  const parsed = addNodesSchema.safeParse(input);
+  if (!parsed.success) {
+    const [issue] = parsed.error.issues;
+    return issue.path[0] === "kind"
+      ? { ok: false, errorKey: "invalidPlacement", field: "kind" }
+      : issue.path[0] === "titles"
+        ? {
+            ok: false,
+            errorKey: issue.message as NodeInputError,
+            field: "titles",
+          }
+        : { ok: false, errorKey: "titlesRequired", field: "titles" };
+  }
+
+  const user = await requireUser();
+  if (!book.success || !parent.success)
+    return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, ADD_NODES_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    const added = await insertNodes(user.id, {
+      bookId: book.data,
+      parentId: parent.data,
+      kind: parsed.data.kind,
+      titles: parsed.data.titles,
+    });
+    return added.ok
+      ? { ok: true, data: { count: added.ids.length } }
+      : { ok: false, errorKey: added.reason };
+  } catch (error) {
+    logFailure(ADD_NODES_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+export async function renameNode(
+  nodeId: unknown,
+  input: unknown,
+): Promise<RenameNodeResult> {
+  const id = nodeIdSchema.safeParse(nodeId);
+  const parsed = renameNodeSchema.safeParse(input);
+  if (!parsed.success) {
+    const [issue] = parsed.error.issues;
+    return {
+      ok: false,
+      errorKey:
+        issue.path[0] === "title"
+          ? (issue.message as NodeInputError)
+          : "titleRequired",
+      field: "title",
+    };
+  }
+
+  const user = await requireUser();
+  if (!id.success) return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, RENAME_NODE_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    return (await changeNode(user.id, id.data, parsed.data.title))
+      ? { ok: true }
+      : { ok: false, errorKey: "notFound" };
+  } catch (error) {
+    logFailure(RENAME_NODE_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+// Deletes the node with its whole subtree.
+export async function deleteNode(nodeId: unknown): Promise<DeleteNodeResult> {
+  const id = nodeIdSchema.safeParse(nodeId);
+  const user = await requireUser();
+  if (!id.success) return { ok: false, errorKey: "notFound" };
+
+  try {
+    if (!(await consumeWriteQuota(user.id, DELETE_NODE_QUOTA))) {
+      return { ok: false, errorKey: "rateLimited" };
+    }
+    if (!(await removeNode(user.id, id.data))) {
+      return { ok: false, errorKey: "notFound" };
+    }
+    logNodeDeleted(user.id, id.data);
+    return { ok: true };
+  } catch (error) {
+    logFailure(DELETE_NODE_QUOTA.action, error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
