@@ -112,6 +112,37 @@ describe("readingPace", () => {
     }
   });
 
+  it.each<[string, PaceNode[]]>([
+    [
+      // Two levels: the completed leaves are worth about 1e-8 of the book (security review).
+      "tiny shares down the tree",
+      [
+        part([done("2026-10-10", 1), done("2026-10-18", 1), todo(10_000)], 1),
+        part([todo()], 10_000),
+      ],
+    ],
+    [
+      "one level, a huge remainder",
+      [
+        done("2026-10-10", 1),
+        done("2026-10-18", 1),
+        ...Array.from({ length: 1998 }, () => todo(10_000)),
+      ],
+    ],
+  ])("gives no date past ten years: %s", (_name, roots) => {
+    expect(readingPace(roots, TODAY)).toEqual({
+      kind: "tooSlow",
+      completions: 2,
+      days: 12,
+    });
+  });
+
+  it("never counts days before the first completion up to today", () => {
+    expect(
+      readingPace([done("2026-10-25"), done("2026-10-30"), todo()], TODAY),
+    ).toEqual({ kind: "insufficient", completions: 0, days: 0 });
+  });
+
   it("ignores completions dated after today", () => {
     expect(
       readingPace([done("2026-10-10"), done("2026-10-30"), todo()], TODAY),

@@ -192,12 +192,18 @@ function PaceSummary({ pace }: Readonly<{ pace: Pace }>) {
                 style: "percent",
                 maximumFractionDigits: 1,
               }),
+              perWeek: format.number(pace.leavesPerWeek, {
+                maximumFractionDigits: 1,
+              }),
+              perWeekCount: pace.leavesPerWeek,
               count: pace.completions,
               days: pace.days,
             })}
           </p>
           <p className="text-muted-foreground text-xs">{t("rule")}</p>
         </>
+      ) : pace.kind === "tooSlow" ? (
+        <p>{t("tooSlow")}</p>
       ) : (
         <>
           <p>{t("insufficient")}</p>

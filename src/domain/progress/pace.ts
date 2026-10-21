@@ -13,6 +13,9 @@ export const PACE_WINDOW_DAYS = 28;
 // Below this, a number would mislead more than help (the story's own example).
 export const MIN_COMPLETIONS = 2;
 export const MIN_SPAN_DAYS = 7;
+// Past ten years a date says nothing useful, and far enough it would not even be a valid date (goals
+// multiply down the tree, so a share can be tiny): the pace is shown without a date instead.
+export const MAX_FORECAST_DAYS = 3650;
 
 export type PaceNode = {
   status: ReadingStatus;
@@ -31,6 +34,8 @@ export type Pace =
       completions: number;
       days: number;
     }
+  // A pace so slow that the finish is more than MAX_FORECAST_DAYS away.
+  | { kind: "tooSlow"; completions: number; days: number }
   | {
       kind: "forecast";
       // Share of the book completed per week (0 to 1) and leaves completed per week, over the window.
@@ -84,10 +89,15 @@ export function readingPace(roots: readonly PaceNode[], today: string): Pace {
     (leaf): leaf is Leaf & { completedAt: string } =>
       leaf.status === "completed" && leaf.completedAt !== null,
   );
-  const first = Math.min(...done.map((leaf) => dayNumber(leaf.completedAt)));
-  // Days from the first completion to today, both included, capped at the window.
+  // Days from the first completion to today, both included, capped at the window. A
+  // completion dated after today does not count.
+  const past = done
+    .map((leaf) => dayNumber(leaf.completedAt))
+    .filter((day) => day <= now);
   const days =
-    done.length === 0 ? 0 : Math.min(PACE_WINDOW_DAYS, now - first + 1);
+    past.length === 0
+      ? 0
+      : Math.min(PACE_WINDOW_DAYS, now - Math.min(...past) + 1);
   // Completed within the last PACE_WINDOW_DAYS days, today included; never after today.
   const windowStart = now - PACE_WINDOW_DAYS + 1;
   const recent = done.filter((leaf) =>
@@ -101,12 +111,16 @@ export function readingPace(roots: readonly PaceNode[], today: string): Pace {
   const remaining = all
     .filter((leaf) => leaf.status !== "completed")
     .reduce((total, leaf) => total + leaf.share, 0);
+  const daysLeft = Math.ceil(remaining / perDay);
+  if (!Number.isFinite(daysLeft) || daysLeft > MAX_FORECAST_DAYS) {
+    return { kind: "tooSlow", completions: recent.length, days };
+  }
   return {
     kind: "forecast",
     sharePerWeek: perDay * 7,
     leavesPerWeek: (recent.length / days) * 7,
     completions: recent.length,
     days,
-    finishOn: fromDayNumber(now + Math.ceil(remaining / perDay)),
+    finishOn: fromDayNumber(now + daysLeft),
   };
 }

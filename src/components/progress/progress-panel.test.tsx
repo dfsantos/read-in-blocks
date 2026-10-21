@@ -156,7 +156,7 @@ describe("ProgressPanel", () => {
         "Previsão de conclusão: 28 de outubro de 2026",
       );
       expect(pace()).toHaveTextContent(
-        "Ritmo: 50% do livro por semana (2 itens concluídos nos últimos 7 dias).",
+        "Ritmo: 50% do livro por semana, cerca de 2 itens concluídos por semana (2 itens nos últimos 7 dias).",
       );
     });
 
@@ -172,6 +172,25 @@ describe("ProgressPanel", () => {
       expect(pace()).toHaveTextContent(
         "Até agora: 1 conclusão nas últimas 4 semanas.",
       );
+      expect(pace()).not.toHaveTextContent("Previsão de conclusão");
+    });
+
+    it("gives no date when the finish is more than ten years away", () => {
+      renderPanel([
+        node("a", null, "chapter", "A", 0, {
+          ...doneOn("2026-10-10"),
+          goalPages: 1,
+        }),
+        node("b", null, "chapter", "B", 1, {
+          ...doneOn("2026-10-18"),
+          goalPages: 1,
+        }),
+        ...Array.from({ length: 1998 }, (_, i) =>
+          node(`x${i}`, null, "chapter", `X${i}`, i + 2, { goalPages: 10_000 }),
+        ),
+      ]);
+
+      expect(pace()).toHaveTextContent("a conclusão ficaria a mais de 10 anos");
       expect(pace()).not.toHaveTextContent("Previsão de conclusão");
     });
 
