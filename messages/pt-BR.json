@@ -338,6 +338,7 @@
       "blockquote": "Citação (Ctrl+Shift+B)",
       "code": "Código no texto (Ctrl+E)",
       "codeBlock": "Bloco de código (Ctrl+Alt+C)",
+      "diagram": "Diagrama",
       "link": "Link",
       "language": "Linguagem do bloco de código",
       "languages": {
@@ -362,7 +363,8 @@
         "swift": "Swift",
         "typescript": "TypeScript",
         "xml": "XML/HTML",
-        "yaml": "YAML"
+        "yaml": "YAML",
+        "mermaid": "Diagrama (Mermaid)"
       },
       "linkForm": {
         "label": "Endereço do link",
@@ -371,7 +373,8 @@
         "remove": "Remover link",
         "cancel": "Cancelar"
       },
-      "codeLabel": "Código em {language}"
+      "codeLabel": "Código em {language}",
+      "diagramTemplate": "flowchart LR\n  A[Ideia] --> B[Conceito]"
     },
     "types": {
       "key_concept": "Conceito-chave",
@@ -399,6 +402,13 @@
       "resolved": "Resolvida",
       "marked": "Anotação marcada como resolvida.",
       "reopened": "Anotação reaberta."
+    },
+    "diagram": {
+      "drawing": "Desenhando o diagrama…",
+      "alt": "Diagrama da anotação",
+      "invalid": "Não foi possível desenhar este diagrama: confira a sintaxe Mermaid.",
+      "unavailable": "Não foi possível carregar o diagrama agora. Atualize a página para tentar de novo.",
+      "source": "Ver o texto do diagrama"
     }
   },
   "blocks": {

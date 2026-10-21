@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +13,10 @@ import { parseNoteContent, textToDoc } from "@/domain/notes/rich-text";
 
 import messages from "../../../messages/pt-BR.json";
 import NoteEditor from "./note-editor";
+
+// Mermaid needs a real layout engine: the editor's preview is checked by the E2E test.
+const renderDiagram = vi.hoisted(() => vi.fn());
+vi.mock("./diagram-renderer", () => ({ renderDiagram }));
 
 // The real Tiptap editor in jsdom: the toolbar's buttons change the document and report it as
 // JSON the server accepts. (Pasted HTML: src/lib/note-extensions.test.ts.)
@@ -68,6 +78,7 @@ describe("NoteEditor", () => {
       "Citação (Ctrl+Shift+B)",
       "Código no texto (Ctrl+E)",
       "Bloco de código (Ctrl+Alt+C)",
+      "Diagrama",
       "Link",
     ]) {
       expect(toolbar.querySelector(`[aria-label="${name}"]`)).not.toBeNull();
@@ -119,6 +130,54 @@ describe("NoteEditor", () => {
         '"language":"python"',
       ),
     );
+  });
+
+  it("keeps the focus in the editor when a toolbar button is clicked", async () => {
+    renderEditor();
+    await screen.findByRole("toolbar", { name: "Formatação" });
+
+    // A prevented mousedown is what stops the button from taking the focus.
+    for (const name of ["Bloco de código (Ctrl+Alt+C)", "Diagrama"]) {
+      expect(fireEvent.mouseDown(screen.getByRole("button", { name }))).toBe(
+        false,
+      );
+    }
+  });
+
+  it("inserts a diagram with a starting text and previews it", async () => {
+    renderDiagram.mockResolvedValue({
+      ok: true,
+      image: { src: "data:image/svg+xml,x", width: 10, height: 5, title: null },
+    });
+    const { onUpdate, user } = renderEditor("");
+    await screen.findByRole("textbox", { name: "Texto da anotação" });
+
+    const button = screen.getByRole("button", { name: "Diagrama" });
+    await user.click(button);
+
+    await waitFor(() =>
+      expect(JSON.stringify(lastContent(onUpdate))).toContain(
+        '"language":"mermaid"',
+      ),
+    );
+    const content = parseNoteContent(lastContent(onUpdate));
+    expect(content.ok && content.text).toContain(
+      "flowchart LR\n  A[Ideia] --> B[Conceito]",
+    );
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Bloco de código (Ctrl+Alt+C)" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(
+      await screen.findByRole("img", { name: "Diagrama da anotação" }),
+    ).toHaveAttribute("src", "data:image/svg+xml,x");
+    expect(renderDiagram).toHaveBeenCalledWith(
+      "flowchart LR\n  A[Ideia] --> B[Conceito]",
+      expect.any(AbortSignal),
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Linguagem do bloco de código" }),
+    ).toHaveValue("mermaid");
   });
 
   it("links the selection to an http(s) address and refuses others", async () => {
