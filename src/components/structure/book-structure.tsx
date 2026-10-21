@@ -25,7 +25,11 @@ import type {
 
 import { AddNodesForm } from "./add-nodes-form";
 import { MoveNodeForm } from "./move-node-form";
-import { ReadingControls, type ReadingActions } from "./reading-controls";
+import {
+  DerivedReading,
+  ReadingControls,
+  type ReadingActions,
+} from "./reading-controls";
 import { DeleteNodeButton, EditNodeForm } from "./node-actions";
 
 // The Server Actions, injected so tests can replace them; add is already bound to the book.
@@ -67,7 +71,8 @@ type Props = Readonly<{ tree: TreeNode[]; actions: StructureActions }>;
 // The book's structure as a simple nested list (US-010); the interactive table of contents arrives
 // in US-015. Each node can be edited (title, summary and goal, US-011), reordered among its
 // siblings by dragging or with Subir/Descer, moved to another parent (US-012), marked as not
-// started, in progress or completed when it is a leaf (US-013), deleted with its subtree, and
+// started, in progress or completed when it is a leaf (US-013) or shown with the state derived
+// from its children, with "complete all" (US-014), deleted with its subtree, and
 // receive children of the kinds the hierarchy allows. Titles are the reader's content: rendered
 // as text, never as markup.
 export function BookStructure({ tree, actions }: Props) {
@@ -303,7 +308,13 @@ function NodeItem({
               actions={actions}
               announce={announce}
             />
-          ) : null}
+          ) : (
+            <DerivedReading
+              node={node}
+              completeAll={actions.completeAll}
+              announce={announce}
+            />
+          )}
         </div>
       )}
       {errorKey ? (

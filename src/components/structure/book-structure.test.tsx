@@ -67,6 +67,9 @@ function renderStructure(
     move: vi.fn().mockResolvedValue({ ok: true }),
     setStatus: vi.fn().mockResolvedValue({ ok: true }),
     setDates: vi.fn().mockResolvedValue({ ok: true }),
+    completeAll: vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: { completed: 2 } }),
     remove: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
   };
@@ -655,6 +658,110 @@ describe("BookStructure", () => {
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
       "Este item não existe mais. Recarregue a página.",
+    );
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("shows a parent's state derived from its children, with their dates (US-014)", () => {
+    renderStructure([
+      node("p1", null, "part", "Parte I", 0, {
+        // Stored on the part's row and ignored.
+        status: "completed",
+        startedAt: "2020-01-01",
+        completedAt: "2020-01-02",
+      }),
+      node("c1", "p1", "chapter", "Um", 0),
+      node("t1", "c1", "topic", "1.1", 0, {
+        status: "completed",
+        startedAt: "2026-10-01",
+        completedAt: "2026-10-03",
+      }),
+      node("t2", "c1", "topic", "1.2", 1, {
+        status: "completed",
+        startedAt: "2026-10-02",
+        completedAt: "2026-10-05",
+      }),
+      node("c2", "p1", "chapter", "Dois", 1),
+    ]);
+
+    const [part, chapter] = screen
+      .getAllByRole("listitem")
+      .filter((item) =>
+        /^(Parte|Capítulo)(Parte I|Um)/.test(item.textContent ?? ""),
+      )
+      .map((item) => item.firstElementChild?.textContent ?? "");
+    expect(chapter).toContain("Concluído");
+    expect(chapter).toContain("Início: 1 de out. de 2026");
+    expect(chapter).toContain("Conclusão: 5 de out. de 2026");
+    expect(part).toContain("Em andamento");
+    expect(part).toContain("Início: 1 de out. de 2026");
+    expect(part).not.toContain("2020");
+    expect(part).toContain("Calculado a partir dos subitens");
+    // No control on a parent, and nothing left to complete in "Um".
+    expect(
+      screen.queryByLabelText("Estado de Parte I"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Concluir tudo em Um" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Concluir tudo em Parte I" }),
+    ).toBeInTheDocument();
+  });
+
+  it("asks before completing everything under a parent and says how many items change", async () => {
+    const { actions, user } = renderStructure();
+
+    await user.click(
+      screen.getByRole("button", { name: "Concluir tudo em Parte I" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveAccessibleName("Concluir tudo em “Parte I”?");
+    expect(dialog).toHaveAccessibleDescription(
+      "Os 2 itens ainda não concluídos dentro dele serão marcados como concluídos hoje. Os que já estavam em andamento mantêm a data de início.",
+    );
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await vi.waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+    );
+    expect(actions.completeAll).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", { name: "Concluir tudo em Parte I" }),
+    );
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Concluir tudo",
+      }),
+    );
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+    expect(actions.completeAll).toHaveBeenCalledWith("p1");
+    expect(screen.getByText("“Parte I”: tudo concluído.")).toHaveClass(
+      "sr-only",
+    );
+  });
+
+  it('shows a refused "complete all" in its dialog', async () => {
+    const { user } = renderStructure(NODES, {
+      completeAll: vi
+        .fn()
+        .mockResolvedValue({ ok: false, errorKey: "notParent" }),
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Concluir tudo em Um" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveAccessibleDescription(
+      "Os 2 itens ainda não concluídos dentro dele serão marcados como concluídos hoje. Os que já estavam em andamento mantêm a data de início.",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Concluir tudo" }),
+    );
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Este item não tem subitens; marque o estado dele diretamente.",
     );
     expect(refresh).not.toHaveBeenCalled();
   });

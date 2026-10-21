@@ -39,6 +39,7 @@ vi.mock("@/server/actions/book-nodes", () => ({
   moveNode: vi.fn(),
   setReadingStatus: vi.fn(),
   setReadingDates: vi.fn(),
+  completeAll: vi.fn(),
   deleteNode: vi.fn(),
 }));
 
