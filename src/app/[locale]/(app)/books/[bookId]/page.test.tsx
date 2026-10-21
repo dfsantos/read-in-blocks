@@ -164,8 +164,12 @@ describe("BookPage", () => {
     expect(
       screen.getByRole("tree", { name: "Sumário do livro" }),
     ).toHaveTextContent("Part I");
-    // User content is text, never markup, in both.
-    expect(screen.getAllByText("<i>One</i>")).toHaveLength(2);
+    // And the progress panel (US-016), by part and chapter.
+    expect(
+      screen.getByRole("progressbar", { name: "Progresso do livro" }),
+    ).toHaveAttribute("aria-valuenow", "0");
+    // User content is text, never markup, in all three.
+    expect(screen.getAllByText("<i>One</i>")).toHaveLength(3);
   });
 
   it("says when the author is unknown", async () => {

@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { cache } from "react";
 
 import { DeleteBookButton } from "@/components/books/delete-book-button";
+import { ProgressPanel } from "@/components/progress/progress-panel";
 import { BookStructure } from "@/components/structure/book-structure";
 import { TableOfContents } from "@/components/toc/table-of-contents";
 import { buttonVariants } from "@/components/ui/button";
@@ -43,12 +44,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: t("metadataTitle", { title: book.title }) };
 }
 
-// The book page (US-007), with its edit and delete actions (US-009), its interactive table of
-// contents (US-015) and its structure of parts, chapters and topics (US-010).
+// The book page (US-007), with its edit and delete actions (US-009), its weighted progress
+// (US-016), its interactive table of contents (US-015) and its structure of parts, chapters and
+// topics (US-010).
 export default async function BookPage({ params }: Props) {
   const book = await loadBook((await params).bookId);
   const user = await requireUser();
   const nodes = await listNodes(user.id, book.id);
+  const tree = buildTree(nodes);
   const t = await getTranslations("books.detail");
 
   return (
@@ -82,6 +85,7 @@ export default async function BookPage({ params }: Props) {
           action={deleteBook.bind(null, book.id)}
         />
       </div>
+      <ProgressPanel tree={tree} />
       <TableOfContents
         bookId={book.id}
         nodes={nodes}
@@ -93,7 +97,7 @@ export default async function BookPage({ params }: Props) {
       />
       {/* The bound ids are still arguments the client sends: the actions parse them again. */}
       <BookStructure
-        tree={buildTree(nodes)}
+        tree={tree}
         actions={{
           add: addNodes.bind(null, book.id),
           update: updateNode,
