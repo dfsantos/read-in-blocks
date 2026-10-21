@@ -2,13 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useFormatter, useTranslations } from "next-intl";
-import {
-  useEffect,
-  useId,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 
 import {
   AlertDialog,
@@ -22,21 +16,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { FieldError } from "@/components/ui/field";
 import type { NoteDoc } from "@/domain/notes/rich-text";
 import { useRouter } from "@/i18n/navigation";
 import type {
+  CreateNoteResult,
   DeleteNoteResult,
-  NoteErrorKey,
   NoteResult,
 } from "@/server/actions/notes";
 
-import {
-  checkNote,
-  useAutosave,
-  useLeaveGuard,
-  type AutosaveStatus,
-} from "./use-autosave";
+import { useAutosave, type AutosaveStatus } from "./use-autosave";
 
 // The editor (Tiptap, ProseMirror and the highlighter) is downloaded only when the reader starts
 // writing or editing (US-019): reading a notebook never pays for it.
@@ -67,7 +55,7 @@ export type NotebookNote = Readonly<{
 export type NoteInputPayload = { content: unknown };
 
 export type NotebookActions = Readonly<{
-  create: (input: NoteInputPayload) => Promise<NoteResult>;
+  create: (input: NoteInputPayload) => Promise<CreateNoteResult>;
   update: (noteId: string, input: NoteInputPayload) => Promise<NoteResult>;
   remove: (noteId: string) => Promise<DeleteNoteResult>;
 }>;
@@ -85,28 +73,6 @@ function useStamp() {
   const format = useFormatter();
   return (value: Date) =>
     format.dateTime(value, { dateStyle: "medium", timeStyle: "short" });
-}
-
-// Asks before following a link inside the app while `active`: an unsaved new note would be lost
-// (beforeunload does not cover navigation without reloading).
-function useInAppLeaveGuard(active: boolean, message: string) {
-  useEffect(() => {
-    if (!active) return;
-    const guard = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0) return;
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-        return;
-      }
-      const link = (event.target as Element | null)?.closest?.("a[href]");
-      if (!link || link.getAttribute("target") === "_blank") return;
-      if (!window.confirm(message)) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    document.addEventListener("click", guard, true);
-    return () => document.removeEventListener("click", guard, true);
-  }, [active, message]);
 }
 
 // A node's notebook (US-018, RF-005): its notes in chronological order, each with when it was
@@ -148,56 +114,20 @@ export function Notebook({ title, notes, actions }: Props) {
           ))}
         </ol>
       )}
-      <AddNote create={actions.create} announce={setAnnouncement} />
+      <AddNote actions={actions} announce={setAnnouncement} />
     </section>
   );
 }
 
 function AddNote({
-  create,
+  actions,
   announce,
 }: Readonly<{
-  create: NotebookActions["create"];
+  actions: NotebookActions;
   announce: (message: string) => void;
 }>) {
   const t = useTranslations("notes");
-  const router = useRouter();
-  const id = useId();
   const [open, setOpen] = useState(false);
-  const [content, setContent] = useState<unknown>();
-  const [pending, setPending] = useState(false);
-  const [errorKey, setErrorKey] = useState<NoteErrorKey>();
-  const dirty = open && content !== undefined;
-
-  useLeaveGuard(dirty);
-  useInAppLeaveGuard(dirty, t("add.leaveConfirm"));
-
-  function reset() {
-    setOpen(false);
-    setContent(undefined);
-    setErrorKey(undefined);
-  }
-
-  async function submit(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
-    if (pending) return;
-    const invalid = checkNote(content);
-    if (invalid) {
-      setErrorKey(invalid);
-      return;
-    }
-    setPending(true);
-    setErrorKey(undefined);
-    const result = await create({ content });
-    setPending(false);
-    if (result.ok) {
-      reset();
-      announce(t("add.saved"));
-      router.refresh();
-      return;
-    }
-    setErrorKey(result.errorKey);
-  }
 
   if (!open) {
     return (
@@ -211,40 +141,87 @@ function AddNote({
       </Button>
     );
   }
+  return (
+    <NewNote
+      actions={actions}
+      announce={announce}
+      close={() => setOpen(false)}
+    />
+  );
+}
+
+// A new note saves itself like an edit (useAutosave): the first save creates it, the next ones
+// update it. "Save" sends what is left and shows it in the list; "Discard" only exists while
+// nothing was saved.
+function NewNote({
+  actions,
+  announce,
+  close,
+}: Readonly<{
+  actions: NotebookActions;
+  announce: (message: string) => void;
+  close: () => void;
+}>) {
+  const t = useTranslations("notes");
+  const router = useRouter();
+  const id = useId();
+  const createdId = useRef<string | undefined>(undefined);
+  const [created, setCreated] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const autosave = useAutosave(async (input) => {
+    if (createdId.current) return actions.update(createdId.current, input);
+    const result = await actions.create(input);
+    if (!result.ok) return result;
+    createdId.current = result.id;
+    setCreated(true);
+    return { ok: true };
+  });
+
+  async function save() {
+    setClosing(true);
+    const saved = await autosave.flush();
+    setClosing(false);
+    if (!saved) return;
+    if (createdId.current) {
+      announce(t("add.saved"));
+      router.refresh();
+    }
+    close();
+  }
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <span aria-hidden="true" className="text-sm font-medium">
         {t("add.label")}
       </span>
       <NoteEditor
         label={t("add.label")}
         autoFocus
-        invalid={errorKey !== undefined}
-        describedBy={errorKey ? `${id}-error` : undefined}
-        onUpdate={(next) => {
-          setContent(next);
-          setErrorKey(undefined);
-        }}
-        onSubmit={() => void submit()}
+        invalid={autosave.status.kind === "failed"}
+        describedBy={`${id}-status`}
+        onUpdate={autosave.schedule}
+        onSubmit={() => void save()}
       />
-      {errorKey ? (
-        <FieldError id={`${id}-error`}>{t(`errors.${errorKey}`)}</FieldError>
-      ) : null}
+      <AutosaveIndicator status={autosave.status} id={`${id}-status`} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? t("add.saving") : t("add.submit")}
+        <Button type="button" disabled={closing} onClick={() => void save()}>
+          {t("add.submit")}
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={pending}
-          onClick={reset}
-        >
-          {t("add.discard")}
-        </Button>
+        {created ? null : (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={closing || autosave.status.kind === "saving"}
+            onClick={() => {
+              autosave.discard();
+              close();
+            }}
+          >
+            {t("add.discard")}
+          </Button>
+        )}
       </div>
-    </form>
+    </div>
   );
 }
 

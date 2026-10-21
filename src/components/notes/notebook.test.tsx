@@ -69,7 +69,7 @@ function renderNotebook(
   notes: NotebookNote[] = NOTES,
 ) {
   const actions = {
-    create: vi.fn().mockResolvedValue({ ok: true }),
+    create: vi.fn().mockResolvedValue({ ok: true, id: "created" }),
     update: vi.fn().mockResolvedValue({ ok: true }),
     remove: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
@@ -158,14 +158,54 @@ describe("Notebook", () => {
     expect(screen.getByText("Anotação salva.")).toBeInTheDocument();
   });
 
-  it("refuses an empty note without calling the server", async () => {
+  it("saves a new note on its own, then keeps updating that same note", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { actions } = renderNotebook({
+      create: vi.fn().mockResolvedValue({ ok: true, id: "new-note" }),
+    });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    const field = await openComposer(user);
+    fireEvent.change(field, { target: { value: "Rascunho" } });
+    await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS));
+    expect(actions.create).toHaveBeenCalledWith({
+      content: textToDoc("Rascunho"),
+    });
+    expect(screen.getByText("Salvo")).toBeInTheDocument();
+    // Once saved, the draft can no longer be discarded (it is a note now).
+    expect(screen.queryByRole("button", { name: "Descartar" })).toBeNull();
+
+    fireEvent.change(field, { target: { value: "Rascunho final" } });
+    await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS));
+    expect(actions.create).toHaveBeenCalledTimes(1);
+    expect(actions.update).toHaveBeenCalledWith("new-note", {
+      content: textToDoc("Rascunho final"),
+    });
+  });
+
+  it("closes an untouched new note without saving", async () => {
     const { actions, user } = renderNotebook();
 
     await openComposer(user);
     await user.click(screen.getByRole("button", { name: "Salvar anotação" }));
 
     expect(actions.create).not.toHaveBeenCalled();
-    expect(screen.getByText("Escreva a anotação.")).toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Nova anotação")).toBeNull();
+  });
+
+  it("refuses an empty note without calling the server", async () => {
+    const { actions, user } = renderNotebook();
+
+    const field = await openComposer(user);
+    await user.type(field, "a");
+    await user.clear(field);
+    await user.click(screen.getByRole("button", { name: "Salvar anotação" }));
+
+    expect(actions.create).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Não salvo: Escreva a anotação."),
+    ).toBeInTheDocument();
   });
 
   it("shows the server's refusal", async () => {
@@ -179,7 +219,9 @@ describe("Notebook", () => {
     await user.click(screen.getByRole("button", { name: "Salvar anotação" }));
 
     expect(
-      screen.getByText("Este caderno chegou ao limite de 500 anotações."),
+      screen.getByText(
+        "Não salvo: Este caderno chegou ao limite de 500 anotações.",
+      ),
     ).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -198,30 +240,7 @@ describe("Notebook", () => {
     expect(leaving.defaultPrevented).toBe(true);
   });
 
-  it("asks before following a link inside the app with an unsaved new note", async () => {
-    const { user } = renderNotebook();
-    const link = document.body.appendChild(document.createElement("a"));
-    link.href = "/books";
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    try {
-      await user.type(await openComposer(user), "Rascunho");
-      const click = new MouseEvent("click", {
-        bubbles: true,
-        cancelable: true,
-      });
-      link.dispatchEvent(click);
-
-      expect(confirm).toHaveBeenCalledWith(
-        "A nova anotação ainda não foi salva. Sair e perdê-la?",
-      );
-      expect(click.defaultPrevented).toBe(true);
-    } finally {
-      link.remove();
-      confirm.mockRestore();
-    }
-  });
-
-  it("discards a new note", async () => {
+  it("discards a new note that was not saved yet", async () => {
     const { actions, user } = renderNotebook();
 
     await user.type(await openComposer(user), "Rascunho");

@@ -284,10 +284,8 @@
       "open": "Escrever anotação",
       "label": "Nova anotação",
       "submit": "Salvar anotação",
-      "saving": "Salvando…",
       "saved": "Anotação salva.",
-      "discard": "Descartar",
-      "leaveConfirm": "A nova anotação ainda não foi salva. Sair e perdê-la?"
+      "discard": "Descartar"
     },
     "edit": {
       "open": "Editar",

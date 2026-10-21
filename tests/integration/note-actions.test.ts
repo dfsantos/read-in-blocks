@@ -109,9 +109,8 @@ describe("notebook Server Actions", () => {
     const { nodeId, noteId } = await chapterWithNote(owner.id);
     signIn(owner);
 
-    expect(await createNote(nodeId, typed("Segunda\nlinha"))).toEqual({
-      ok: true,
-    });
+    const created = await createNote(nodeId, typed("Segunda\nlinha"));
+    expect(created).toEqual({ ok: true, id: expect.any(String) });
     expect(await updateNote(noteId, typed("Primeira, revista"))).toEqual({
       ok: true,
     });

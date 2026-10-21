@@ -30,8 +30,13 @@ import {
 export type NoteErrorKey =
   NoteInputError | "tooManyNotes" | "notFound" | "rateLimited" | "failed";
 
-export type NoteResult =
-  { ok: true } | { ok: false; errorKey: NoteErrorKey; field?: "body" };
+export type NoteFailure = { ok: false; errorKey: NoteErrorKey; field?: "body" };
+
+export type NoteResult = { ok: true } | NoteFailure;
+
+// A new note answers with its id, so the editor keeps saving into it (US-019).
+export type CreateNoteResult =
+  { ok: true; id: string } | Extract<NoteResult, { ok: false }>;
 
 export type DeleteNoteResult =
   { ok: true } | { ok: false; errorKey: "notFound" | "rateLimited" | "failed" };
@@ -74,7 +79,7 @@ function logNoteEvent(entry: NoteEvent) {
 
 // Any other issue (the input is not an object at all) gets the "required" key: the message of a
 // Zod issue is only an i18n key when the schema set it.
-function inputError(issues: readonly { message: string }[]): NoteResult {
+function inputError(issues: readonly { message: string }[]): NoteFailure {
   const message = issues[0].message;
   return {
     ok: false,
@@ -95,7 +100,7 @@ function parseNote(input: unknown) {
         ok: false,
         errorKey: noteInputErrors.invalidContent,
         field: "body",
-      } satisfies NoteResult,
+      } satisfies NoteFailure,
     };
   }
   return { note: parsed.data };
@@ -105,7 +110,7 @@ function parseNote(input: unknown) {
 export async function createNote(
   nodeId: unknown,
   input: unknown,
-): Promise<NoteResult> {
+): Promise<CreateNoteResult> {
   const id = nodeIdSchema.safeParse(nodeId);
   const parsed = parseNote(input);
   if (parsed.error) return parsed.error;
@@ -118,7 +123,9 @@ export async function createNote(
       return { ok: false, errorKey: "rateLimited" };
     }
     const created = await insertNote(user.id, id.data, parsed.note);
-    return created.ok ? { ok: true } : { ok: false, errorKey: created.reason };
+    return created.ok
+      ? { ok: true, id: created.id }
+      : { ok: false, errorKey: created.reason };
   } catch (error) {
     logFailure(CREATE_NOTE_QUOTA.action, error);
     return { ok: false, errorKey: "failed" };

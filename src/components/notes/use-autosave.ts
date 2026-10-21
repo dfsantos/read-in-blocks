@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { noteInputSchema } from "@/domain/notes/note-input";
 import type { NoteErrorKey, NoteResult } from "@/server/actions/notes";
 
-// Saves a note being edited on its own (US-019, ADR-0007): a while after the reader stops typing,
-// when the editor loses focus and when it closes. One save at a time, always with the latest
+// Saves a note being written or edited on its own (US-019, ADR-0007): a while after the reader
+// stops typing, when the reader finishes and when the editor closes (navigating inside the app). One save at a time, always with the latest
 // content. While something is unsaved the browser asks before leaving the page (beforeunload).
 
 export type AutosaveStatus =
@@ -115,5 +115,12 @@ export function useAutosave(
       status.kind === "failed",
   );
 
-  return { status, schedule, flush };
+  // Drops what was not saved yet (a new note the reader gives up on).
+  const discard = useCallback(() => {
+    clearTimeout(timer.current);
+    pending.current = undefined;
+    setStatus({ kind: "idle" });
+  }, []);
+
+  return { status, schedule, flush, discard };
 }
