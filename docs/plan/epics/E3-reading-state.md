@@ -29,3 +29,5 @@ Cobre RF-003. Persona: **Leitor**.
 - [ ] Ação “concluir tudo” em um nó pai marca todos os descendentes como concluídos, com confirmação. Marcar um pai como concluído conclui todos os descendentes (D-07).
 - [ ] Datas do pai derivadas: início = menor `started_at` dos filhos; conclusão = maior `completed_at`, quando concluído.
 - [ ] Testes unitários em tabela cobrindo árvores de 1, 2 e 3 níveis e casos de borda (pai sem filhos vira folha).
+
+**Notas técnicas (revisões da US-013):** a linha de um nó guarda `status`, `started_at` e `completed_at` mesmo depois que ele ganha filhos (por adição ou movimento), e esses valores reaparecem se ele voltar a ser folha. O estado e as datas de um nó com filhos vêm sempre da derivação: a leitura ignora o que está guardado nele. Decidir também se, ao voltar a ser folha, o estado guardado é mantido ou zerado.
