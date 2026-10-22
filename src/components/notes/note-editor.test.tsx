@@ -132,6 +132,34 @@ describe("NoteEditor", () => {
     );
   });
 
+  it("takes the focus when it arrives, unless the reader already moved it", async () => {
+    const editor = (
+      <NoteEditor label="Nova anotação" autoFocus onUpdate={vi.fn()} />
+    );
+    const { unmount } = render(
+      <NextIntlClientProvider locale="pt-BR" messages={messages}>
+        {editor}
+      </NextIntlClientProvider>,
+    );
+    const area = await screen.findByRole("textbox", { name: "Nova anotação" });
+    await waitFor(() => expect(area).toHaveFocus());
+    unmount();
+
+    // The reader is already typing the page of a quote when the editor loads.
+    const reference = document.createElement("input");
+    document.body.append(reference);
+    reference.focus();
+    render(
+      <NextIntlClientProvider locale="pt-BR" messages={messages}>
+        {editor}
+      </NextIntlClientProvider>,
+    );
+    await screen.findByRole("textbox", { name: "Nova anotação" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(reference).toHaveFocus();
+    reference.remove();
+  });
+
   it("keeps the focus in the editor when a toolbar button is clicked", async () => {
     renderEditor();
     await screen.findByRole("toolbar", { name: "Formatação" });
