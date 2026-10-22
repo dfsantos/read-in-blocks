@@ -215,7 +215,7 @@
       "tooManyTitles": "Envie no máximo 100 títulos por vez.",
       "invalidPlacement": "Esse tipo de item não pode ficar aqui.",
       "tooManyNodes": "Um livro pode ter no máximo 2.000 itens na estrutura.",
-      "notFound": "Este item não existe mais. Recarregue a página.",
+      "notFound": "Este item não existe mais. Atualize a página.",
       "rateLimited": "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
       "failed": "Não foi possível salvar. Tente de novo em instantes.",
       "summaryTooLong": "O resumo pode ter no máximo 1.000 caracteres.",
@@ -298,7 +298,7 @@
       "open": "Excluir",
       "openFor": "Excluir a anotação de {date}",
       "title": "Excluir esta anotação?",
-      "description": "A anotação será apagada e não poderá ser recuperada.",
+      "description": "A anotação será apagada para sempre. Não é possível desfazer.",
       "cancel": "Cancelar",
       "confirm": "Excluir anotação",
       "deleting": "Excluindo…",
@@ -306,18 +306,18 @@
     },
     "errors": {
       "bodyRequired": "Escreva a anotação.",
-      "bodyTooLong": "A anotação pode ter até 10.000 caracteres.",
+      "bodyTooLong": "A anotação pode ter no máximo 10.000 caracteres.",
       "invalidCharacters": "A anotação tem caracteres não permitidos.",
       "tooManyNotes": "Este caderno chegou ao limite de 500 anotações.",
-      "notFound": "Não encontramos este item. Atualize a página.",
+      "notFound": "Este item não existe mais. Atualize a página.",
       "rateLimited": "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
-      "failed": "Não foi possível salvar agora. Tente de novo.",
+      "failed": "Não foi possível salvar. Tente de novo em instantes.",
       "invalidContent": "A anotação tem uma formatação não permitida.",
       "invalidLink": "Use um link completo que comece com http://, https:// ou mailto:.",
       "contentTooLarge": "A anotação ficou grande demais. Divida-a em mais de uma.",
       "invalidType": "Escolha o tipo da anotação.",
       "referenceRequired": "Informe a página ou a posição da citação.",
-      "referenceTooLong": "A referência pode ter até 50 caracteres.",
+      "referenceTooLong": "A referência pode ter no máximo 50 caracteres.",
       "referenceInvalid": "A referência tem caracteres não permitidos."
     },
     "autosave": {
@@ -373,7 +373,6 @@
         "remove": "Remover link",
         "cancel": "Cancelar"
       },
-      "codeLabel": "Código em {language}",
       "diagramTemplate": "flowchart LR\n  A[Ideia] --> B[Conceito]"
     },
     "types": {
@@ -437,6 +436,20 @@
       "empty": "Nenhuma anotação ainda. Os capítulos em que você mais anotar aparecem aqui.",
       "listLabel": "Capítulos com mais anotações, do mais anotado ao menos",
       "rule": "Cada capítulo conta as anotações dele e as dos seus tópicos."
+    }
+  },
+  "states": {
+    "notFound": {
+      "metadataTitle": "Página não encontrada — Read in Blocks",
+      "title": "Página não encontrada",
+      "description": "O endereço não existe ou não está disponível para você.",
+      "back": "Voltar para a biblioteca"
+    },
+    "error": {
+      "title": "Algo deu errado",
+      "description": "Não foi possível carregar esta página. Tente de novo em instantes.",
+      "retry": "Tentar de novo",
+      "back": "Voltar para a biblioteca"
     }
   }
 }

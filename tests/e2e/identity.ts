@@ -15,6 +15,7 @@ export const E2E_ACCOUNTS = {
   resume: "e2e-resume@example.test",
   blocks: "e2e-blocks@example.test",
   diagrams: "e2e-diagrams@example.test",
+  accessibility: "e2e-accessibility@example.test",
 } as const;
 
 export const E2E_ALLOWLIST = Object.values(E2E_ACCOUNTS).join(",");

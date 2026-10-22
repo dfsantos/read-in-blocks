@@ -7,6 +7,7 @@ import {
   type Editor,
   type JSONContent,
 } from "@tiptap/react";
+import { Selection } from "@tiptap/pm/state";
 import {
   BoldIcon,
   CodeIcon,
@@ -108,7 +109,19 @@ export default function NoteEditor({
     immediatelyRender: false,
     // The page's CSP only allows styles with its nonce: the base styles live in globals.css.
     injectCSS: false,
-    autofocus: autoFocus ? "end" : false,
+    // The editor arrives a moment after the form (next/dynamic): it only takes the focus if the
+    // reader has not moved it meanwhile (to the kind or the page of a quote, for instance).
+    autofocus: false,
+    // Checked and done at once: Tiptap's focus command waits a frame, long enough to lose a key.
+    onCreate: ({ editor: created }) => {
+      const active = document.activeElement;
+      if (!autoFocus || (active !== null && active !== document.body)) return;
+      const { view } = created;
+      view.dispatch(
+        view.state.tr.setSelection(Selection.atEnd(view.state.doc)),
+      );
+      view.focus();
+    },
     editorProps: {
       attributes: attributes(),
       handleKeyDown: (_view, event) => {

@@ -176,7 +176,7 @@ describe("BookStructure", () => {
       "rateLimited",
       "Muitas alterações em pouco tempo. Aguarde um minuto e tente de novo.",
     ],
-    ["notFound", "Este item não existe mais. Recarregue a página."],
+    ["notFound", "Este item não existe mais. Atualize a página."],
   ] as const)("shows the server's %s answer", async (errorKey, text) => {
     const { user } = renderStructure([], {
       add: vi.fn().mockResolvedValue({ ok: false, errorKey }),
@@ -372,6 +372,52 @@ describe("BookStructure", () => {
       parentId: "c1",
       index: 1,
     });
+  });
+
+  it("keeps the focus on a moved item when it reaches the end of the list", async () => {
+    const move = vi.fn().mockResolvedValue({ ok: true });
+    const actions = {
+      add: vi.fn(),
+      update: vi.fn(),
+      move,
+      setStatus: vi.fn(),
+      setDates: vi.fn(),
+      completeAll: vi.fn(),
+      remove: vi.fn(),
+    } as unknown as StructureActions;
+    const view = (nodes: FlatNode[]) => (
+      <NextIntlClientProvider
+        locale="pt-BR"
+        messages={messages}
+        timeZone="America/Sao_Paulo"
+      >
+        <BookStructure tree={buildTree(nodes)} actions={actions} />
+      </NextIntlClientProvider>
+    );
+    const { rerender } = render(view(NODES));
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Subir Parte I" }));
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+    // The refreshed page brings Parte I to the top, where Subir is disabled.
+    rerender(
+      view(
+        NODES.map((item) =>
+          item.id === "p1"
+            ? { ...item, position: 0 }
+            : item.id === "pre"
+              ? { ...item, position: 1 }
+              : item,
+        ),
+      ),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Subir Parte I" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Descer Parte I" }),
+    ).toHaveFocus();
   });
 
   it("reorders by dragging a node onto a sibling, and only onto a sibling", async () => {
@@ -657,7 +703,7 @@ describe("BookStructure", () => {
     await user.click(within(dialog).getByRole("button", { name: "Excluir" }));
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-      "Este item não existe mais. Recarregue a página.",
+      "Este item não existe mais. Atualize a página.",
     );
     expect(refresh).not.toHaveBeenCalled();
   });

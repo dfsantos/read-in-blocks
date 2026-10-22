@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { createContext, use, useState } from "react";
+import { createContext, use, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { effectiveWeights } from "@/domain/progress/weight";
@@ -165,6 +165,20 @@ function NodeItem({
   const [moving, setMoving] = useState(false);
   const [dropTarget, setDropTarget] = useState(false);
   const [errorKey, setErrorKey] = useState<StructureErrorKey>();
+  const up = useRef<HTMLButtonElement>(null);
+  const down = useRef<HTMLButtonElement>(null);
+  // After Subir/Descer the focus stays on the moved item: on the same button, or on the other one
+  // when this one is disabled at the end of the list (a disabled button drops the focus).
+  const refocus = useRef<"up" | "down" | null>(null);
+  useEffect(() => {
+    const wanted = refocus.current;
+    if (!wanted) return;
+    refocus.current = null;
+    const atTop = index === 0;
+    const atBottom = index === siblings - 1;
+    const target = wanted === "up" ? (atTop ? down : up) : atBottom ? up : down;
+    target.current?.focus();
+  }, [index, siblings]);
   const childKinds = allowedChildKinds(node.kind);
   const targets = moveTargets(roots, node);
   // Only among siblings: moving elsewhere goes through "Mover" (US-012).
@@ -182,6 +196,7 @@ function NodeItem({
       router.refresh();
       return;
     }
+    refocus.current = null;
     setErrorKey(result.errorKey);
   }
 
@@ -231,27 +246,37 @@ function NodeItem({
             <span className="text-muted-foreground text-xs uppercase">
               {t(`kinds.${node.kind}`)}
             </span>
-            <span className="min-w-0 flex-1 break-words">{node.title}</span>
+            <span className="min-w-0 grow basis-40 break-words">
+              {node.title}
+            </span>
             <span className="text-muted-foreground text-xs">
               {defaultWeight
                 ? t("details.defaultWeight")
                 : t("details.goal", { count: node.goalPages ?? 0 })}
             </span>
             <Button
+              ref={up}
               size="sm"
               variant="ghost"
               disabled={index === 0}
               aria-label={t("move.upFor", { title: node.title })}
-              onClick={() => reorder(index - 1)}
+              onClick={() => {
+                refocus.current = "up";
+                void reorder(index - 1);
+              }}
             >
               {t("move.up")}
             </Button>
             <Button
+              ref={down}
               size="sm"
               variant="ghost"
               disabled={index === siblings - 1}
               aria-label={t("move.downFor", { title: node.title })}
-              onClick={() => reorder(index + 1)}
+              onClick={() => {
+                refocus.current = "down";
+                void reorder(index + 1);
+              }}
             >
               {t("move.down")}
             </Button>

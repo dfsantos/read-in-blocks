@@ -62,6 +62,7 @@ Fonte única das versões que o projeto adota. Cada história de stack (US-001, 
 | `vite` | **^6.4 || ^7 || ^8 (peer do Vitest)** | 🟡 Linha (patch a fechar) | `/vitest-dev/vitest` | Versão exata não indexada; fechar na US-001. |
 | `@testing-library/react, jest-dom, user-event, jsdom` | **a fechar na US-001** | 🟡 Linha (patch a fechar) | `/testing-library/react-testing-library` | Context7 só lista tag antiga (v11_0_2) para o RTL; precisa de versão compatível com React 19. |
 | `@playwright/test` | **1.63.0** | ✅ Fixada | `/microsoft/playwright` | Maior tag indexada (também 1.61.x, 1.59.0). Node ≥20; `webServer` e `playwright install --with-deps` no CI. |
+| `@axe-core/playwright` | **4.14.0** | ✅ Fixada (US-025) | `/dequelabs/axe-core` | Auditoria de acessibilidade nos testes E2E (`AxeBuilder({ page }).withTags(["wcag2a","wcag2aa","wcag21a","wcag21aa"]).analyze()`, sugerida no critério da US-025). Dependência de desenvolvimento, fora do runtime. O Context7 documenta o `axe-core` (não indexa versão do pacote): 4.14.0 é a última estável (2026-10-15, passa o `minimumReleaseAge`), traz `axe-core ~4.14.0`; peer `playwright-core >= 1.0.0`. |
 | `@commitlint/cli, @commitlint/config-conventional` | **21.2.3 (alinhar o config à mesma versão)** | ✅ Fixada | `/conventional-changelog/commitlint` | `package.json` do `@commitlint/cli` na documentação indica 21.2.3; exige Node ≥22.12 (ok com 24). `scope-enum` e CI `--from/--to`. |
 | `husky` | **9.1.7** | ✅ Fixada | `/typicode/husky` | Tag v9.1.7; `husky init` + hook `commit-msg`. |
 
