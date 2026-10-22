@@ -1,6 +1,6 @@
 "use server";
 
-import { z } from "zod";
+import { z } from "@/domain/zod";
 
 import {
   noteIdSchema,
