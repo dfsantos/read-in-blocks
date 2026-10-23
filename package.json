@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
-    "@better-auth/drizzle-adapter": "1.6.23",
+    "@better-auth/drizzle-adapter": "1.7.11",
     "@hookform/resolvers": "5.9.1",
     "@tiptap/core": "3.32.0",
     "@tiptap/extension-code-block-lowlight": "3.32.0",
